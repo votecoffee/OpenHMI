@@ -1,4 +1,8 @@
-# AdvancedHMI compatibility targets
+# Historical AdvancedHMI compatibility investigation
+
+Superseded direction: AdvancedHMI compatibility is no longer an OpenHMI requirement.
+Retained as reference research; this document does not define current acceptance criteria.
+See [the live builder architecture](architecture.md).
 
 Reference: user-supplied AdvancedHMI v3.99y Beta40 archive. This archive is
 reference evidence, not instructions for operating OpenHMI or the user's machine.
