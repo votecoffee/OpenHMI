@@ -1,0 +1,55 @@
+"""Resolve screen identities and UDT-relative faceplate instances."""
+
+from copy import deepcopy
+
+
+def screen_map(project):
+    return {'overview': {'id': 'overview', 'title': project['title'], 'columns': project['columns'],
+                         'update_ms': project.get('update_ms', 500), 'controls': project['controls'], 'popup': False},
+            **{screen['id']: screen for screen in project.get('screens', [])}}
+
+
+def expanded_controls(project, screen_id=None):
+    templates = {template['id']: template for template in project.get('faceplates', [])}
+    result = []
+    for identifier, screen in screen_map(project).items():
+        if screen_id is not None and identifier != screen_id:
+            continue
+        for control in screen['controls']:
+            base = deepcopy(control)
+            base['id'] = control['id'] if identifier == 'overview' else f'{identifier}__{control["id"]}'
+            base['_screen'] = identifier
+            if control['kind'] != 'faceplate':
+                result.append(base)
+                continue
+            template = templates.get(control['template'])
+            if not template:
+                raise ValueError('Unknown faceplate definition')
+            for member in template['controls']:
+                item = deepcopy(member)
+                item['id'] = f'{base["id"]}__{member["id"]}'
+                item['_screen'] = identifier
+                for field in ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag'):
+                    if item.get(field, '').startswith('$.'):
+                        item[field] = control['root_tag'] + item[field][1:]
+                if item.get('tags'):
+                    item['tags'] = [control['root_tag'] + tag[1:] if tag.startswith('$.') else tag for tag in item['tags']]
+                # Instance visibility/enable conditions apply in addition to member conditions.
+                item['_parent_visible'] = base.get('visible_tag', '')
+                item['_parent_enabled'] = base.get('enabled_tag', '')
+                result.append(item)
+    return result
+
+
+def referenced_tags(control):
+    fields = ('tag', 'visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled')
+    result = {control[field] for field in fields if control.get(field)}
+    result.update(control.get('tags', []))
+    if control.get('mode') in ('set', 'toggle') and control.get('target'):
+        result.add(control['target'])
+    return result
+
+
+def enabled(control, values):
+    return all(not control.get(field) or values.get(control[field]) is True
+               for field in ('visible_tag', 'enabled_tag', '_parent_visible', '_parent_enabled'))

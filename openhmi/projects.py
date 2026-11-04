@@ -9,6 +9,7 @@ from threading import RLock
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from .runtime_models import Connection, TagDefinition, HistorianSettings
 
 
 class StrictModel(BaseModel):
@@ -18,6 +19,10 @@ class StrictModel(BaseModel):
 class ControlBase(StrictModel):
     id: str = Field(min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
     label: str = Field(min_length=1, max_length=100)
+    visible_tag: str = Field(default='', max_length=200)
+    enabled_tag: str = Field(default='', max_length=200)
+    color_tag: str = Field(default='', max_length=200)
+    active_color: str = Field(default='#002878', pattern=r'^#[a-fA-F0-9]{6}$')
 
 
 class NumericControl(ControlBase):
@@ -56,7 +61,11 @@ class AlarmControl(ControlBase):
 
 class ButtonControl(ControlBase):
     kind: Literal["button"]
-    action: str = Field(min_length=1, max_length=100)
+    action: str = Field(default='', max_length=100)
+    mode: Literal['python', 'set', 'toggle', 'navigate', 'popup', 'close_popup'] = 'python'
+    target: str = Field(default='', max_length=200)
+    value: float | int | bool | str = False
+    screen: str = Field(default='overview', max_length=60)
     security_groups: list[str] = Field(default_factory=list, max_length=100)
 
 
@@ -75,6 +84,18 @@ class NumericInputControl(NumericControl):
 
 class RecipeSelectionControl(ControlBase):
     kind: Literal['recipe']
+
+
+class FaceplateControl(ControlBase):
+    kind: Literal['faceplate']
+    template: str = Field(min_length=1, max_length=60)
+    root_tag: str = Field(min_length=1, max_length=200)
+
+
+class TrendControl(ControlBase):
+    kind: Literal['trend']
+    tags: list[str] = Field(min_length=1, max_length=12)
+    seconds: int = Field(default=300, ge=10, le=604800)
 
 
 class Language(StrictModel):
@@ -108,7 +129,30 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
+
+
+class Screen(StrictModel):
+    id: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_-]{0,59}$')
+    title: str = Field(min_length=1, max_length=120)
+    columns: Literal[1, 2, 3] = 2
+    update_ms: int = Field(default=500, ge=100, le=60000)
+    popup: bool = False
+    controls: list[Control] = Field(default_factory=list, max_length=100)
+
+
+class FaceplateDefinition(StrictModel):
+    id: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_-]{0,59}$')
+    name: str = Field(min_length=1, max_length=100)
+    udt_type: str = Field(default='', max_length=100)
+    members: dict[str, Literal['boolean', 'number', 'integer', 'string']] = Field(default_factory=dict, max_length=100)
+    controls: list[Control] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode='after')
+    def nonrecursive(self):
+        if any(control.kind == 'faceplate' for control in self.controls):
+            raise ValueError('Nested faceplates are not supported')
+        return self
 
 
 class Project(StrictModel):
@@ -116,6 +160,12 @@ class Project(StrictModel):
     title: str = Field(min_length=1, max_length=120)
     columns: Literal[1, 2, 3] = 2
     controls: list[Control] = Field(max_length=100)
+    update_ms: int = Field(default=500, ge=100, le=60000)
+    screens: list[Screen] = Field(default_factory=list, max_length=100)
+    faceplates: list[FaceplateDefinition] = Field(default_factory=list, max_length=100)
+    connections: list[Connection] = Field(default_factory=list, max_length=20)
+    tags: list[TagDefinition] = Field(default_factory=list, max_length=5000)
+    historian: HistorianSettings = Field(default_factory=HistorianSettings)
     languages: list[Language] = Field(default_factory=lambda: [Language(code="en", name="English", flag="us")], min_length=1, max_length=30)
     default_language: str = "en"
     alarms: list[AlarmDefinition] = Field(default_factory=list, max_length=1000)
@@ -131,6 +181,19 @@ class Project(StrictModel):
             raise ValueError("Language codes must be unique and the default must be configured")
         if len({alarm.id for alarm in self.alarms}) != len(self.alarms):
             raise ValueError("Alarm IDs must be unique")
+        for name, items in [('screen', self.screens), ('faceplate', self.faceplates), ('connection', self.connections)]:
+            if len({item.id for item in items}) != len(items):
+                raise ValueError(f'{name} IDs must be unique')
+        if any(screen.id == 'overview' for screen in self.screens):
+            raise ValueError('overview is the reserved main screen ID')
+        if len({tag.name for tag in self.tags}) != len(self.tags):
+            raise ValueError('Tag names must be unique')
+        connections = {connection.id for connection in self.connections}
+        if any(tag.connection and tag.connection not in connections for tag in self.tags):
+            raise ValueError('Tag references an unknown connection')
+        for screen in self.screens:
+            if len({control.id for control in screen.controls}) != len(screen.controls):
+                raise ValueError('Control IDs must be unique within a screen')
         return self
 
 

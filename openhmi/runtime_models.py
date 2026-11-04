@@ -1,0 +1,65 @@
+"""Connections, logical tags and history configuration, independent of the editor."""
+
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class Model(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+
+
+class Connection(Model):
+    id: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_-]{0,59}$')
+    name: str = Field(min_length=1, max_length=100)
+    kind: Literal['logix'] = 'logix'
+    path: str = Field(min_length=1, max_length=200)
+    enabled: bool = False
+    timeout_seconds: float = Field(default=2.0, ge=0.2, le=10)
+    program_tags: bool = True
+
+
+class TagDefinition(Model):
+    name: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_.\[\]:-]{0,199}$')
+    connection: str = ''
+    address: str = Field(default='', max_length=200)
+    type: Literal['boolean', 'number', 'integer', 'string', 'struct'] = 'number'
+    initial: float | int | bool | str | dict = 0.0
+    writable: bool = False
+    scale: float = Field(default=1.0, allow_inf_nan=False)
+    offset: float = Field(default=0.0, allow_inf_nan=False)
+    members: dict[str, Literal['boolean', 'number', 'integer', 'string']] = Field(default_factory=dict, max_length=500)
+    udt_type: str = Field(default='', max_length=100)
+
+    @model_validator(mode='after')
+    def valid_tag(self):
+        if self.connection and not self.address:
+            raise ValueError('PLC tags require an address')
+        if self.scale == 0 or (self.type not in ('number', 'integer') and (self.scale != 1 or self.offset != 0)):
+            raise ValueError('Scaling requires a numeric tag and nonzero scale')
+        if self.type != 'struct' and self.members:
+            raise ValueError('Only structure tags define members')
+        if any(not key or len(key) > 160 or not all(part.isidentifier() or part.isdigit() for part in key.replace('[', '.').replace(']', '').split('.')) for key in self.members):
+            raise ValueError('Invalid UDT member path')
+        if not self.connection:
+            types = {'boolean': (bool,), 'number': (int, float), 'integer': (int,), 'string': (str,), 'struct': (dict,)}
+            if type(self.initial) not in types[self.type]:
+                raise ValueError('Initial value must match the local tag type')
+        return self
+
+
+class HistoryTag(Model):
+    tag: str = Field(min_length=1, max_length=200)
+    sample_ms: int = Field(default=1000, ge=100, le=3600000)
+    deadband: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+
+
+class HistorianSettings(Model):
+    tags: list[HistoryTag] = Field(default_factory=list, max_length=1000)
+    retention_days: int = Field(default=30, ge=1, le=3650)
+    max_rows: int = Field(default=1000000, ge=1000, le=10000000)
+
+    @model_validator(mode='after')
+    def distinct_tags(self):
+        if len({tag.tag for tag in self.tags}) != len(self.tags):
+            raise ValueError('History tags must be unique')
+        return self

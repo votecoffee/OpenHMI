@@ -34,6 +34,9 @@ SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.
 HMI security supports local accounts and Windows user/group assignments to local
 application groups, with protected buttons and numeric value inputs.
+The runtime now includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
+UDT faceplate contracts and SQL tag history. The designer workflows for these
+features are being added; see [runtime semantics](docs/runtime-and-projects.md).
 
 Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
 the supplied high-performance HMI references and FactoryTalk View ME templates.
