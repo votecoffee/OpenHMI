@@ -18,11 +18,11 @@ from .recipe_auth import hash_password, verify_password
 from .windows_identity import WindowsIdentity
 
 COOKIE = 'openhmi_session'
-PERMISSIONS = {'project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'security.manage',
+PERMISSIONS = {'project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'security.manage', 'activity.view', 'diagnostics.view',
                'recipes.engineer', 'recipes.approver', 'recipes.operator', 'recipes.administrator'}
 DEFAULT_GROUPS = {
     'Administrators': sorted(PERMISSIONS),
-    'Engineers': ['project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'recipes.engineer'],
+    'Engineers': ['project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'recipes.engineer', 'activity.view', 'diagnostics.view'],
     'Operators': ['runtime.operate', 'alarms.acknowledge', 'recipes.operator'],
     'Approvers': ['recipes.approver'],
 }

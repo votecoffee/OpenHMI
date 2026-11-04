@@ -116,7 +116,7 @@ function ActionButton({ id, label, action, security_groups = [], puck, enabled_t
     try {
       const result = await api(`/api/controls/${encodeURIComponent(id)}/activate`, json('POST', {}));
       if (result.mode) window.dispatchEvent(new CustomEvent('openhmi-navigate', { detail: result }));
-      setFeedback(ui('completed'));
+      setFeedback(result.audit_status === 'pending' ? `Completed; activity finalization pending. Operation ${result.operation_id}` : ui('completed'));
     } catch (error) { setFeedback(error.message); setFailed(true); }
     finally { setBusy(false); }
   }
@@ -140,7 +140,7 @@ function NumericInput({ id, label, tag, unit, decimals, minimum, maximum, securi
   const permitted = allowed(session, 'runtime.write', security_groups) && (!enabled_tag || live.values[enabled_tag] === true);
   async function write(event) {
     event.preventDefault(); setBusy(true);
-    try { if (!entry.trim()) throw new Error('Enter a value'); await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value: Number(entry) })); setEntry(''); setMessage('Value written'); }
+    try { if (!entry.trim()) throw new Error('Enter a value'); const result = await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value: Number(entry) })); setEntry(''); setMessage(result.audit_status === 'pending' ? `Value written; activity finalization pending. Operation ${result.operation_id}` : 'Value written'); }
     catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   }

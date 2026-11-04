@@ -55,6 +55,8 @@ editable defaults, not fixed Windows roles. Supported permissions:
 | `runtime.write` | Write a value through an active numeric input |
 | `alarms.acknowledge` | Acknowledge individual/all monitored alarms |
 | `security.manage` | Manage security; override control-specific group membership |
+| `activity.view` | Inspect/export the runtime operator activity journal |
+| `diagnostics.view` | Inspect/export cached runtime connection and tag diagnostics |
 | `recipes.engineer` | Create/edit/submit/load recipes |
 | `recipes.approver` | Approve/reject/withdraw recipes, including one's own changes |
 | `recipes.operator` | Load/clear recipe copies |
@@ -65,6 +67,10 @@ Administrators initially receive all permissions. Engineers initially receive
 project editing, runtime operation/writing, alarm acknowledgement and recipe
 engineering. Operators receive runtime operation, alarm acknowledgement and recipe
 loading. Approvers receive recipe review. Add the groups needed for a user's job.
+
+New Engineers groups also receive activity/diagnostics viewing. Existing group
+definitions are preserved; grant new permissions through Security as needed.
+Security administrators can inspect both views without changing older groups.
 
 ## Protect buttons and values
 

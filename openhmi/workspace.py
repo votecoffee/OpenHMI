@@ -18,7 +18,7 @@ from .projects import Project, ProjectStore
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
           'security_settings', 'security_group', 'security_user', 'security_windows', 'security_audit', 'tag_history',
-          'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'sqlite_sequence'}
+          'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'operator_activity', 'sqlite_sequence'}
 
 
 class ProjectWorkspace:

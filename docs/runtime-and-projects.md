@@ -103,7 +103,8 @@ Export uses SQLite's online backup API to create a consistent database snapshot.
 The ZIP contains a versioned manifest and SHA-256 checksums, the database and,
 when configured, the startup Python entry file and legacy recipe account file.
 SQL includes screens, UDT definitions, connections/tags, recipes/images/reviews,
-selected recipe copy, HMI security/password hashes, alarms and tag history.
+selected recipe copy, HMI security/password hashes, alarms, tag history and
+the runtime operator activity journal.
 It does not capture a controller's running memory, external Python modules,
 environment dependencies or the OpenHMI installation. Backups contain private
 account/project data; checksums detect corruption, not publisher authenticity.
@@ -123,3 +124,8 @@ faceplate/no-code actions. Browser checks cover tag browsing with a fake PLC,
 scaling, faceplate design/instantiation, screen rates, popups/trends, retained
 operator input, and project backup/open/import. Hardware timing, controller writes and commissioning
 remain unvalidated against a real controller.
+
+M1 [activity and diagnostic workflows](activity-and-diagnostics.md) add durable
+operator attempts/outcomes, interruption/uncertainty handling and protected
+connection/tag-quality inspection. These views read cached runtime data without
+adding screen scan demand. The journal is included in project backup/restore.

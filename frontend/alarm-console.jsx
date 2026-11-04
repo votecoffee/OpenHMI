@@ -15,8 +15,8 @@ export function AlarmConsole() {
   async function acknowledge(identifier) {
     setBusy(true);
     try {
-      await api(identifier == null ? '/api/alarms/acknowledge-all' : `/api/alarms/${identifier}/acknowledge`, json('POST', {}));
-      setFeedback(ui('acknowledged'));
+      const result = await api(identifier == null ? '/api/alarms/acknowledge-all' : `/api/alarms/${identifier}/acknowledge`, json('POST', {}));
+      setFeedback(result.audit_status === 'pending' ? `Acknowledged; activity finalization pending. Operation ${result.operation_id}` : ui('acknowledged'));
     } catch (error) { setFeedback(error.message); }
     finally { setBusy(false); }
   }

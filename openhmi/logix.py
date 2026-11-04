@@ -322,8 +322,10 @@ class RuntimeDriver(SimulatorDriver):
                 if sample.get('quality') == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
                     sample.update(quality='stale', error='PLC sample is stale')
                 if tag['connection'] not in self.connections:
-                    sample.update(quality='bad', error='Connection is disabled')
+                    sample.update(quality='bad', error='PLC acquisition is held' if self.plc_hold else 'Connection is disabled')
                 sample.pop('monotonic', None)
+                if alias in self.samples:
+                    sample['age_seconds'] = max(0, now - self.samples[alias]['monotonic'])
                 result[alias] = sample
             return result
 

@@ -1,0 +1,11 @@
+.operations { overflow-x: auto; }
+.operations-filters, .operations-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 12px 0; }
+.operations-filters label { flex-direction: column; align-items: start; }
+.operations-actions a { color: #002878; padding: 8px; }
+.operations :is(td,th) { vertical-align: top; }
+.operations small { font-size: 10px; overflow-wrap: anywhere; }
+.activity-table td:first-child { min-width: 160px; }
+.activity-table td:last-child { min-width: 220px; }
+.activity-table [data-outcome="uncertain"] strong, .activity-table [data-outcome="pending"] strong { border: 1px solid #666; padding: 2px 5px; }
+.activity-error { max-width: 450px; overflow-wrap: anywhere; }
+.operations details p { margin: 5px 0; }

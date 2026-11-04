@@ -1,0 +1,55 @@
+import { test, expect } from '@playwright/test';
+
+test.use({ baseURL: 'http://127.0.0.1:8766' });
+test('protected operator journal, denial attribution, filters, export and diagnostics', async ({ page }) => {
+  test.setTimeout(120000);
+  const errors = [];
+  const originalMotor = (await (await page.request.get('/api/tags')).json()).values.MotorRunning;
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/activity');
+  await expect(page.getByText('Sign in with activity viewing permission to inspect the operator journal.')).toBeVisible();
+  await page.getByLabel('HMI user', { exact: true }).fill('admin');
+  await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
+  await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Operator activity', exact: true })).toBeVisible();
+  await page.goto('/runtime');
+  await page.getByRole('button', { name: 'Toggle simulated motor', exact: true }).click();
+  await page.getByRole('link', { name: 'Activity', exact: true }).click();
+  const successful = page.locator('.activity-table tbody tr').filter({ hasText: 'toggle' }).first();
+  await expect(successful).toContainText('admin');
+  await expect(successful).toContainText('succeeded');
+  await successful.getByText('Operation details', { exact: true }).click();
+  await expect(successful).toContainText('callback_returned');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Export activity CSV', exact: true }).click();
+  expect((await downloadPromise).suggestedFilename()).toBe('operator-activity.csv');
+  await page.getByRole('button', { name: 'Sign out of HMI', exact: true }).click();
+  const denied = await page.request.post('/api/controls/toggle/activate', { data: {} });
+  expect(denied.status()).toBe(401);
+  expect(denied.headers()['x-openhmi-audit-status']).toBe('denied');
+  await page.getByLabel('HMI user', { exact: true }).fill('admin');
+  await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
+  await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Outcome', exact: true }).selectOption('denied');
+  await page.getByRole('button', { name: 'Apply activity filters', exact: true }).click();
+  await expect(page.locator('.activity-table tbody tr').first()).toContainText('anonymous');
+  await expect(page.locator('.activity-table tbody tr').first()).toContainText('denied');
+  if (process.env.OPENHMI_ACTIVITY_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_ACTIVITY_SCREENSHOT, fullPage: true });
+  const noScan = page.waitForRequest(request => request.url().endsWith('/api/subscriptions') && request.method() === 'POST' && request.postDataJSON().screens.length === 0);
+  await page.getByRole('link', { name: 'Diagnostics', exact: true }).click();
+  await noScan;
+  await expect(page.getByRole('region', { name: 'Runtime diagnostics', exact: true })).toBeVisible();
+  await page.getByLabel('Tag filter', { exact: true }).fill('TankLevel');
+  await page.getByRole('button', { name: 'Filter diagnostic tags', exact: true }).click();
+  await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(1);
+  await expect(page.locator('.diagnostics-tags tbody tr')).toContainText('good');
+  await expect(page.getByText('No PLC connections are configured.')).toBeVisible();
+  const jsonDownload = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Export diagnostics JSON', exact: true }).click();
+  expect((await jsonDownload).suggestedFilename()).toBe('runtime-diagnostics.json');
+  if (process.env.OPENHMI_DIAGNOSTICS_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_DIAGNOSTICS_SCREENSHOT, fullPage: true });
+  expect(errors).toEqual([]);
+  if ((await (await page.request.get('/api/tags')).json()).values.MotorRunning !== originalMotor) {
+    expect((await page.request.post('/api/controls/toggle/activate', { data: {} })).ok()).toBe(true);
+  }
+});

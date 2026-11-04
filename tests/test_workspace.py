@@ -18,6 +18,9 @@ class WorkspaceTests(unittest.TestCase):
             workspace = ProjectWorkspace(path, handler)
             with TestClient(workspace) as client:
                 app = workspace.current
+                operation = client.post('/api/controls/toggle/activate', json={})
+                self.assertEqual(operation.status_code, 200, operation.text)
+                operation_id = operation.headers['X-OpenHMI-Operation-ID']
                 with app.state.store.transaction() as db:
                     db.execute("INSERT INTO recipe_image VALUES('fixture',?,1,1)", (b'synthetic-image',))
                     db.execute("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES('TankLevel',?,'42','good')", (time.time(),))
@@ -35,6 +38,7 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertTrue(client.get('/api/tags').json()['plc_hold'])
                 self.assertNotIn('test', [action['name'] for action in client.get('/api/catalog').json()['actions']])
                 self.assertEqual(workspace.current.state.recipes.image('fixture'), b'synthetic-image')
+                self.assertEqual(workspace.current.state.activity.query(search=operation_id)['items'][0]['status'], 'succeeded')
                 self.assertEqual(len(workspace.current.state.historian.query(['TankLevel'], time.time() - 60, time.time() + 60)['samples']), 1)
                 state = client.get('/api/project').json()
                 self.assertEqual(client.post('/api/project/apply', json={'expected_revision': state['draft_revision']}).status_code, 200)

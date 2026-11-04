@@ -14,6 +14,8 @@ from pydantic import BaseModel, ConfigDict
 
 from .drivers import SimulatorDriver
 from .application import Application
+from .activity import ActivityJournal
+from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .historian import Historian
 from .screens import expanded_controls, screen_map, enabled
@@ -78,6 +80,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             try:
                 await asyncio.to_thread(application.driver.poll)
                 await asyncio.to_thread(historian.sample)
+                await asyncio.to_thread(activity.maintenance)
             except Exception:
                 logging.exception('Driver/history cycle failed')
             await asyncio.sleep(0.05)
@@ -113,6 +116,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             return JSONResponse({'detail': 'A different project was opened. Reload before making changes.'}, status_code=409)
         response = await call_next(request)
         response.headers['X-OpenHMI-Project'] = instance
+        if hasattr(request.state, 'activity_operation'):
+            response.headers['X-OpenHMI-Operation-ID'] = request.state.activity_operation
+            response.headers['X-OpenHMI-Audit-Status'] = getattr(request.state, 'activity_status', 'pending')
         return response
     app.state.driver = application.driver
     app.state.application = application
@@ -120,6 +126,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.alarms = monitor
     app.state.historian = historian
     security = app.state.security = Security(store)
+    activity = app.state.activity = ActivityJournal(store, security)
+    add_operations_routes(app, activity, security, application.driver)
     add_security_routes(app, security)
     add_recipe_routes(app, store, application, recipe_users, security)
     web = Path(__file__).parent / "web"
@@ -255,42 +263,59 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     @app.post("/api/alarms/acknowledge-all")
     def acknowledge_all(request: ActionRequest, http: Request) -> dict:
-        security.require(http, 'alarms.acknowledge')
-        return monitor.acknowledge()
+        return acknowledge_runtime(None, http)
 
     @app.post("/api/alarms/{occurrence_id}/acknowledge")
     def acknowledge(occurrence_id: int, request: ActionRequest, http: Request) -> dict:
-        security.require(http, 'alarms.acknowledge')
-        try:
-            return monitor.acknowledge(occurrence_id)
-        except KeyError as error:
-            raise HTTPException(404, "Alarm occurrence not found") from error
+        return acknowledge_runtime(occurrence_id, http)
+
+    def acknowledge_runtime(identifier, http):
+        def execute(ticket):
+            security.require(http, 'alarms.acknowledge')
+            with monitor.lock:
+                with store._lock:
+                    if identifier is not None and not store._db.execute('SELECT 1 FROM alarm_occurrence WHERE id=?', (identifier,)).fetchone():
+                        raise HTTPException(404, 'Alarm occurrence not found')
+                ticket.dispatch()
+                result = monitor.acknowledge(identifier)
+                ticket.confirm(verification='alarm_acknowledged', occurrences=result['acknowledged'], count=len(result['acknowledged']))
+                return result
+        return activity.run(http, 'alarm_acknowledge', str(identifier) if identifier is not None else 'all', {'occurrence_id': identifier}, execute)
 
     @app.post("/api/actions/{name}")
     def action(name: str, request: ActionRequest, http: Request) -> dict:
         active_controls = expanded_controls(store.snapshot()['active'])
-        if not any(control.get("action") == name for control in active_controls):
-            raise HTTPException(404, "Action is not bound to an active control")
-        matches = [control for control in active_controls if control.get('action') == name and (request.control_id is None or control['id'] == request.control_id)]
-        if not matches:
-            raise HTTPException(404, 'Action is not bound to this active control')
-        # Old clients without a control ID must satisfy every binding of this action.
-        for control in matches:
-            security.require(http, 'runtime.operate', control.get('security_groups', []))
-            if not enabled(control, application.driver.snapshot()):
-                raise HTTPException(423, 'Control is disabled by its tag bindings')
-        if name not in {item["name"] for item in application.actions()}:
-            raise HTTPException(404, "Action is unavailable; check startup handler configuration")
-        try:
-            application.invoke(name)
-        except Exception as error:
-            logging.exception("Application action %s failed", name)
-            raise HTTPException(500, "Python action failed; see server log") from error
-        sample_alarms()
-        return {"ok": True}
+        matches = [control for control in active_controls if control.get('action') == name and control.get('mode', 'python') == 'python' and (request.control_id is None or control['id'] == request.control_id)]
+        def execute(ticket):
+            if not matches:
+                raise HTTPException(404, 'Action is not bound to this active control')
+            # Old clients without a control ID must satisfy every Python-action binding.
+            for control in matches:
+                security.require(http, 'runtime.operate', control.get('security_groups', []))
+                if not enabled(control, application.driver.snapshot()):
+                    raise HTTPException(423, 'Control is disabled by its tag bindings')
+            if name not in {item['name'] for item in application.actions()}:
+                raise HTTPException(404, 'Action is unavailable; check startup handler configuration')
+            ticket.dispatch()
+            try:
+                application.invoke(name)
+            except Exception as error:
+                logging.exception('Application action %s failed', name)
+                raise HTTPException(500, 'Python action failed; see server log') from error
+            ticket.confirm(verification='callback_returned')
+            sample_alarms()
+            return {'ok': True}
+        return activity.run(http, 'python_action', request.control_id or name, {'action': name, 'control_ids': [control['id'] for control in matches], 'binding_count': len(matches)}, execute)
 
     @app.put('/api/controls/{control_id}/value')
     def write_value(control_id: str, body: ValueRequest, http: Request):
+        control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] == 'input'), {})
+        context = {'requested_value': body.value, 'control_id': control_id, 'tag': control.get('tag'), 'screen': control.get('_screen')}
+        if control.get('tag'):
+            context['before'] = application.driver.sample_snapshot().get(control['tag'])
+        return activity.run(http, 'value_write', control_id, context, lambda ticket: write_runtime(control_id, body, http, ticket))
+
+    def write_runtime(control_id, body, http, ticket):
         with application.lock:
             control = next((control for control in expanded_controls(store.snapshot()['active']) if control['id'] == control_id and control['kind'] == 'input'), None)
             if not control:
@@ -304,15 +329,30 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if not math.isfinite(body.value) or not control['minimum'] <= body.value <= control['maximum']:
                 raise HTTPException(422, 'Value is outside the configured input limits')
             value = application.driver.coerce_number(control['tag'], body.value)
+            ticket.dispatch(tag=control['tag'], screen=control['_screen'], before=application.driver.sample_snapshot().get(control['tag']), requested_value=value)
             try:
                 application.driver.write(control['tag'], [value])
             except (ValueError, ConnectionError, KeyError) as error:
                 raise HTTPException(409, str(error)) from error
+            ticket.confirm(verification=write_verification(control['tag']), requested_value=value)
             return {'ok': True, 'value': value}
 
     @app.post('/api/controls/{control_id}/activate')
     def activate(control_id: str, request: ActionRequest, http: Request):
         control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] == 'button'), None)
+        if control and control.get('mode', 'python') == 'python':
+            return action(control['action'], ActionRequest(control_id=control_id), http)
+        context = {field: control.get(field) for field in ('mode', 'target', 'value', 'screen', '_screen')} if control else {}
+        if control and control.get('target'):
+            context['before'] = application.driver.sample_snapshot().get(control['target'])
+        return activity.run(http, 'button_action', control_id, context, lambda ticket: activate_runtime(control, http, ticket))
+
+    def write_verification(tag):
+        root, _ = application.driver.sources.get(tag, (None, ''))
+        definition = application.driver.definitions.get(root)
+        return 'tag_readback' if definition and definition['connection'] else 'local_write'
+
+    def activate_runtime(control, http, ticket):
         if not control:
             raise HTTPException(404, 'Active button not found')
         security.require(http, 'runtime.operate', control.get('security_groups', []))
@@ -320,18 +360,20 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         if not enabled(control, values):
             raise HTTPException(423, 'Control is disabled by its tag bindings')
         mode = control.get('mode', 'python')
-        if mode == 'python':
-            return action(control['action'], ActionRequest(control_id=control_id), http)
         if mode in ('navigate', 'popup', 'close_popup'):
+            ticket.dispatch()
+            ticket.confirm(verification='navigation_response')
             return {'ok': True, 'mode': mode, 'screen': control.get('screen')}
         try:
             if control['target'] not in values:
                 raise ValueError('Target has no good-quality value')
             value = not values[control['target']] if mode == 'toggle' else control['value']
             value = application.driver.coerce_number(control['target'], value)
+            ticket.dispatch(tag=control['target'], before=application.driver.sample_snapshot().get(control['target']), requested_value=value)
             application.driver.write(control['target'], [value])
         except (ValueError, ConnectionError, KeyError) as error:
             raise HTTPException(409, str(error)) from error
+        ticket.confirm(verification=write_verification(control['target']), requested_value=value)
         return {'ok': True}
 
     @app.post('/api/subscriptions')
@@ -391,6 +433,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get("/recipe-editor", include_in_schema=False)
     @app.get('/security', include_in_schema=False)
     @app.get('/projects', include_in_schema=False)
+    @app.get('/activity', include_in_schema=False)
+    @app.get('/diagnostics', include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 

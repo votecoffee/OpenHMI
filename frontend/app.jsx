@@ -8,6 +8,8 @@ import './project-tools.css';
 import './recipes.css';
 import './security.css';
 import './engineering.css';
+import './operations.css';
+import { ActivityConsole, DiagnosticsConsole } from './operations.jsx';
 import { Live, ScreenControls, createConfig } from './controls.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
@@ -180,10 +182,10 @@ function App({ initial, catalog }) {
     window.addEventListener('openhmi-editor-scope', editor);
     return () => { window.removeEventListener('openhmi-navigate', navigate); window.removeEventListener('openhmi-editor-scope', editor); };
   }, []);
-  const leasedScreens = runtime && location.pathname === '/runtime' ? [currentScreen.id, ...popups].join(',') : editorSubscription.screen;
+  const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...popups].join(',') : '' : editorSubscription.screen;
   useEffect(() => {
     let stopped = false, timer;
-    async function heartbeat() { try { await api('/api/subscriptions', json('POST', { client: clientId.current, screens: leasedScreens.split(','), preview_root: runtime ? '' : editorSubscription.root })); } catch {} if (!stopped) timer = setTimeout(heartbeat, 5000); }
+    async function heartbeat() { try { await api('/api/subscriptions', json('POST', { client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [], preview_root: runtime ? '' : editorSubscription.root })); } catch {} if (!stopped) timer = setTimeout(heartbeat, 5000); }
     heartbeat(); return () => { stopped = true; clearTimeout(timer); };
   }, [leasedScreens, editorSubscription.root]);
   useEffect(() => {
@@ -219,8 +221,8 @@ function App({ initial, catalog }) {
     {projectChanged && <p role="alert" className="save-status">A different project was opened. Saves from this editor are blocked; copy any unsaved work before reloading. <button onClick={() => location.reload()}>Reload opened project</button></p>}
     {live.plcHold && <p role="status" className="save-status">Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.</p>}
     {runtime ? <main className="runtime"><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
-      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
-      <Localization project={active.project}>{location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
+      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
+      <Localization project={active.project}>{location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
         <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
         <ScreenControls.Provider value={currentScreen.controls}><Render config={config} data={toEditor(currentScreen)} /></ScreenControls.Provider>
         {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenControls.Provider value={screen.controls}><Render config={config} data={toEditor(screen)} /></ScreenControls.Provider></section></div>; })}

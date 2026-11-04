@@ -22,7 +22,7 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | Milestone | Status | Outcome / exit gate | Tracking |
 | --- | --- | --- | --- |
 | M0 — Verified software baseline | Complete software checkpoint | Existing visual/runtime/project foundations verified at `8a2deb5`: 34 Python tests, 9 browser tests and package checks. No hardware/domain acceptance implied. | [M0](https://github.com/votecoffee/OpenHMI/milestone/1) |
-| M1 — Operational traceability and diagnostics | In progress | Durable operator activity journal and readable runtime diagnostics, including denial, failure and uncertainty. | [M1](https://github.com/votecoffee/OpenHMI/milestone/2), [#5](https://github.com/votecoffee/OpenHMI/issues/5), [#6](https://github.com/votecoffee/OpenHMI/issues/6) |
+| M1 — Operational traceability and diagnostics | Complete software checkpoint | Durable journal and readable diagnostics delivered; 44 Python tests and 10 browser tests passed. Hardware/domain acceptance remains separate. | [M1](https://github.com/votecoffee/OpenHMI/milestone/2), [#5](https://github.com/votecoffee/OpenHMI/issues/5), [#6](https://github.com/votecoffee/OpenHMI/issues/6) |
 | M2 — ControlLogix bench acceptance | Awaiting identified bench inputs | Measured reads, data types, scan/load and reconnect behavior; subsequently controlled write acceptance with evidence. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
 | M3 — PLC transactions and recipe deployment | Planned; offline work can follow M1 | Explicit request/acknowledgement contracts and a verified, version-associated recipe transfer into a PLC-owned copy. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Planned; parallel software track | Persisted project revision history, useful diff/rollback, conflict recovery and migration/restore checks. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
@@ -116,9 +116,10 @@ close a bench, domain or pilot acceptance gate.
 
 ## Execution order and inputs
 
-Continue M1 now: operator journal first, then runtime diagnostics. M2 read-only
-bench preparation can proceed in parallel when hardware details are supplied.
-Next develop M3 offline contracts and M4 recovery features; hardware-dependent
+M1's operator journal and runtime diagnostics are delivered; see
+[behavior and validation](activity-and-diagnostics.md). M2 read-only bench
+preparation can proceed when hardware details are supplied. Next develop M3
+offline contracts and M4 recovery features; hardware-dependent
 parts of M3 wait for M2. M5 choices/review can proceed alongside those tracks.
 M6 closes only after the relevant preceding acceptance gates. M7 stays deferred
 and is not a dependency of the no-code/runtime milestones.

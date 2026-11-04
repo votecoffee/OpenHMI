@@ -8,7 +8,13 @@ export async function api(path, options = {}) {
       ? data.detail.map(item => `${item.loc.join('.')}: ${item.msg}`).join('; ') : data.detail;
     const error = new Error(detail || `HTTP ${response.status}`);
     error.conflict = response.status === 409;
+    error.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
+    error.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
     throw error;
+  }
+  if (response.headers.has('X-OpenHMI-Operation-ID')) {
+    data.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
+    data.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
   }
   if (!projectInstance && path === '/api/project') projectInstance = data.project_instance || response.headers.get('X-OpenHMI-Project');
   return data;

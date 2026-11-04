@@ -35,6 +35,8 @@ SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.
 HMI security supports local accounts and Windows user/group assignments to local
 application groups, with protected buttons and numeric value inputs.
+An operator journal records command/write/acknowledgement attempts and outcomes;
+protected Activity and Diagnostics pages expose traceability and cached runtime state.
 The runtime includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
 multiple screens/popups, UDT-bound faceplate definitions, conditional bindings,
 no-code tag/navigation actions and SQL history/trends. A project library supports
@@ -141,6 +143,16 @@ preserve existing projects. PLC connections remain held until explicit **Apply l
 imported Python is saved for review and never executed automatically.
 The browser backup/import limit is 256 MiB; external Python dependencies and the
 OpenHMI installation are separate. See [backup details](docs/runtime-and-projects.md).
+
+### Activity and diagnostics
+
+Use **Activity** to inspect operator identity, control/tag context, requested
+values and confirmed/denied/uncertain outcomes. Filter and export the journal;
+its operation IDs also appear in API response headers. **Diagnostics** shows
+connection/scan counters, tag quality/age and errors without requesting new scan
+tags or writing equipment. Grant `activity.view` / `diagnostics.view` through HMI
+groups; security administrators can inspect both. See
+[journal behavior, recovery and retention](docs/activity-and-diagnostics.md).
 
 ### Languages
 
@@ -281,8 +293,8 @@ and [equipment controls/operator validation](https://github.com/votecoffee/OpenH
 
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
-The verified software baseline is complete. Current work adds operator activity
-traceability and runtime diagnostics; bench commissioning, PLC transactions/recipe
+The verified software baseline and M1 operator activity/diagnostic workflows are
+complete as software checkpoints. Bench commissioning, PLC transactions/recipe
 transfer, project recovery, operator review and packaged pilot acceptance follow.
 The integrated Python IDE remains deferred.
 
