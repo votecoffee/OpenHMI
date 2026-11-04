@@ -6,6 +6,7 @@ import '../openhmi/web/style.css';
 import './hmi.css';
 import './project-tools.css';
 import './recipes.css';
+import './security.css';
 import { Live, ScreenControls, createConfig } from './controls.jsx';
 import { toEditor, toProject } from './model.mjs';
 import { api, json } from './api.mjs';
@@ -13,6 +14,7 @@ import { Localization } from './localization.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
 import { AlarmConsole } from './alarm-console.jsx';
 import { RecipeWorkspace } from './recipes.jsx';
+import { SecurityContext, SecurityBar, SecurityAdmin, allowed } from './security.jsx';
 
 const editorOverrides = { headerActions: () => null };
 
@@ -109,11 +111,14 @@ function App({ initial, catalog }) {
   const [live, setLive] = useState({ values: {}, connected: false, alarms: null, alarmConnected: false });
   const [active, setActive] = useState({ revision: initial.active_revision, project: initial.active });
   const [screenConnected, setScreenConnected] = useState(true);
+  const [session, setSession] = useState(null);
+  async function refreshSession() { try { setSession(await api('/api/security/session')); } catch { setSession(null); } }
   useEffect(() => {
     let stopped = false;
     let timer;
     async function tick() {
-      const [tags, alarms, recipe] = await Promise.allSettled([api('/api/tags'), api('/api/alarms'), api('/api/recipes/selected')]);
+      const [tags, alarms, recipe, identity] = await Promise.allSettled([api('/api/tags'), api('/api/alarms'), api('/api/recipes/selected'), api('/api/security/session')]);
+      if (!stopped) setSession(identity.status === 'fulfilled' ? identity.value : null);
       if (!stopped) setLive({ values: tags.status === 'fulfilled' ? tags.value.values : {}, connected: tags.status === 'fulfilled',
         alarms: alarms.status === 'fulfilled' ? alarms.value : null, alarmConnected: alarms.status === 'fulfilled',
         recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' });
@@ -128,13 +133,14 @@ function App({ initial, catalog }) {
     tick();
     return () => { stopped = true; clearTimeout(timer); };
   }, [runtime]);
-  return <Live.Provider value={live}>
+  return <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={live}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
       <span className={`connection ${live.connected ? 'connected' : ''}`}>{live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
+    <SecurityBar session={session} refresh={refreshSession} />
     {runtime ? <main className="runtime"><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
       <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
-      <Localization project={active.project}>{['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={catalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <ScreenControls.Provider value={active.project.controls}><Render config={config} data={toEditor(active.project)} /></ScreenControls.Provider>}</Localization></main> : <MemoBuilder initial={initial} config={config} catalog={catalog} />}
-  </Live.Provider>;
+      <Localization project={active.project}>{location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={catalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <ScreenControls.Provider value={active.project.controls}><Render config={config} data={toEditor(active.project)} /></ScreenControls.Provider>}</Localization></main> : allowed(session, 'project.edit') ? <MemoBuilder initial={initial} config={config} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
+  </Live.Provider></SecurityContext.Provider>;
 }
 
 try {

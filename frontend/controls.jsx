@@ -3,6 +3,7 @@ import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { LoadedRecipe } from './recipes.jsx';
+import { SecurityContext, allowed } from './security.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -101,8 +102,10 @@ function AlarmIndicator({ id, label, tag, priority, puck }) {
   </article>;
 }
 
-function ActionButton({ id, label, action, puck }) {
+function ActionButton({ id, label, action, security_groups = [], puck }) {
   const live = useContext(Live);
+  const { session } = useContext(SecurityContext) || {};
+  const permitted = allowed(session, 'runtime.operate', security_groups);
   const { text, ui } = useLocalization();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -111,17 +114,40 @@ function ActionButton({ id, label, action, puck }) {
     setBusy(true);
     setFailed(false);
     try {
-      await api(`/api/actions/${encodeURIComponent(action)}`, json('POST', {}));
+      await api(`/api/actions/${encodeURIComponent(action)}`, json('POST', { control_id: id }));
       setFeedback(ui('completed'));
     } catch (error) { setFeedback(error.message); setFailed(true); }
     finally { setBusy(false); }
   }
   return <article className="hmi-control hmi-command" data-control="button">
-    <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy} onClick={invoke}>
+    <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy || !permitted} onClick={invoke}>
       {busy ? ui('working') : text(`control.${id}.label`, label)}
     </button><span className={failed ? 'hmi-quality' : 'command-feedback'}>
-      {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : '')}
+      {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : !permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
+  </article>;
+}
+
+function NumericInput({ id, label, tag, unit, decimals, minimum, maximum, security_groups = [], puck }) {
+  const live = useContext(Live);
+  const { session } = useContext(SecurityContext) || {};
+  const { text } = useLocalization();
+  const { value, valid, problem } = useValue(tag, 'number');
+  const [entry, setEntry] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const permitted = allowed(session, 'runtime.write', security_groups);
+  async function write(event) {
+    event.preventDefault(); setBusy(true);
+    try { if (!entry.trim()) throw new Error('Enter a value'); await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value: Number(entry) })); setEntry(''); setMessage('Value written'); }
+    catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  }
+  return <article className="hmi-control hmi-input" data-control="input"><span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {valid ? <strong className="hmi-value">{value.toFixed(decimals)} {unit}</strong> : <Quality text={problem} />}
+    <form onSubmit={write}><input aria-label={`${label} new value`} type="number" min={minimum} max={maximum} step="any" value={entry} onChange={event => setEntry(event.target.value)} disabled={puck?.isEditing || !live.connected || !permitted || busy} />
+      <button disabled={puck?.isEditing || !live.connected || !permitted || busy}>Write value</button></form>
+    <span className="command-feedback">{!permitted ? 'Read only — authorized HMI group required' : message}</span><TagReference tag={tag} puck={puck} />
   </article>;
 }
 
@@ -158,6 +184,9 @@ function ScreenFrame({ children, title, columns, puck }) {
 }
 
 export function createConfig(catalog) {
+  const groupsField = { type: 'custom', render: ({ value = [], onChange }) => <fieldset className="security-group-choice"><legend>Allowed HMI groups (any selected)</legend>
+    {catalog.security_groups.map(group => <label key={group}><input type="checkbox" checked={value.includes(group)} onChange={event => onChange(event.target.checked ? [...value, group] : value.filter(item => item !== group))} />{group}</label>)}
+    <small>No groups selected: use the user's operation permission.</small></fieldset> };
   const tagField = type => ({ type: 'select', label: 'Tag', options: catalog.tags
     .filter(tag => tag.type === type).map(tag => ({ label: tag.name, value: tag.name })) });
   const labelField = { type: 'text', label: 'Label' };
@@ -172,6 +201,8 @@ export function createConfig(catalog) {
     },
     categories: { hmi: { title: 'High performance HMI', components: Object.values(controlTypes) } },
     components: {
+      NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, security_groups: groupsField },
+        defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },
       Indicator: {
@@ -189,9 +220,9 @@ export function createConfig(catalog) {
         defaultProps: { label: 'Process alarm', tag: 'ProcessAlarm', priority: 2 }, render: AlarmIndicator,
       },
       ActionButton: {
-        label: 'Action button', fields: { label: labelField, action: { type: 'select', label: 'Action',
+        label: 'Action button', fields: { label: labelField, security_groups: groupsField, action: { type: 'select', label: 'Action',
           options: catalog.actions.map(action => ({ label: action.label, value: action.name })) } },
-        defaultProps: { label: 'Toggle simulated motor', action: 'toggle_motor' }, render: ActionButton,
+        defaultProps: { label: 'Toggle simulated motor', action: 'toggle_motor', security_groups: [] }, render: ActionButton,
       },
     },
   };

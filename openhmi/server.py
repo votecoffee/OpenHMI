@@ -5,7 +5,7 @@ import argparse
 from contextlib import asynccontextmanager
 import logging
 import asyncio
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
@@ -14,11 +14,19 @@ from .drivers import SimulatorDriver
 from .application import Application
 from .alarms import AlarmMonitor
 from .recipe_routes import add_recipe_routes
+from .security import Security
+from .security_routes import add_security_routes
 from .projects import Project, ProjectStore, RevisionConflict, RevisionRequest, SaveRequest
 
 
 class ActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    control_id: str | None = None
+
+
+class ValueRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    value: float
 
 
 def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None) -> FastAPI:
@@ -68,7 +76,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.application = application
     app.state.store = store
     app.state.alarms = monitor
-    add_recipe_routes(app, store, application, recipe_users)
+    security = app.state.security = Security(store)
+    add_security_routes(app, security)
+    add_recipe_routes(app, store, application, recipe_users, security)
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
@@ -84,13 +94,19 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if type(value) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible alarm tag: {alarm.tag}")
         for control in project.controls:
+            required = getattr(control, 'security_groups', [])
+            known_groups = {group['name'] for group in security.snapshot()['groups']}
+            if not set(required) <= known_groups:
+                raise HTTPException(422, 'Control references an unknown HMI security group')
             if control.kind == 'recipe':
                 continue
             if control.kind == "button":
                 if control.action not in actions:
                     raise HTTPException(422, f"Unknown action: {control.action}")
             else:
-                expected = (float, int) if control.kind in ("numeric", "analog") else (bool,)
+                expected = (float, int) if control.kind in ("numeric", "analog", "input") else (bool,)
+                if control.kind == 'input' and type(tags.get(control.tag)) is not float:
+                    raise HTTPException(422, 'Numeric input currently requires a floating-point tag')
                 if type(tags.get(control.tag)) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control.tag}")
 
@@ -106,6 +122,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                      for name, value in application.driver.snapshot().items()],
             "actions": application.actions(),
             "flags": sorted(path.stem for path in (web / "assets" / "flags").glob("*.svg")),
+            "security_groups": [group['name'] for group in security.snapshot()['groups']],
         }
 
     @app.get("/api/project")
@@ -124,12 +141,14 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(409, str(error)) from error
 
     @app.put("/api/project/draft")
-    def save(request: SaveRequest) -> dict:
+    def save(request: SaveRequest, http: Request) -> dict:
+        security.require(http, 'project.edit')
         validate_bindings(request.project)
         return transact(store.save, request)
 
     @app.post("/api/project/apply")
-    def apply(request: RevisionRequest) -> dict:
+    def apply(request: RevisionRequest, http: Request) -> dict:
+        security.require(http, 'project.edit')
         with monitor.lock:
             result = transact(lambda value: store.apply(value, validate_bindings), request)
             sample_alarms()
@@ -140,21 +159,29 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         return monitor.snapshot()
 
     @app.post("/api/alarms/acknowledge-all")
-    def acknowledge_all(request: ActionRequest) -> dict:
+    def acknowledge_all(request: ActionRequest, http: Request) -> dict:
+        security.require(http, 'alarms.acknowledge')
         return monitor.acknowledge()
 
     @app.post("/api/alarms/{occurrence_id}/acknowledge")
-    def acknowledge(occurrence_id: int, request: ActionRequest) -> dict:
+    def acknowledge(occurrence_id: int, request: ActionRequest, http: Request) -> dict:
+        security.require(http, 'alarms.acknowledge')
         try:
             return monitor.acknowledge(occurrence_id)
         except KeyError as error:
             raise HTTPException(404, "Alarm occurrence not found") from error
 
     @app.post("/api/actions/{name}")
-    def action(name: str, request: ActionRequest) -> dict:
+    def action(name: str, request: ActionRequest, http: Request) -> dict:
         active_controls = store.snapshot()["active"]["controls"]
         if not any(control.get("action") == name for control in active_controls):
             raise HTTPException(404, "Action is not bound to an active control")
+        matches = [control for control in active_controls if control.get('action') == name and (request.control_id is None or control['id'] == request.control_id)]
+        if not matches:
+            raise HTTPException(404, 'Action is not bound to this active control')
+        # Old clients without a control ID must satisfy every binding of this action.
+        for control in matches:
+            security.require(http, 'runtime.operate', control.get('security_groups', []))
         if name not in {item["name"] for item in application.actions()}:
             raise HTTPException(404, "Action is unavailable; check startup handler configuration")
         try:
@@ -165,11 +192,25 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         sample_alarms()
         return {"ok": True}
 
+    @app.put('/api/controls/{control_id}/value')
+    def write_value(control_id: str, body: ValueRequest, http: Request):
+        with application.lock:
+            control = next((control for control in store.snapshot()['active']['controls'] if control['id'] == control_id and control['kind'] == 'input'), None)
+            if not control:
+                raise HTTPException(404, 'Active numeric input not found')
+            security.require(http, 'runtime.write', control.get('security_groups', []))
+            import math
+            if not math.isfinite(body.value) or not control['minimum'] <= body.value <= control['maximum']:
+                raise HTTPException(422, 'Value is outside the configured input limits')
+            application.driver.write(control['tag'], [body.value])
+            return {'ok': True, 'value': application.driver.read(control['tag'])[0]}
+
     @app.get("/", include_in_schema=False)
     @app.get("/runtime", include_in_schema=False)
     @app.get("/alarms", include_in_schema=False)
     @app.get("/recipes", include_in_schema=False)
     @app.get("/recipe-editor", include_in_schema=False)
+    @app.get('/security', include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 

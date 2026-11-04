@@ -9,3 +9,10 @@ def create_test_app():
         {'name': 'engineer', 'roles': ['engineer', 'approver', 'operator'], 'password_hash': encoded},
         {'name': 'manager', 'roles': ['administrator'], 'password_hash': encoded},
     ]})
+
+
+def create_secure_test_app():
+    from tests.test_security import bootstrap
+    app = create_app()
+    bootstrap(app)
+    return app

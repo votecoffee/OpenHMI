@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
 import { Live } from './controls.jsx';
 import { useLocalization } from './localization.jsx';
+import { SecurityContext } from './security.jsx';
 
 const blank = () => ({ title: '', description: '', image_id: null, parameters: [] });
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -97,6 +98,7 @@ function validatedContent(content) {
 
 export function RecipeWorkspace({ edit, catalog }) {
   const live = useContext(Live);
+  const hmiSecurity = useContext(SecurityContext);
   const { ui } = useLocalization();
   const [state, setState] = useState(null);
   const [session, setSession] = useState({ configured: false, user: null });
@@ -108,6 +110,7 @@ export function RecipeWorkspace({ edit, catalog }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [policy, setPolicy] = useState(null);
+  useEffect(() => { if (hmiSecurity?.session?.configured) setSession(hmiSecurity.session); }, [hmiSecurity?.session]);
   function choose(revision) {
     setSource(revision); setContent(revision ? clone(revision.content) : blank()); setCode(revision?.code || ''); setReason(''); setDirty(false);
   }
@@ -161,7 +164,7 @@ export function RecipeWorkspace({ edit, catalog }) {
   const recipeAudit = source ? state.audit.filter(event => event.recipe_id === source.recipe_id) : [];
   return <section className="recipe-workspace" aria-label={edit ? 'Recipe editor' : 'Recipe viewer'}>
     <div className="recipe-heading"><h1>{edit ? 'Recipe editor' : ui('recipes')}</h1><a href={edit ? '/recipes' : '/recipe-editor'}>{edit ? 'Operator viewer' : 'Recipe editor'}</a></div>
-    <RecipeSession session={session} onChange={setSession} />
+    {hmiSecurity?.session?.configured ? <p>Recipe permissions use the signed-in HMI account.</p> : <RecipeSession session={session} onChange={setSession} />}
     <p role="status" aria-label="Recipe operation">{message}</p>
     <div className="recipe-loaded"><h2>{ui('recipeLoadedCopy')}</h2><LoadedRecipe /></div>
     <div className="recipe-browser"><label>{ui('recipeLibrary')}<select aria-label="Recipe revision" value={source?.id || ''} onChange={event => {

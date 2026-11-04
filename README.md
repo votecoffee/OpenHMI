@@ -32,6 +32,8 @@ support translated operator text and a flag selector. A project-wide Python alar
 service monitors tag triggers and retains occurrences, acknowledgement and history.
 SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.
+HMI security supports local accounts and Windows user/group assignments to local
+application groups, with protected buttons and numeric value inputs.
 
 Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
 the supplied high-performance HMI references and FactoryTalk View ME templates.
@@ -41,8 +43,8 @@ Alarm symbols combine priority number, shape and the ME template palette.
 
 Current limits: one screen, a configurable control grid, simulation only, 500 ms polling,
 no integrated Python editor or Python hot reload, and no screen-revision history/rollback UI.
-There is no PLC adapter or application-wide production authentication yet.
-Recipe operations have their own server-managed accounts and roles.
+There is no PLC adapter yet. Windows/domain password logon still needs validation
+with configured accounts; local authorization and synthetic Windows mappings are tested.
 
 ## Install
 
@@ -120,7 +122,8 @@ Returned but unacknowledged occurrences remain visible. The project database
 retains alarm state/history across restarts; simulator tag values themselves reset.
 The built-in **Toggle simulated process alarm** action can be assigned to a button
 for testing. Polling can miss short pulses. Remote PLC handshakes, audible/silence
-behavior, shelving and production operator authentication are not implemented.
+behavior and shelving are not implemented. HMI security can require group
+permission for acknowledgement; production commissioning remains separate work.
 
 See [language and alarm semantics](docs/languages-and-alarms.md) for trigger,
 translation, persistence, quality and retention details and the FactoryTalk ME references.
@@ -138,14 +141,31 @@ editor retains local changes and asks you to copy them before reloading. Conflic
 merging is not implemented. Previous browser-local GrapesJS prototype saves are
 left in browser storage and are not automatically imported into this format.
 
-### Recipes
+### Login and security groups
 
-Create a local recipe account (the password is prompted), then start OpenHMI:
+Enable HMI login by creating the first local administrator (password is prompted):
 
 ```powershell
-.\.venv\Scripts\openhmi-users.exe --user engineer --roles engineer approver operator
-.\.venv\Scripts\openhmi.exe
+.\.venv\Scripts\openhmi-security.exe --project .local/project.sqlite3 --user admin
+.\.venv\Scripts\openhmi.exe --project .local/project.sqlite3
 ```
+
+Sign in through the login bar and open **Security**. Create HMI groups, choose
+their permissions, and assign local users or Windows users/groups. Windows login
+verifies credentials on the Windows server and maps authenticated SIDs to HMI groups.
+It uses an explicit credential prompt; automatic browser SSO is not implemented.
+
+Select an **Action button** or **Numeric input** in the designer, choose its
+allowed HMI groups, and apply. Unauthorized users see disabled controls. Python
+checks the same permissions and active binding on every action or value write.
+Project editing, alarm acknowledgement and recipe operations also use HMI permissions.
+New projects show **Unsecured simulation** until the first administrator exists.
+See [security setup, permissions and Windows behavior](docs/security.md).
+
+### Recipes
+
+Use **Security** to assign recipe permissions to HMI groups and their users.
+For example, assign Engineers and Approvers to an author who also approves changes.
 
 Open **Recipes** and **Recipe editor** to create recipes, add parameters and a
 PNG/JPEG product image, and record a reason for each change. Each save creates a
@@ -189,8 +209,9 @@ currently require restarting the server. An integrated Python editor and deliber
 module reload are planned. Screen-only changes already apply without a restart.
 If a saved screen uses a custom action, start with that handler module again.
 
-The server binds to loopback and provides unauthenticated simulation actions.
-Real equipment access, operator permissions and commissioning are separate work.
+The server binds to loopback. Without configured HMI security accounts it provides
+unsecured simulation actions; after bootstrap, mutations require HMI permissions.
+Real equipment access and commissioning remain separate work.
 Stop it with Ctrl+C.
 
 ## Architecture
@@ -227,7 +248,8 @@ Run local Python and browser checks (browser checks require installed Google Chr
 npx.cmd playwright test
 ```
 
-Browser checks manage their own in-memory simulation server on port 8765.
+Browser checks manage in-memory simulation servers on ports 8765 and 8766,
+using synthetic accounts for recipe and HMI security validation.
 No automatic GitHub Actions workflows are configured. Keep machine/customer data
 and credentials outside tracked source; `.local/` is ignored for local artifacts.
 

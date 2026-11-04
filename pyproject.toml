@@ -17,6 +17,7 @@ test = ["httpx>=0.27,<1"]
 [project.scripts]
 openhmi = "openhmi.server:main"
 openhmi-users = "openhmi.recipe_auth:main"
+openhmi-security = "openhmi.security:main"
 
 [tool.setuptools.packages.find]
 include = ["openhmi*"]

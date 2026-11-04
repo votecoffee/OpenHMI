@@ -121,5 +121,14 @@ owns immutable content revisions, approval identity, field-change audit, images
 and operation policy in SQLite. Loading takes a separate snapshot of the content
 and its production-approval Boolean. Library changes do not alter the simulator's
 loaded copy. Test recipes may be loaded; the eventual controller owns run/reject
-decisions. Recipe accounts protect those operations only; application-wide
-authentication and a real controller transfer handshake remain future work.
+decisions. Legacy recipe-only accounts remain supported in unsecured projects;
+application-wide authorization now uses [HMI security groups](security.md).
+A real controller transfer handshake remains future work.
+
+HMI security stores local users, application groups, Windows SID assignments and
+security audit in the project database. Local password verification and native
+Windows credential verification produce the same application principal. Browser
+controls consume its permissions; Python validates permissions and active control
+bindings before actions or writes. The numeric input control adds bounded,
+group-protected value editing. Unconfigured projects explicitly remain unsecured
+simulation; no default account is created. Windows SSO remains future work.

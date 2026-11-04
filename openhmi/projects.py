@@ -57,6 +57,20 @@ class AlarmControl(ControlBase):
 class ButtonControl(ControlBase):
     kind: Literal["button"]
     action: str = Field(min_length=1, max_length=100)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+
+class NumericInputControl(NumericControl):
+    kind: Literal['input']
+    minimum: float = Field(default=0.0, allow_inf_nan=False)
+    maximum: float = Field(default=100.0, allow_inf_nan=False)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def ordered_limits(self):
+        if self.minimum >= self.maximum:
+            raise ValueError('Input minimum must be less than maximum')
+        return self
 
 
 class RecipeSelectionControl(ControlBase):
@@ -94,7 +108,7 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl, Field(discriminator="kind")]
 
 
 class Project(StrictModel):

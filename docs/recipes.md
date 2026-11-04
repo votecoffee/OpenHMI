@@ -54,7 +54,17 @@ Previewing a recipe is distinct from loading it. The **Selected recipe** toolbox
 control shows the loaded product on a custom screen. The library begins empty;
 no customer or production recipe is created automatically.
 
-## Local accounts and use
+## Accounts and use
+
+With [HMI security](security.md) configured, recipe operations use the signed-in
+local or Windows HMI account. Assign `recipes.engineer`, `recipes.approver`,
+`recipes.operator` and/or `recipes.administrator` permissions to its HMI groups.
+The author can approve when they have the review permission. Windows groups can
+map to the same HMI groups as local users. HMI login is authoritative once enabled;
+legacy recipe-only sessions cannot bypass it.
+
+The following recipe-only setup remains supported for older unsecured simulation
+projects. For new projects, use `openhmi-security` and the Security page instead.
 
 Create an account from the checkout; passwords are prompted and are not command-line
 arguments. The user file belongs under ignored `.local/`, outside Git:
@@ -89,9 +99,9 @@ language system; recipe content text is displayed as authored.
 
 ## Initial scope
 
-This is a local application workflow. Recipe authentication does not retroactively
-authenticate the existing simulator/alarm APIs. Server-managed accounts establish
-identity for recipe operations; this is not a qualified electronic-signature or
+This is a local application workflow. With HMI security enabled, simulator actions,
+screen editing and alarm acknowledgement also require HMI permissions. Legacy
+recipe-only authentication protects recipe operations alone. This is not a qualified electronic-signature or
 regulatory-compliance claim. Trusted Python code and database administrators remain
 inside the application's trust boundary.
 
