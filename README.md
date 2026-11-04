@@ -173,3 +173,6 @@ and credentials outside tracked source; `.local/` is ignored for local artifacts
 [MIT](LICENSE), copyright 2026 votecoffee. Puck, React and other dependencies retain
 their own licenses; the asset build includes dependency license texts and bundle
 notices. No Anvil, Craft.js, FUXA or AdvancedHMI code or assets are vendored.
+The supplied Noto Sans SC font is included under SIL OFL 1.1 and flag-icons SVGs
+under MIT; their license files accompany the assets. See
+[language asset details](docs/languages-and-alarms.md).

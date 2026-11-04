@@ -21,4 +21,4 @@ openhmi = "openhmi.server:main"
 include = ["openhmi*"]
 
 [tool.setuptools.package-data]
-openhmi = ["web/*", "web/vendor/*"]
+openhmi = ["web/*", "web/vendor/*", "web/assets/fonts/*", "web/assets/flags/*"]
