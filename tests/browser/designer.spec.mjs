@@ -1,0 +1,38 @@
+import { test, expect } from '@playwright/test';
+
+test('designer controls, address editing, saved reload and simulated runtime', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  const canvas = page.frameLocator('.gjs-frame');
+  await expect(canvas.locator('[data-control]')).toHaveCount(2);
+  const block = page.locator('.gjs-block').filter({ hasText: 'Numeric display' });
+  const source = await block.boundingBox();
+  const target = await page.locator('.gjs-frame').boundingBox();
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + 100, target.y + 250, { steps: 20 });
+  await page.mouse.move(target.x + 110, target.y + 260, { steps: 5 });
+  await page.mouse.up();
+  await expect(canvas.locator('[data-control]')).toHaveCount(3);
+  await canvas.locator('[data-control="numeric-display"]').first().click();
+  await page.locator('.gjs-pn-btn.fa-cog').click();
+  const address = page.locator('.gjs-trt-trait').filter({ hasText: 'PLCAddressValue' }).locator('input');
+  await address.fill('MissingTag');
+  await address.press('Tab');
+  await page.getByRole('button', { name: 'Save locally', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.reload();
+  await expect(canvas.locator('[data-control]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Load saved', exact: true }).click();
+  await expect(canvas.locator('[data-control]')).toHaveCount(3);
+  await page.getByRole('button', { name: 'Run screen', exact: true }).click();
+  await expect(page.locator('#runtime')).toContainText('MissingTag: Unknown tag');
+  await expect(page.locator('#runtime')).toContainText('TankLevel: 42');
+  await expect(page.locator('#runtime')).toContainText('MotorRunning: ON');
+  await page.route('**/api/tags', route => route.abort());
+  await expect(page.locator('#runtime')).toContainText('Disconnected');
+  await page.getByRole('button', { name: 'Back to designer', exact: true }).click();
+  await expect(page.locator('#designer')).toBeVisible();
+  expect(errors).toEqual([]);
+});

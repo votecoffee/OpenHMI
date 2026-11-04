@@ -80,3 +80,9 @@ mistaken for the final portable project format or subscription transport.
 
 Deployment authentication, multiuser editing, historian/alarms, reusable faceplates,
 debugging and signed application packaging are subsequent product work.
+
+Tracked next steps:
+
+* [Portable project format and FUXA comparison](https://github.com/votecoffee/OpenHMI/issues/1).
+* [Driver subscriptions and Python handlers](https://github.com/votecoffee/OpenHMI/issues/2).
+* [First protocol adapter and hardware acceptance](https://github.com/votecoffee/OpenHMI/issues/3).

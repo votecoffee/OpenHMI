@@ -1,0 +1,10 @@
+body { margin: 0; background: #15202d; color: #e6eef7; font: 15px system-ui, sans-serif; }
+header { display: flex; align-items: center; gap: 14px; padding: 14px 20px; }
+header strong { color: #70d4c4; font-size: 24px; }
+header span { margin-right: auto; }
+button { cursor: pointer; background: #233c52; color: white; border: 1px solid #56718b; padding: 8px 12px; border-radius: 4px; }
+#status { margin: 0; padding: 12px 20px; background: #24364a; }
+#runtime { background: #eff4f9; color: #15202d; min-height: 65vh; padding: 24px; }
+#runtime [data-control] { box-sizing: border-box; display: inline-block; vertical-align: top; margin: 12px; padding: 24px; min-width: 180px; border: 2px solid #56718b; border-radius: 8px; font: 22px system-ui; background: white; }
+footer { padding: 12px 20px; font-size: 13px; }
+[hidden] { display: none !important; }

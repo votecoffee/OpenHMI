@@ -8,3 +8,6 @@ build/
 dist/
 .env
 .pytest_cache/
+openhmi/web/vendor/
+test-results/
+playwright-report/

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openhmi"
+version = "0.1.0.dev0"
+description = "Python HMI runtime with an experimental web designer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+
+[project.optional-dependencies]
+test = ["httpx>=0.27,<1"]
+
+[project.scripts]
+openhmi = "openhmi.server:main"
+
+[tool.setuptools.packages.find]
+include = ["openhmi*"]
+
+[tool.setuptools.package-data]
+openhmi = ["web/*", "web/vendor/*"]
