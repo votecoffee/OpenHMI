@@ -1,10 +1,10 @@
-"""Small typed read/write contract; subscription semantics are still planned."""
+"""Typed logical tag contract; the runtime owns scan demand and transport adapters."""
 
 from typing import Protocol, TypeAlias
 import math
 from copy import deepcopy
 
-Value: TypeAlias = bool | int | float | str
+Value: TypeAlias = bool | int | float | str | dict[str, object] | list[object]
 
 
 class Driver(Protocol):

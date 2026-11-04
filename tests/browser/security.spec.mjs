@@ -55,6 +55,9 @@ test('HMI groups administer and enforce button and numeric input access', async 
   await page.getByRole('button', { name: 'Toggle simulated motor', exact: true }).click();
   await expect(page.locator('[data-control="indicator"]')).toContainText('OFF');
   await page.getByLabel('Tank setpoint new value', { exact: true }).fill('23.5');
+  await page.waitForResponse(response => response.url().endsWith('/api/project/active'));
+  await page.waitForResponse(response => response.url().endsWith('/api/project/active'));
+  await expect(page.getByLabel('Tank setpoint new value', { exact: true })).toHaveValue('23.5');
   await page.getByRole('button', { name: 'Write value', exact: true }).click();
   await expect(page.locator('[data-control="input"]')).toContainText('23.5');
   if (process.env.OPENHMI_SECURITY_RUNTIME) await page.screenshot({ path: process.env.OPENHMI_SECURITY_RUNTIME, fullPage: true });

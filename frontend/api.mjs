@@ -1,5 +1,7 @@
+let projectInstance = null;
 export async function api(path, options = {}) {
-  const response = await fetch(path, { signal: AbortSignal.timeout(5000), ...options });
+  const headers = { ...options.headers, ...(projectInstance ? { 'X-OpenHMI-Project': projectInstance } : {}) };
+  const response = await fetch(path, { signal: AbortSignal.timeout(5000), ...options, headers });
   const data = await response.json();
   if (!response.ok) {
     const detail = Array.isArray(data.detail)
@@ -8,6 +10,7 @@ export async function api(path, options = {}) {
     error.conflict = response.status === 409;
     throw error;
   }
+  if (!projectInstance && path === '/api/project') projectInstance = data.project_instance || response.headers.get('X-OpenHMI-Project');
   return data;
 }
 

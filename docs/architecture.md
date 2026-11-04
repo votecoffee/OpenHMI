@@ -57,10 +57,10 @@ arbitrary hot code replacement.
 6. Python customization uses named application actions. The browser chooses a
    registered action; it does not submit Python source for execution.
 
-The first implementation is a local, single-screen simulation prototype.
-Screen/tag delivery may use bounded polling initially. Production permissions,
-audit, rollback UI, multiple users, subscriptions and commissioning behavior need
-separate acceptance. Live Python code replacement is a future feature with a
+The initial single-screen simulation has expanded to multiple screens/popups,
+shared pycomm3 polling, UDT faceplate definitions, SQL history and a project library.
+Tag delivery uses bounded polling. Hardware commissioning, full operator-action
+audit and screen rollback remain separate work. Live Python code replacement is a future feature with a
 module lifecycle; initially custom handlers are loaded at startup.
 
 ## Project and runtime ownership
@@ -80,8 +80,8 @@ actions, not raw HTML/CSS or Puck internals. An adapter translates between that
 schema and the editor. Use identical controls for editor previews and viewers.
 The initial layout is a configurable control grid in a gray ME-derived screen
 frame; [the HMI style guide](hmi-style-guide.md) records its source decisions.
-Free placement, reusable
-faceplates, multiple screens and richer graphics remain future work.
+Reusable UDT faceplate definitions and multiple screens now share that catalog.
+Free placement and richer graphics remain future work.
 
 ## Priorities
 
@@ -132,3 +132,11 @@ controls consume its permissions; Python validates permissions and active contro
 bindings before actions or writes. The numeric input control adds bounded,
 group-protected value editing. Unconfigured projects explicitly remain unsecured
 simulation; no default account is created. Windows SSO remains future work.
+
+[Runtime and project workflows](runtime-and-projects.md) describe shared screen-rate
+polling, UDT member resolution, conditional/no-code actions, SQL trends and complete
+backup import/export. A workspace switch drains the previous application service;
+browser mutation headers identify the originating project instance to reject stale
+cross-project edits. Imported connections stay held until explicit apply, and
+imported Python source never executes automatically. The integrated Python IDE
+is explicitly deferred by the project owner.

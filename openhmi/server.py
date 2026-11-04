@@ -5,8 +5,9 @@ import argparse
 from contextlib import asynccontextmanager
 import logging
 import asyncio
+import uuid
 from fastapi import FastAPI, HTTPException, Request, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
@@ -32,6 +33,7 @@ class SubscriptionRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     client: str
     screens: list[str]
+    preview_root: str = ''
 
 
 class ValueRequest(BaseModel):
@@ -39,9 +41,10 @@ class ValueRequest(BaseModel):
     value: float
 
 
-def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None) -> FastAPI:
+def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None, hold_connections=False) -> FastAPI:
     store = ProjectStore(project_path)
     application = Application(RuntimeDriver())
+    application.driver.plc_hold = hold_connections
     application.driver.configure(Project.model_validate(store.snapshot()['active']).model_dump())
     historian = Historian(store, application.driver)
     historian.configure(Project.model_validate(store.snapshot()['active']).historian.model_dump())
@@ -101,6 +104,16 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             store.close()
 
     app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifespan)
+    instance = app.state.project_instance = uuid.uuid4().hex
+
+    @app.middleware('http')
+    async def project_identity(request, call_next):
+        expected = request.headers.get('x-openhmi-project')
+        if request.method not in ('GET', 'HEAD', 'OPTIONS') and expected and expected != instance:
+            return JSONResponse({'detail': 'A different project was opened. Reload before making changes.'}, status_code=409)
+        response = await call_next(request)
+        response.headers['X-OpenHMI-Project'] = instance
+        return response
     app.state.driver = application.driver
     app.state.application = application
     app.state.store = store
@@ -117,7 +130,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         for tag in project.tags:
             if tag.name in kinds:
                 raise HTTPException(422, 'Built-in simulation/recipe tags cannot be redefined')
-            kinds[tag.name] = tag.type
+            kinds[tag.name] = 'number' if tag.type == 'integer' and (tag.scale != 1 or tag.offset != 0) else tag.type
             for member, kind in tag.members.items():
                 alias = tag.name + '.' + member
                 if alias in kinds:
@@ -150,6 +163,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             controls = expanded_controls(project_data)
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
+        if len({control['id'] for control in controls}) != len(controls):
+            raise HTTPException(422, 'Expanded control IDs collide; rename the screen, control or faceplate member control')
         known_groups = {group['name'] for group in security.snapshot()['groups']}
         for control in controls:
             for field in ('visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled'):
@@ -184,7 +199,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get("/api/tags")
     def tags() -> dict:
         with application.lock:
-            return {'driver': 'logix' if application.driver.connections else 'simulator', 'values': application.driver.snapshot(), 'samples': application.driver.sample_snapshot(), 'connections': application.driver.status()}
+            return {'driver': 'logix' if application.driver.connections else 'simulator', 'values': application.driver.snapshot(), 'samples': application.driver.sample_snapshot(), 'connections': application.driver.status(), 'plc_hold': application.driver.plc_hold}
 
     @app.get("/api/catalog")
     def catalog() -> dict:
@@ -202,12 +217,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     @app.get("/api/project")
     def project() -> dict:
-        return store.snapshot()
+        return {**store.snapshot(), 'project_instance': instance}
 
     @app.get("/api/project/active")
     def active() -> dict:
         state = store.snapshot()
-        return {"revision": state["active_revision"], "project": state["active"]}
+        return {'revision': state['active_revision'], 'project': state['active'], 'project_instance': instance}
 
     def transact(operation, request):
         try:
@@ -226,6 +241,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         security.require(http, 'project.edit')
         with monitor.lock:
             result = transact(lambda value: store.apply(value, validate_bindings), request)
+            application.driver.plc_hold = False
+            if hasattr(app.state, 'release_connections'):
+                app.state.release_connections()
             application.driver.configure(Project.model_validate(result['active']).model_dump())
             historian.configure(Project.model_validate(result['active']).historian.model_dump())
             sample_alarms()
@@ -280,13 +298,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             security.require(http, 'runtime.write', control.get('security_groups', []))
             if not enabled(control, application.driver.snapshot()):
                 raise HTTPException(423, 'Control is disabled by its tag bindings')
+            if control['tag'] not in application.driver.snapshot():
+                raise HTTPException(409, 'Input tag has no good-quality value')
             import math
             if not math.isfinite(body.value) or not control['minimum'] <= body.value <= control['maximum']:
                 raise HTTPException(422, 'Value is outside the configured input limits')
-            root, member = application.driver.sources.get(control['tag'], (None, ''))
-            definition = application.driver.definitions.get(root)
-            kind = definition['members'][member] if definition and member else definition['type'] if definition else 'number'
-            value = int(body.value) if kind == 'integer' and body.value.is_integer() else body.value
+            value = application.driver.coerce_number(control['tag'], body.value)
             try:
                 application.driver.write(control['tag'], [value])
             except (ValueError, ConnectionError, KeyError) as error:
@@ -311,6 +328,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if control['target'] not in values:
                 raise ValueError('Target has no good-quality value')
             value = not values[control['target']] if mode == 'toggle' else control['value']
+            value = application.driver.coerce_number(control['target'], value)
             application.driver.write(control['target'], [value])
         except (ValueError, ConnectionError, KeyError) as error:
             raise HTTPException(409, str(error)) from error
@@ -322,7 +340,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         if len(body.client) > 100 or not body.client or len(body.screens) > 20:
             raise HTTPException(422, 'Subscription limits exceeded')
         try:
-            application.driver.lease(body.client, body.screens)
+            if body.preview_root:
+                security.require(request, 'project.edit')
+            application.driver.lease(body.client, body.screens, preview_root=body.preview_root)
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         return {'expires_in_seconds': 15}
@@ -353,10 +373,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         return historian.query(names, finish - seconds, finish, limit)
 
     @app.get('/api/history.csv')
-    def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000)):
+    def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000), end: float | None = None):
         import csv
         from io import StringIO
-        data = history(tags, seconds, 20000)
+        data = history(tags, seconds, 20000, end)
         output = StringIO()
         writer = csv.writer(output)
         writer.writerow(['tag', 'timestamp', 'value', 'quality', 'source_timestamp'])
@@ -370,6 +390,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get("/recipes", include_in_schema=False)
     @app.get("/recipe-editor", include_in_schema=False)
     @app.get('/security', include_in_schema=False)
+    @app.get('/projects', include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 
@@ -388,7 +409,8 @@ def main() -> None:
     assets = Path(__file__).parent / "web" / "vendor" / "app.js"
     if not assets.exists():
         raise SystemExit("Missing designer assets. Run npm ci and npm run build first.")
-    uvicorn.run(create_app(args.project, args.handlers, args.recipe_users), host="127.0.0.1", port=8000)
+    from .workspace import ProjectWorkspace
+    uvicorn.run(ProjectWorkspace(args.project, args.handlers, args.recipe_users), host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":

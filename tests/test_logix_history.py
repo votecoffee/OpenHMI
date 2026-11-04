@@ -52,6 +52,44 @@ def logix_project():
 
 
 class LogixHistoryTests(unittest.TestCase):
+    def test_integer_values_preserve_bit_trigger_types_and_scaled_writes(self):
+        project = logix_project()
+        project['tags'][1]['type'] = 'integer'
+        project['tags'][1]['scale'] = 1.0
+        project['tags'][1]['offset'] = 0.0
+        driver = RuntimeDriver(FakePLC)
+        driver.configure(project)
+        driver.poll(0)
+        plc = driver.connections['plc'].client
+        plc.values['Level'] = 30
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        self.assertIs(type(driver.sample_snapshot(1)['LevelA']['value']), int)
+        project['tags'][1]['scale'] = 0.1
+        driver.configure(project)
+        driver.poll(2)
+        self.assertEqual(driver.sample_snapshot(2)['LevelA']['value'], 3.0)
+        driver.write('LevelA', [3.5])
+        self.assertEqual(plc.writes[-1], ('Level', 35))
+        self.assertIs(type(plc.writes[-1][1]), int)
+        driver.close()
+    def test_reconnect_backoff_is_not_extended_by_skipped_polls(self):
+        driver = RuntimeDriver(FakePLC)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        connection = driver.connections['plc']
+        connection.client.fail = True
+        driver.poll(2)
+        self.assertEqual(connection.retry_at, 3)
+        driver.deadlines.clear()
+        driver.poll(2.5)
+        self.assertEqual(connection.retry_at, 3)
+        self.assertEqual(connection.failures, 1)
+        driver.poll(3.6)
+        self.assertTrue(connection.connected)
+        self.assertEqual(driver.sample_snapshot(3.6)['LevelA']['quality'], 'good')
+        driver.close()
     def test_shared_subscription_rates_udt_dedup_and_lease_expiry(self):
         driver = RuntimeDriver(FakePLC)
         driver.configure(logix_project())
@@ -59,6 +97,8 @@ class LogixHistoryTests(unittest.TestCase):
         driver.lease('viewer2', ['slow'], 1)
         driver.poll(1)
         plc = driver.connections['plc'].client
+        self.assertEqual(driver.connections['plc'].tag_metadata('Motor[0].Speed')['external_access'], 'Read/Write')
+        self.assertEqual(driver.connections['plc'].tag_metadata('MotorOther.Speed'), {})
         self.assertEqual(plc.reads, [('Motor', 'Level')])
         self.assertEqual(driver.sample_snapshot(1)['MotorA.Speed']['value'], 42.0)
         self.assertEqual(driver.sample_snapshot(1)['LevelA']['value'], 65.0)
@@ -125,6 +165,8 @@ class LogixHistoryTests(unittest.TestCase):
             state = client.get('/api/project').json()
             project = state['draft']
             project['tags'] = [{'name': 'UnitA', 'type': 'struct', 'initial': {'Run': False, 'Speed': 20.0}, 'members': {'Run': 'boolean', 'Speed': 'number'}, 'udt_type': 'GenericUDT', 'writable': True}]
+            project['controls'].extend([{'id': 'gateToggle', 'kind': 'button', 'label': 'Gate', 'mode': 'toggle', 'target': 'UnitA.Run'},
+                                        {'id': 'gatedSet', 'kind': 'button', 'label': 'Gated set', 'mode': 'set', 'target': 'TankLevel', 'value': 10, 'enabled_tag': 'UnitA.Run'}])
             project['faceplates'] = [{'id': 'Generic', 'name': 'Generic', 'udt_type': 'GenericUDT', 'members': {'Run': 'boolean', 'Speed': 'number'}, 'controls': [
                 {'id': 'run', 'kind': 'button', 'label': 'Run', 'mode': 'toggle', 'target': '$.Run'},
                 {'id': 'speed', 'kind': 'input', 'label': 'Speed', 'tag': '$.Speed'}]}]
@@ -132,8 +174,11 @@ class LogixHistoryTests(unittest.TestCase):
             saved = client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': project})
             self.assertEqual(saved.status_code, 200, saved.text)
             self.assertEqual(client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']}).status_code, 200)
+            self.assertEqual(client.post('/api/controls/gatedSet/activate', json={}).status_code, 423)
             self.assertEqual(client.post('/api/controls/equipment__unit__run/activate', json={}).status_code, 200)
             self.assertTrue(app.state.driver.read('UnitA.Run')[0])
+            self.assertEqual(client.post('/api/controls/gatedSet/activate', json={}).status_code, 200)
+            self.assertEqual(app.state.driver.read('TankLevel'), [10.0])
             self.assertEqual(client.put('/api/controls/equipment__unit__speed/value', json={'value': 45.0}).status_code, 200)
             self.assertEqual(app.state.driver.read('UnitA.Speed'), [45.0])
             self.assertEqual(client.post('/api/subscriptions', json={'client': 'a', 'screens': ['missing']}).status_code, 422)

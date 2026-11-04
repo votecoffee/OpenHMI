@@ -21,7 +21,7 @@ language when an application needs custom behavior.
 
 The prototype uses Puck with an HMI control catalog. The developer sees screen,
 tag, units, decimal places and action properties rather than HTML, CSS or React.
-The editor and runtime use the same controls and show simulated values live.
+The editor and runtime use the same controls and show live tag values.
 
 Implemented: numeric displays, binary indicators, analog ranges, alarm indicators,
 action buttons, tag/action dropdowns,
@@ -34,9 +34,10 @@ SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.
 HMI security supports local accounts and Windows user/group assignments to local
 application groups, with protected buttons and numeric value inputs.
-The runtime now includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
-UDT faceplate contracts and SQL tag history. The designer workflows for these
-features are being added; see [runtime semantics](docs/runtime-and-projects.md).
+The runtime includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
+multiple screens/popups, UDT-bound faceplate definitions, conditional bindings,
+no-code tag/navigation actions and SQL history/trends. A project library supports
+create/open and complete database backup export/import.
 
 Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
 the supplied high-performance HMI references and FactoryTalk View ME templates.
@@ -44,10 +45,12 @@ The default screen uses a gray header/body/sidebar/footer layout, compact Noto S
 labels, subdued blue live values, flat navy commands and neutral normal states.
 Alarm symbols combine priority number, shape and the ME template palette.
 
-Current limits: one screen, a configurable control grid, simulation only, 500 ms polling,
-no integrated Python editor or Python hot reload, and no screen-revision history/rollback UI.
-There is no PLC adapter yet. Windows/domain password logon still needs validation
-with configured accounts; local authorization and synthetic Windows mappings are tested.
+Current limits: configurable grids rather than free placement, best-effort polling,
+no integrated Python editor/hot reload and no screen-revision rollback UI.
+The ControlLogix adapter has offline protocol and browser checks; live PLC
+commissioning and Windows/domain password logon still need validation with
+configured hardware/accounts. Recipe loads currently retain an HMI-side copy;
+controller recipe transfer and application acknowledgement remain future work.
 
 ## Install
 
@@ -98,6 +101,45 @@ Use **Alarm setup** to register project-wide tag monitoring separately from grap
 The header summarizes active/unacknowledged monitored alarms across the project.
 Communication loss or invalid values are displayed explicitly. Existing saved
 screens are retained; the expanded five-control example appears in new projects.
+
+### Connections, screens and reusable controls
+
+1. In **Connections**, add a ControlLogix/CompactLogix pycomm3 route, enable it and
+   apply. Tags remain read-only until explicitly configured for writing.
+2. In **Tags**, browse the connection and add logical HMI names for PLC addresses,
+   or create local tags. Set numeric scaling and write permission as needed.
+3. In **Screens**, add screens/popups and set each tag update interval. The server
+   merges requests across viewers, reads shared tags at the fastest needed rate
+   and batches due addresses through pycomm3.
+4. In **Faceplates**, declare a UDT/member contract, design controls with relative
+   member tags and choose a live UDT for preview. Drop a **UDT faceplate** onto a
+   screen and bind its definition and compatible root UDT.
+5. Select an action button's **Action type** for set/toggle tag, navigation, popup
+   or registered Python actions. Boolean tag properties control visibility,
+   enabled state and value color. Server checks also enforce conditional enablement.
+6. In **History**, choose tags, sampling, deadband and retention. Drop a **Trend**
+   onto a screen for live/history viewing, time-range/end-time selection and CSV export.
+
+Update intervals are best-effort acquisition requests, not PLC cyclic I/O
+subscriptions. Alarm/history demand continues without an open viewer. See
+[runtime, UDT and history semantics](docs/runtime-and-projects.md) for quality,
+write/readback behavior, supported types and current limits.
+
+### Projects and backups
+
+Start through `openhmi`, then open **Projects**. Create/open projects in the local
+library beside the selected database, export a complete backup ZIP or import one
+under a new project ID. New projects inherit the current HMI security configuration.
+Project administration and complete backups require security administration rights
+when security is configured.
+
+Backups contain the database (screens, connections, tags, faceplates, recipes and
+images, security, alarm and tag history), plus the configured startup Python entry
+file and legacy recipe account file when present. Imports verify checksums and
+preserve existing projects. PLC connections remain held until explicit **Apply live**;
+imported Python is saved for review and never executed automatically.
+The browser backup/import limit is 256 MiB; external Python dependencies and the
+OpenHMI installation are separate. See [backup details](docs/runtime-and-projects.md).
 
 ### Languages
 
@@ -229,9 +271,9 @@ The server validates a typed, versioned OpenHMI screen schema rather than storin
 raw HTML/CSS or Puck internals. SQLite transactions protect draft/active updates.
 Existing viewers poll for new active revisions; tag state remains owned by Python.
 
-Next work: [screen/project lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
-[Python IDE and subscriptions](https://github.com/votecoffee/OpenHMI/issues/2),
-[a first PLC adapter](https://github.com/votecoffee/OpenHMI/issues/3),
+Next work: [screen history/rollback and project lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
+[Python IDE and reload (deferred)](https://github.com/votecoffee/OpenHMI/issues/2),
+[PLC hardware acceptance](https://github.com/votecoffee/OpenHMI/issues/3),
 and [equipment controls/operator validation](https://github.com/votecoffee/OpenHMI/issues/4).
 
 ## Maintainers

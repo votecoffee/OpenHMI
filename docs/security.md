@@ -80,7 +80,7 @@ Other operators can still see the current value, but their input and button are
 disabled. The Python API enforces the same rule on every operation. Unavailable
 login status, expired sessions and missing memberships lock the controls.
 
-Numeric inputs bind to existing floating-point simulator tags and have server
+Numeric inputs bind to existing numeric logical tags, including UDT members, and have server
 validated minimum/maximum values. Writes are accepted only through an active
 input binding. The API does not accept an arbitrary tag name or group claim.
 Buttons send their active control ID; older clients without an ID must satisfy
@@ -129,7 +129,8 @@ The CLI binds to loopback for local use. A remote deployment requires HTTPS to
 protect login credentials and an appropriate hosted deployment setup. Trusted
 Python handlers and database/OS administrators are inside the trust boundary.
 This is application authorization, not controller safety logic or an independent
-security certification. PLC access is still simulated.
+security certification. The pycomm3 adapter is available, but live PLC commissioning
+has not been performed. Unavailable/bad-quality input tags also block value writes.
 
 Old `openhmi-users` recipe-only files are supported in projects that have no HMI
 security accounts. After bootstrap, HMI accounts/groups are authoritative for

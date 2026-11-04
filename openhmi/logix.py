@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import math
+import json
 import re
 from threading import RLock
 import time
@@ -18,7 +19,16 @@ def member_value(value, path):
 
 
 def type_ok(value, kind):
-    return type(value) in {'boolean': (bool,), 'number': (int, float), 'integer': (int,), 'string': (str,), 'struct': (dict,)}[kind] and not (type(value) is float and not math.isfinite(value))
+    if type(value) not in {'boolean': (bool,), 'number': (int, float), 'integer': (int,), 'string': (str,), 'struct': (dict,)}[kind]:
+        return False
+    if type(value) is float and not math.isfinite(value) or type(value) is int and abs(value) > 9007199254740991:
+        return False
+    if kind == 'struct':
+        try:
+            json.dumps(value, allow_nan=False)
+        except (ValueError, TypeError, OverflowError):
+            return False
+    return True
 
 
 class LogixConnection:
@@ -26,6 +36,7 @@ class LogixConnection:
         self.config, self.factory = config, factory
         self.lock = RLock()
         self.client = None
+        self.connected = False
         self.error = None
         self.retry_at, self.failures = 0, 0
         self.metadata = {}
@@ -39,6 +50,7 @@ class LogixConnection:
                 except Exception:
                     pass
                 self.client = None
+            self.connected = False
 
     def connect(self, now):
         if self.client:
@@ -58,6 +70,7 @@ class LogixConnection:
             if not client.open():
                 raise ConnectionError('PLC connection did not open')
             self.metadata = {name: self._metadata(name, info) for name, info in client.tags.items()}
+            self.connected = True
         except Exception:
             self.close()
             raise
@@ -94,6 +107,12 @@ class LogixConnection:
             return 'number'
         return 'string'
 
+    def tag_metadata(self, address):
+        if address in self.metadata:
+            return self.metadata[address]
+        candidates = [name for name in self.metadata if address.startswith(name + '.') or address.startswith(name + '[')]
+        return self.metadata[max(candidates, key=len)] if candidates else {}
+
     def failed(self, error, now):
         self.error = str(error)
         self.failures += 1
@@ -102,6 +121,8 @@ class LogixConnection:
 
     def read(self, addresses, now):
         with self.lock:
+            if self.client is None and now < self.retry_at:
+                raise ConnectionError(self.error or 'Waiting for reconnect backoff')
             try:
                 self.connect(now)
                 results = []
@@ -149,16 +170,19 @@ class RuntimeDriver(SimulatorDriver):
         self.project = None
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self.local_names = set()
+        self.plc_hold = False
 
     def configure(self, project):
         with self.io_lock, self.lock:
-            configs = {config['id']: config for config in project.get('connections', []) if config['enabled']}
+            configs = {config['id']: config for config in project.get('connections', []) if config['enabled'] and not self.plc_hold}
+            changed_connections = {identifier for identifier, connection in self.connections.items() if configs.get(identifier) != connection.config}
             for identifier, connection in list(self.connections.items()):
                 if configs.get(identifier) != connection.config:
                     connection.close()
                     del self.connections[identifier]
             for identifier, config in configs.items():
                 if identifier not in self.connections:
+                    changed_connections.add(identifier)
                     self.connections[identifier] = LogixConnection(config, self.factory)
             old = self.definitions
             self.definitions = {tag['name']: deepcopy(tag) for tag in project.get('tags', [])}
@@ -170,7 +194,7 @@ class RuntimeDriver(SimulatorDriver):
                 self.sources[name] = (name, '')
                 for member in tag['members']:
                     self.sources[f'{name}.{member}'] = (name, member)
-                if old.get(name) != tag:
+                if old.get(name) != tag or tag['connection'] in changed_connections:
                     for alias, (root, _) in self.sources.items():
                         if root == name:
                             self.samples.pop(alias, None)
@@ -181,13 +205,15 @@ class RuntimeDriver(SimulatorDriver):
             self.project = deepcopy(project)
             self.deadlines.clear()
 
-    def lease(self, client, screens, now=None):
+    def lease(self, client, screens, now=None, preview_root=''):
         now = time.monotonic() if now is None else now
         with self.lock:
             known = screen_map(self.project)
             if any(screen not in known for screen in screens):
                 raise ValueError('Unknown subscription screen')
-            self.leases[client] = (set(screens), now + 15)
+            if preview_root and (preview_root not in self.definitions or self.definitions[preview_root]['type'] != 'struct'):
+                raise ValueError('Faceplate preview requires a configured UDT tag')
+            self.leases[client] = (set(screens), now + 15, preview_root)
             self.leases = {key: value for key, value in self.leases.items() if value[1] > now}
             if len(self.leases) > 1000:
                 self.leases.pop(next(iter(self.leases)))
@@ -201,6 +227,9 @@ class RuntimeDriver(SimulatorDriver):
             return rates
         screens = screen_map(project)
         wanted = set().union(*(value[0] for value in self.leases.values() if value[1] > now)) if self.leases else set()
+        for lease in self.leases.values():
+            if lease[1] > now and lease[2]:
+                demand(lease[2], 500)
         for identifier in wanted & screens.keys():
             for control in expanded_controls(project, identifier):
                 for tag in referenced_tags(control):
@@ -213,6 +242,7 @@ class RuntimeDriver(SimulatorDriver):
         return rates
 
     def poll(self, now=None):
+        real_clock = now is None
         now = time.monotonic() if now is None else now
         with self.io_lock:
             with self.lock:
@@ -243,10 +273,11 @@ class RuntimeDriver(SimulatorDriver):
                     results = connection.read(due, now)
                 except Exception:
                     results = [None] * len(due)
+                acquired = time.monotonic() if real_clock else now
                 with self.lock:
                     for address, result in zip(due, results):
                         rate = grouped[(identifier, address)]
-                        self.deadlines[(identifier, address)] = now + rate / 1000
+                        self.deadlines[(identifier, address)] = acquired + rate / 1000
                         for root, tag in self.definitions.items():
                             if tag['connection'] != identifier or tag['address'] != address:
                                 continue
@@ -262,10 +293,15 @@ class RuntimeDriver(SimulatorDriver):
                                     if not type_ok(value, kind):
                                         raise ValueError('PLC value does not match configured type')
                                     if not member and kind in ('number', 'integer'):
-                                        value = value * tag['scale'] + tag['offset']
-                                    self.samples[alias] = {'value': value, 'quality': 'good', 'timestamp': utc_now(), 'monotonic': now, 'rate_ms': rate, 'error': None}
+                                        if tag['scale'] != 1 or tag['offset'] != 0:
+                                            value = value * tag['scale'] + tag['offset']
+                                        elif kind == 'number':
+                                            value = float(value)
+                                        if not math.isfinite(value):
+                                            raise ValueError('Scaled PLC value is not finite')
+                                    self.samples[alias] = {'value': value, 'quality': 'good', 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate, 'error': None}
                                 except (ValueError, KeyError, TypeError, IndexError) as failure:
-                                    self.samples[alias] = {'value': None, 'quality': 'bad', 'timestamp': utc_now(), 'monotonic': now, 'rate_ms': rate, 'error': str(failure)}
+                                    self.samples[alias] = {'value': None, 'quality': 'bad', 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate, 'error': str(failure)}
 
     def sample_snapshot(self, now=None):
         now = time.monotonic() if now is None else now
@@ -307,14 +343,15 @@ class RuntimeDriver(SimulatorDriver):
                 with self.lock:
                     return super().write(address, values)
             kind = tag['members'][member] if member else tag['type']
-            if not tag['writable'] or len(values) != 1 or not type_ok(values[0], kind) or kind == 'struct':
+            write_kind = 'number' if kind == 'integer' and not member and (tag['scale'] != 1 or tag['offset'] != 0) else kind
+            if not tag['writable'] or len(values) != 1 or not type_ok(values[0], write_kind) or kind == 'struct':
                 raise ValueError('Tag is read-only or write type is incompatible')
             value = values[0]
             if tag['connection']:
                 connection = self.connections.get(tag['connection'])
                 if not connection:
                     raise ConnectionError('PLC connection is disabled')
-                metadata = connection.metadata.get(tag['address'], {})
+                metadata = connection.tag_metadata(tag['address'])
                 if metadata.get('external_access') != 'Read/Write':
                     raise ValueError('PLC metadata does not permit writes')
                 raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
@@ -336,9 +373,21 @@ class RuntimeDriver(SimulatorDriver):
                     else:
                         self._tags[root] = float(value) if kind == 'number' else value
 
+    def coerce_number(self, address, value):
+        root, member = self.sources.get(address, (None, ''))
+        tag = self.definitions.get(root)
+        kind = tag['members'][member] if tag and member else tag['type'] if tag else 'number' if type(self._tags.get(address)) is float else 'integer' if type(self._tags.get(address)) is int else ''
+        if tag and not member and kind == 'integer' and (tag['scale'] != 1 or tag['offset'] != 0):
+            kind = 'number'
+        if kind == 'number' and type(value) is int:
+            return float(value)
+        if kind == 'integer' and type(value) is float and value.is_integer():
+            return int(value)
+        return value
+
     def status(self):
         with self.lock:
-            return [{'id': identifier, 'connected': connection.client is not None, 'error': connection.error,
+            return [{'id': identifier, 'connected': connection.connected, 'error': connection.error,
                      'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
                      'groups': [{'rate_ms': rate, 'addresses': sorted(address for (conn, address), interval in self.last_rates.items() if conn == identifier and interval == rate)}
                                 for rate in sorted({interval for (conn, _), interval in self.last_rates.items() if conn == identifier})]}

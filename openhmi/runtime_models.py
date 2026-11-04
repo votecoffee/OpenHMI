@@ -1,6 +1,9 @@
 """Connections, logical tags and history configuration, independent of the editor."""
 
 from typing import Literal
+import json
+import math
+import re
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -32,6 +35,10 @@ class TagDefinition(Model):
 
     @model_validator(mode='after')
     def valid_tag(self):
+        try:
+            json.dumps(self.initial, allow_nan=False)
+        except (ValueError, TypeError, OverflowError) as error:
+            raise ValueError('Initial values must be finite JSON data') from error
         if self.connection and not self.address:
             raise ValueError('PLC tags require an address')
         if self.scale == 0 or (self.type not in ('number', 'integer') and (self.scale != 1 or self.offset != 0)):
@@ -44,6 +51,17 @@ class TagDefinition(Model):
             types = {'boolean': (bool,), 'number': (int, float), 'integer': (int,), 'string': (str,), 'struct': (dict,)}
             if type(self.initial) not in types[self.type]:
                 raise ValueError('Initial value must match the local tag type')
+            if self.scale != 1 or self.offset != 0:
+                raise ValueError('Local tags use engineering values directly; scaling is for PLC sources')
+            for path, kind in self.members.items():
+                try:
+                    value = self.initial
+                    for part in re.findall(r'[^.\[\]]+', path):
+                        value = value[int(part)] if isinstance(value, list) else value[part]
+                    if type(value) not in types[kind]:
+                        raise ValueError('Initial UDT member type does not match its declaration')
+                except (KeyError, TypeError, IndexError) as error:
+                    raise ValueError('Initial UDT data must contain all declared members') from error
         return self
 
 

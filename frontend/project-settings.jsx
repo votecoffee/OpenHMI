@@ -3,7 +3,9 @@ import { uiText } from './localization.jsx';
 
 export function getSettings(project) {
   return { languages: project.languages || [{ code: 'en', name: 'English', flag: 'us', direction: 'ltr', translations: {} }],
-    default_language: project.default_language || 'en', alarms: project.alarms || [], alarm_history_limit: project.alarm_history_limit || 1000 };
+    default_language: project.default_language || 'en', alarms: project.alarms || [], alarm_history_limit: project.alarm_history_limit || 1000,
+    screens: project.screens || [], faceplates: project.faceplates || [], connections: project.connections || [], tags: project.tags || [],
+    update_ms: project.update_ms || 500, historian: project.historian || { tags: [], retention_days: 30, max_rows: 1000000 } };
 }
 
 export function ProjectSettings({ tab, settings, controls, title, catalog, onChange }) {
@@ -28,7 +30,10 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
     [`control.${control.id}.label`, control.label],
     ...('unit' in control ? [[`control.${control.id}.unit`, control.unit]] : []),
     ...(control.kind === 'indicator' ? [[`control.${control.id}.on_text`, control.on_text || 'ON'], [`control.${control.id}.off_text`, control.off_text || 'OFF']] : []),
-  ]), ...settings.alarms.map(alarm => [`alarm.${alarm.id}.message`, alarm.message]), ...Object.entries(uiText).map(([key, value]) => [`ui.${key}`, value])];
+  ]), ...(settings.screens || []).flatMap(screen => [[`screen.${screen.id}.title`, screen.title], ...screen.controls.flatMap(control => [
+    [`control.${screen.id}__${control.id}.label`, control.label], ...('unit' in control ? [[`control.${screen.id}__${control.id}.unit`, control.unit]] : []),
+    ...(control.kind === 'indicator' ? [[`control.${screen.id}__${control.id}.on_text`, control.on_text || 'ON'], [`control.${screen.id}__${control.id}.off_text`, control.off_text || 'OFF']] : [])])]),
+    ...settings.alarms.map(alarm => [`alarm.${alarm.id}.message`, alarm.message]), ...Object.entries(uiText).map(([key, value]) => [`ui.${key}`, value])];
   function updateAlarm(index, change) { onChange({ ...settings, alarms: settings.alarms.map((alarm, i) => i === index ? { ...alarm, ...change } : alarm) }); }
   if (tab === 'languages') return <section className="project-settings" aria-label="Language settings">
     <h2>Project languages</h2><p>Only added languages appear in the runtime flag selector. Empty translations use the source text.</p>

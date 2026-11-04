@@ -1,0 +1,26 @@
+.engineering { padding: 20px; background: #ddd; }
+.engineering :is(input,select,button) { font: inherit; padding: 6px; border: 1px solid #888; background: #f2f2f2; color: #333; }
+.engineering label { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px; font-size: 12px; }
+.engineering button { cursor: pointer; background: #002878; color: white; min-height: 36px; margin: 6px; }
+.engineering button:disabled { background: #ccc; color: #666; }
+.engineering fieldset { margin: 12px 0; border: 1px solid #999; }
+.engineering table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.engineering :is(td,th) { padding: 6px; border-bottom: 1px solid #aaa; text-align: start; }
+.engineering table input[type="number"] { width: 100px; }
+.engineering pre { white-space: pre-wrap; }
+.binding-contents { border: 0; padding: 0; margin: 0; min-width: 0; }
+.binding-frame { min-width: 0; }
+.hmi-trend svg { width: 100%; min-height: 140px; font: 10px sans-serif; }
+.hmi-trend a { color: #002878; font-size: 12px; }
+.trend-tools { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin: 8px 0; }
+.trend-tools label { display: flex; flex-direction: column; gap: 4px; }
+.trend-tools :is(input,select,button) { font: inherit; border: 1px solid #888; padding: 5px; background: #eee; color: #333; }
+.hmi-faceplate { border: 1px solid #999; padding: 10px; background: #d4d4d4; }
+.faceplate-grid { display: grid; gap: 8px; margin-top: 8px; }
+.screen-navigation { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.screen-navigation button { border: 1px solid #888; background: #ddd; color: #333; padding: 7px 12px; cursor: pointer; font: inherit; }
+.screen-navigation button[aria-pressed="true"] { border: 2px solid #002878; }
+.hmi-popup-shade { position: fixed; inset: 0; background: #0005; display: grid; place-items: center; z-index: 10000; }
+.hmi-popup { max-height: 90vh; overflow: auto; background: #ddd; border: 2px solid #555; width: min(1000px,95vw); padding: 12px; }
+.hmi-popup > header { display: flex; justify-content: space-between; padding: 8px; }
+.hmi-popup > header button { font: inherit; padding: 6px 12px; }

@@ -173,6 +173,12 @@ class Project(StrictModel):
 
     @model_validator(mode="after")
     def unique_ids(self):
+        from .drivers import SimulatorDriver
+        if any(tag.name in SimulatorDriver().snapshot() for tag in self.tags):
+            raise ValueError('Built-in simulation and recipe tags cannot be redefined')
+        aliases = [name for tag in self.tags for name in [tag.name, *(tag.name + '.' + member for member in tag.members)]]
+        if len(aliases) != len(set(aliases)):
+            raise ValueError('Logical tag and UDT member names collide')
         ids = [control.id for control in self.controls]
         if len(ids) != len(set(ids)):
             raise ValueError("Control IDs must be unique")
