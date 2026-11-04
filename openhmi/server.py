@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict
 from .drivers import SimulatorDriver
 from .application import Application
 from .alarms import AlarmMonitor
+from .recipe_routes import add_recipe_routes
 from .projects import Project, ProjectStore, RevisionConflict, RevisionRequest, SaveRequest
 
 
@@ -20,7 +21,7 @@ class ActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def create_app(project_path: Path | None = None, handlers: Path | None = None) -> FastAPI:
+def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None) -> FastAPI:
     store = ProjectStore(project_path)
     application = Application(SimulatorDriver())
     if handlers:
@@ -67,6 +68,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
     app.state.application = application
     app.state.store = store
     app.state.alarms = monitor
+    add_recipe_routes(app, store, application, recipe_users)
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
@@ -82,6 +84,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
                 if type(value) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible alarm tag: {alarm.tag}")
         for control in project.controls:
+            if control.kind == 'recipe':
+                continue
             if control.kind == "button":
                 if control.action not in actions:
                     raise HTTPException(422, f"Unknown action: {control.action}")
@@ -98,7 +102,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
     @app.get("/api/catalog")
     def catalog() -> dict:
         return {
-            "tags": [{"name": name, "type": "boolean" if type(value) is bool else "number"}
+            "tags": [{"name": name, "type": "boolean" if type(value) is bool else "string" if type(value) is str else "number"}
                      for name, value in application.driver.snapshot().items()],
             "actions": application.actions(),
             "flags": sorted(path.stem for path in (web / "assets" / "flags").glob("*.svg")),
@@ -164,6 +168,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
     @app.get("/", include_in_schema=False)
     @app.get("/runtime", include_in_schema=False)
     @app.get("/alarms", include_in_schema=False)
+    @app.get("/recipes", include_in_schema=False)
+    @app.get("/recipe-editor", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 
@@ -177,11 +183,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="OpenHMI local live builder (simulation)")
     parser.add_argument("--project", type=Path, default=Path(".local/project.sqlite3"), help="Project database path")
     parser.add_argument("--handlers", type=Path, help="Trusted local Python action module loaded at startup")
+    parser.add_argument("--recipe-users", type=Path, default=Path('.local/recipe-users.json'), help="Server-managed recipe account file")
     args = parser.parse_args()
     assets = Path(__file__).parent / "web" / "vendor" / "app.js"
     if not assets.exists():
         raise SystemExit("Missing designer assets. Run npm ci and npm run build first.")
-    uvicorn.run(create_app(args.project, args.handlers), host="127.0.0.1", port=8000)
+    uvicorn.run(create_app(args.project, args.handlers, args.recipe_users), host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,38 @@
+.recipe-workspace { padding: 20px; color: #333; background: #ddd; font-family: "OpenHMI Noto", Arial, sans-serif; }
+.recipe-heading { display: flex; justify-content: space-between; align-items: center; }
+.recipe-heading h1 { margin-top: 0; }
+.recipe-workspace a { color: #002878; }
+.recipe-workspace label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.recipe-workspace input, .recipe-workspace select, .recipe-workspace textarea { font: inherit; padding: 7px; border: 1px solid #888; background: #f2f2f2; color: #333; max-width: 100%; }
+.recipe-workspace button { font: inherit; min-height: 38px; padding: 7px 12px; border: 1px solid #666; background: #002878; color: white; cursor: pointer; }
+.recipe-workspace button:disabled { color: #666; background: #c6c6c6; border-color: #999; cursor: default; }
+.recipe-session, .recipe-browser, .recipe-actions, .recipe-content-fields, .recipe-image-editor, .recipe-gates { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+.recipe-session { padding: 10px; border: 1px solid #999; }
+.recipe-session form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.recipe-browser > label { flex: 1; min-width: 240px; }
+.recipe-loaded { padding: 12px; border: 1px solid #999; margin: 15px 0; }
+.recipe-loaded h2 { font-size: 16px; margin-top: 0; }
+.loaded-recipe, .recipe-preview { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.loaded-recipe > div:last-child, .recipe-preview > div:last-child { flex: 1; min-width: 220px; }
+.recipe-image { width: 220px; height: 160px; object-fit: contain; background: #d4d4d4; border: 1px solid #999; }
+.recipe-no-image { width: 220px; height: 130px; display: flex; align-items: center; justify-content: center; border: 1px solid #aaa; color: #666; font-size: 12px; }
+.loaded-recipe.compact { gap: 10px; }
+.loaded-recipe.compact .recipe-image, .loaded-recipe.compact .recipe-no-image { width: 130px; height: 95px; }
+.loaded-recipe.compact p { margin: 5px 0; font-size: 11px; }
+.recipe-production { font-weight: bold; border: 1px solid #777; padding: 4px 8px; display: inline-block; }
+.recipe-review-state { display: flex; flex-wrap: wrap; gap: 12px; padding: 10px; border: 1px solid #999; font-size: 12px; }
+.recipe-hash { font: 10px monospace; overflow-wrap: anywhere; }
+.recipe-reason { margin: 15px 0; }
+.recipe-reason textarea { width: 100%; min-height: 55px; }
+.recipe-content-fields > label { flex: 1; min-width: 180px; }
+.recipe-workspace fieldset { margin: 12px 0; border: 1px solid #999; }
+.recipe-workspace table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; text-align: start; }
+.recipe-workspace :is(td, th) { text-align: start; padding: 6px; border-bottom: 1px solid #aaa; overflow-wrap: anywhere; }
+.parameter-editor input, .parameter-editor select { width: 100%; min-width: 60px; }
+.parameter-editor { table-layout: fixed; }
+.recipe-policy { border: 1px solid #999; padding: 12px; margin-top: 20px; }
+.recipe-policy > div { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+.recipe-policy label:has(input[type="checkbox"]) { flex-direction: row; }
+.recipe-policy button { margin: 6px; }
+.project-tabs a { padding: 6px 12px; border: 1px solid #888; background: #ddd; color: #333; text-decoration: none; }
+@media (max-width: 750px) { .parameter-editor { display: block; overflow-x: auto; table-layout: auto; } .recipe-workspace { padding: 12px; } }

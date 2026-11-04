@@ -115,3 +115,11 @@ implemented separately from screen controls. The Python lifespan owns the alarm
 sampling task; SQLite retains alarm occurrences and events. Runtime graphics
 consume its status without driving the monitor. Draft language/alarm settings
 share the screen's validation, revision checks and Apply live boundary.
+
+[SQL recipes](recipes.md) use a separate revision and review lifecycle. Python
+owns immutable content revisions, approval identity, field-change audit, images
+and operation policy in SQLite. Loading takes a separate snapshot of the content
+and its production-approval Boolean. Library changes do not alter the simulator's
+loaded copy. Test recipes may be loaded; the eventual controller owns run/reject
+decisions. Recipe accounts protect those operations only; application-wide
+authentication and a real controller transfer handshake remain future work.

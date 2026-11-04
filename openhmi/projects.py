@@ -59,6 +59,10 @@ class ButtonControl(ControlBase):
     action: str = Field(min_length=1, max_length=100)
 
 
+class RecipeSelectionControl(ControlBase):
+    kind: Literal['recipe']
+
+
 class Language(StrictModel):
     code: str = Field(pattern=r"^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$", max_length=35)
     name: str = Field(min_length=1, max_length=60)
@@ -90,7 +94,7 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl, Field(discriminator="kind")]
 
 
 class Project(StrictModel):

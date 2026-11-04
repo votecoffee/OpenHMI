@@ -12,6 +12,11 @@ export const uiText = {
   raised: 'Raised', time: 'Time', event: 'Event', quality_bad: 'Bad trigger data', quality_recovered: 'Trigger data recovered',
   configuration_changed: 'Configuration changed', noOutstanding: 'No outstanding alarms', noHistory: 'No alarm events',
   working: 'Working...', pending: 'Command pending', completed: 'Action completed', configureAction: 'Select to configure action',
+  recipes: 'Recipes', recipeNoImage: 'No recipe image', recipeUnavailable: 'Recipe selection unavailable', recipeNotLoaded: 'No recipe loaded',
+  recipeRevision: 'Revision', recipeProduction: 'PRODUCTION APPROVED', recipeTest: 'NOT PRODUCTION APPROVED', recipeLoadedBy: 'Loaded by',
+  recipeApprovedBy: 'Approved by', recipeParameter: 'Parameter', recipeValue: 'Value', recipeUnits: 'Units', recipeLoadedCopy: 'Loaded copy',
+  recipeLibrary: 'Recipe library / revision', recipeLoad: 'Load recipe', recipeClear: 'Clear loaded copy',
+  recipePlcDecision: 'Production approval travels with the loaded copy. The PLC decides whether to run, reject parts or inhibit operation.',
 };
 const Context = createContext(null);
 const english = { code: 'en', name: 'English', flag: 'us', direction: 'ltr', translations: {} };

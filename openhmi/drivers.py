@@ -2,6 +2,7 @@
 
 from typing import Protocol, TypeAlias
 import math
+from copy import deepcopy
 
 Value: TypeAlias = bool | int | float | str
 
@@ -16,7 +17,18 @@ class SimulatorDriver:
     """In-memory scalar tags, with no network or controller connection."""
 
     def __init__(self) -> None:
-        self._tags: dict[str, Value] = {"TankLevel": 42.0, "MotorRunning": True, "ProcessAlarm": False, "AlarmWord": 0}
+        self._tags: dict[str, Value] = {"TankLevel": 42.0, "MotorRunning": True, "ProcessAlarm": False, "AlarmWord": 0,
+                                      "RecipeProductionApproved": False, "RecipeRevision": 0, "RecipeCode": '', "RecipeChangeAllowed": False}
+        self._loaded_recipe = None
+
+    def load_recipe(self, snapshot):
+        self._loaded_recipe = deepcopy(snapshot)
+        self._tags['RecipeProductionApproved'] = bool(snapshot and snapshot['production_approved'])
+        self._tags['RecipeRevision'] = snapshot['number'] if snapshot else 0
+        self._tags['RecipeCode'] = snapshot['code'] if snapshot else ''
+
+    def recipe_copy(self):
+        return deepcopy(self._loaded_recipe)
 
     def read(self, address: str, count: int = 1) -> list[Value]:
         if type(count) is not int or count != 1:

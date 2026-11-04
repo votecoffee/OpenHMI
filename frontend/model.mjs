@@ -1,6 +1,7 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', alarm: 'AlarmIndicator',
+  recipe: 'SelectedRecipe',
 };
 const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type]) => [type, kind]));
 
@@ -17,6 +18,7 @@ export function toProject(data, settings = {}) {
     schema_version: 1, title: data.root.props.title, columns: Number(data.root.props.columns),
     controls: data.content.map(({ type, props }) => {
       const base = { kind: kinds[type], id: props.id, label: props.label };
+      if (type === 'SelectedRecipe') return base;
       if (type === 'ActionButton') return { ...base, action: props.action };
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
       if (type === 'Indicator') return { ...base, tag: props.tag, on_text: props.on_text ?? 'ON', off_text: props.off_text ?? 'OFF' };

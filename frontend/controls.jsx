@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState } from 'react';
 import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
+import { LoadedRecipe } from './recipes.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -124,6 +125,12 @@ function ActionButton({ id, label, action, puck }) {
   </article>;
 }
 
+function SelectedRecipe({ id, label }) {
+  const { text } = useLocalization();
+  return <article className="hmi-control hmi-recipe" data-control="recipe"><span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    <LoadedRecipe compact /></article>;
+}
+
 function ScreenFrame({ children, title, columns, puck }) {
   const live = useContext(Live);
   const { text, ui, language } = useLocalization();
@@ -165,6 +172,7 @@ export function createConfig(catalog) {
     },
     categories: { hmi: { title: 'High performance HMI', components: Object.values(controlTypes) } },
     components: {
+      SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },
       Indicator: {
         label: 'Indicator', fields: { label: labelField, tag: tagField('boolean'), on_text: { type: 'text', label: 'ON text' }, off_text: { type: 'text', label: 'OFF text' } },

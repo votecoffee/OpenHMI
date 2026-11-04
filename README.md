@@ -30,6 +30,8 @@ conflict detection and automatic updates in already-open runtime viewers.
 Python modules can register custom named actions at startup. Project languages
 support translated operator text and a flag selector. A project-wide Python alarm
 service monitors tag triggers and retains occurrences, acknowledgement and history.
+SQL recipes include a generic editor/viewer, product images, typed parameters,
+revision history, recorded approvals and an independent loaded recipe copy.
 
 Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
 the supplied high-performance HMI references and FactoryTalk View ME templates.
@@ -39,7 +41,8 @@ Alarm symbols combine priority number, shape and the ME template palette.
 
 Current limits: one screen, a configurable control grid, simulation only, 500 ms polling,
 no integrated Python editor or Python hot reload, and no screen-revision history/rollback UI.
-There is no PLC adapter or production authentication yet.
+There is no PLC adapter or application-wide production authentication yet.
+Recipe operations have their own server-managed accounts and roles.
 
 ## Install
 
@@ -134,6 +137,32 @@ Concurrent editors use revision checks. A stale save/apply is rejected; the
 editor retains local changes and asks you to copy them before reloading. Conflict
 merging is not implemented. Previous browser-local GrapesJS prototype saves are
 left in browser storage and are not automatically imported into this format.
+
+### Recipes
+
+Create a local recipe account (the password is prompted), then start OpenHMI:
+
+```powershell
+.\.venv\Scripts\openhmi-users.exe --user engineer --roles engineer approver operator
+.\.venv\Scripts\openhmi.exe
+```
+
+Open **Recipes** and **Recipe editor** to create recipes, add parameters and a
+PNG/JPEG product image, and record a reason for each change. Each save creates a
+new content revision. Submit and approve it for production; the author may also
+approve when their account has that role. Approval records the signed-in user.
+The SQL history retains field changes, review decisions and load operations.
+
+Both test and approved recipes may be loaded. Loading copies the recipe and its
+`RecipeProductionApproved` Boolean to the simulator. Later library changes leave
+that copy unchanged until explicitly loaded again. The PLC will own the decision
+to run, reject parts or inhibit operation; there is no mandatory stopped-machine
+gate. Actual PLC transfer is future adapter work.
+
+Drop **Selected recipe** onto a screen to show the loaded product and its image.
+An administrator can freeze editing, approval or loading separately and optionally
+bind those operations to Boolean permit tags. See [recipe setup and semantics](docs/recipes.md)
+for account roles, change policy, persistence and transfer boundaries.
 
 ### Python customization
 

@@ -23,30 +23,69 @@ the project's SQLite database, separately from screen drafts and alarm history.
 ## Management structure
 
 Recipe mutations require a signed-in account configured on the server. Roles are
-engineer (author/submit), approver (review/withdraw), operator (select), and
-administrator (manage policy and perform role operations). By default an author
-cannot approve their own revision, including when they are an administrator.
-Policy changes are version checked and require an administrator's reason.
+engineer (author/submit/load), approver (review/withdraw), operator (load), and
+administrator (manage policy and perform role operations). One person may hold
+multiple roles and approve their own changes. Approval records the actual signed-in
+user, timestamp and review comment. Policy changes are version checked and require
+an administrator's reason.
 
-Editing and approval can each be frozen, or tied to a configured Boolean permit
-tag. Production selection starts disabled. When enabled, it requires an approved
-revision, a true recipe-change permit and, by default, a stopped machine.
-Missing, invalid or unavailable interlock values block the operation. The server
-checks policy, role, exact revision and interlocks in the same operation that
-records a change. The UI cannot bypass these checks.
+Editing, approval and loading can each be enabled/frozen, or optionally tied to a
+configured Boolean application permit tag. They start enabled with no application
+permit. Missing/invalid permit values block only operations that use that permit.
+There is no stopped-machine requirement and no approval-based loading prohibition:
+unapproved recipes may be loaded for testing. The PLC decides whether to run, reject
+parts or inhibit operation. Server checks for role, exact revision, policy and any
+configured permit are applied to the operation that records a change.
 
-Selection records the approved revision ID and its content hash. New approvals
-never select themselves. Selecting an older approved revision is an explicit,
-audited selection under the same operating rules. A selected revision cannot be
-withdrawn until another approved revision is selected or the selection is cleared.
+Loading records an independent snapshot of the recipe content, image, revision ID,
+content hash and production-approval state. The simulator exposes
+`RecipeProductionApproved` (BOOL), `RecipeCode` (STRING) and `RecipeRevision` (integer),
+plus a copied parameter payload through `driver.recipe_copy()` / `app.recipes.selected()`.
+An approved library revision loads with the Boolean true; other states load false.
+New edits, approvals and withdrawals leave the already-loaded copy unchanged.
+Reload explicitly when the PLC copy or its approval flag should change.
 
 ## Screens
 
-The generic editor manages recipes, parameter rows, images, reasons, revision
-comparisons and review/history. The operator viewer shows approved recipes and
-the selected production revision, with its image and parameter values. Previewing
-a recipe is distinct from selecting it. A reusable HMI control shows the current
-selection so the operator can identify the selected product on a custom screen.
+The generic editor manages recipes, typed parameter rows and limits, images,
+reasons, field-level change history and review decisions. The operator viewer
+shows library revisions and the loaded copy with their images and parameters.
+Previewing a recipe is distinct from loading it. The **Selected recipe** toolbox
+control shows the loaded product on a custom screen. The library begins empty;
+no customer or production recipe is created automatically.
+
+## Local accounts and use
+
+Create an account from the checkout; passwords are prompted and are not command-line
+arguments. The user file belongs under ignored `.local/`, outside Git:
+
+```powershell
+.\.venv\Scripts\openhmi-users.exe --user engineer --roles engineer approver operator
+.\.venv\Scripts\openhmi-users.exe --user manager --roles administrator
+.\.venv\Scripts\openhmi.exe --recipe-users .local/recipe-users.json
+```
+
+Accounts use salted PBKDF2-HMAC-SHA256 hashes with 600,000 iterations, server-side
+one-hour sessions and HttpOnly/SameSite cookies. The work factor follows the
+[OWASP password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+Account changes require a server restart; sessions are not persisted. There are
+no default credentials or browser-selectable roles. Existing accounts are preserved
+by the account-creation command. Protect the local account file and database with
+the operating system's normal access controls.
+
+Open `/recipe-editor`, sign in, create a recipe and provide a reason. Each save
+creates a draft revision. Submit it, enter another reason and approve or reject it.
+The approver may be the author when their account has the approver role.
+Open `/recipes` to preview or load either test or approved recipes. A load reason
+is required. The administrator's change-policy panel controls each operation and
+optional application permits; every policy change is audited.
+
+Images are uploaded as PNG/JPEG (maximum 5 MiB input, 4096x4096 pixels), decoded,
+orientation-corrected, stripped of metadata and stored as canonical PNG SQL blobs
+(maximum 8 MiB). Updating an image requires a new recipe content revision.
+Numeric values are type/limit checked, and integer values are bounded to the exact
+range supported by the browser editor. Operator UI labels use the project's
+language system; recipe content text is displayed as authored.
 
 ## Initial scope
 
@@ -56,6 +95,8 @@ identity for recipe operations; this is not a qualified electronic-signature or
 regulatory-compliance claim. Trusted Python code and database administrators remain
 inside the application's trust boundary.
 
-Selection is an HMI-side record, not proof of a controller download or readback.
-The first PLC adapter will need an explicit transfer/acknowledgement transaction
-and commissioning checks. Images identify products; no customer images are shipped.
+The current load publishes to the in-process simulator, not a real controller.
+Its last loaded copy is retained in SQL and restored to that simulator on restart.
+A real adapter needs a transfer/acknowledgement transaction and readback that
+associates parameters and `RecipeProductionApproved` with the same copied revision.
+The PLC's running copy and run/reject logic remain independent of library editing.

@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   use: { channel: 'chrome', baseURL: 'http://127.0.0.1:8765', viewport: { width: 1440, height: 1000 } },
   webServer: {
-    command: `"${python}" -m uvicorn openhmi.server:create_app --factory --host 127.0.0.1 --port 8765`,
+    command: `"${python}" -m uvicorn tests.browser_server:create_test_app --factory --host 127.0.0.1 --port 8765`,
     url: 'http://127.0.0.1:8765/api/tags',
     reuseExistingServer: false,
   },

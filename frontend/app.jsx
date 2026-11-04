@@ -5,12 +5,14 @@ import '@puckeditor/core/no-external.css';
 import '../openhmi/web/style.css';
 import './hmi.css';
 import './project-tools.css';
+import './recipes.css';
 import { Live, ScreenControls, createConfig } from './controls.jsx';
 import { toEditor, toProject } from './model.mjs';
 import { api, json } from './api.mjs';
 import { Localization } from './localization.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
 import { AlarmConsole } from './alarm-console.jsx';
+import { RecipeWorkspace } from './recipes.jsx';
 
 const editorOverrides = { headerActions: () => null };
 
@@ -91,7 +93,7 @@ function Builder({ initial, config, catalog }) {
         <a href="/runtime" target="_blank" rel="noreferrer">Open live screen ↗</a></div></div>
     <p role="status" aria-label="Draft status" className="save-status">{message}</p>
     <nav className="project-tabs" aria-label="Project tools">{[['screen', 'Screen'], ['languages', 'Languages'], ['alarms', 'Alarm setup']].map(([key, label]) =>
-      <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}</nav>
+      <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}<a href="/recipe-editor">Recipes</a></nav>
     {tab !== 'screen' && <ProjectSettings tab={tab} settings={settings} controls={previewControls} title={previewProject.title} catalog={catalog} onChange={settingsChanged} />}
     <div hidden={tab !== 'screen'}><Puck config={config} data={initialData} iframe={{ enabled: false }}
       headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed}
@@ -111,9 +113,10 @@ function App({ initial, catalog }) {
     let stopped = false;
     let timer;
     async function tick() {
-      const [tags, alarms] = await Promise.allSettled([api('/api/tags'), api('/api/alarms')]);
+      const [tags, alarms, recipe] = await Promise.allSettled([api('/api/tags'), api('/api/alarms'), api('/api/recipes/selected')]);
       if (!stopped) setLive({ values: tags.status === 'fulfilled' ? tags.value.values : {}, connected: tags.status === 'fulfilled',
-        alarms: alarms.status === 'fulfilled' ? alarms.value : null, alarmConnected: alarms.status === 'fulfilled' });
+        alarms: alarms.status === 'fulfilled' ? alarms.value : null, alarmConnected: alarms.status === 'fulfilled',
+        recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' });
       if (runtime) {
         try {
           const next = await api('/api/project/active');
@@ -129,8 +132,8 @@ function App({ initial, catalog }) {
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
       <span className={`connection ${live.connected ? 'connected' : ''}`}>{live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
     {runtime ? <main className="runtime"><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
-      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
-      <Localization project={active.project}>{location.pathname === '/alarms' ? <AlarmConsole /> : <ScreenControls.Provider value={active.project.controls}><Render config={config} data={toEditor(active.project)} /></ScreenControls.Provider>}</Localization></main> : <MemoBuilder initial={initial} config={config} catalog={catalog} />}
+      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
+      <Localization project={active.project}>{['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={catalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <ScreenControls.Provider value={active.project.controls}><Render config={config} data={toEditor(active.project)} /></ScreenControls.Provider>}</Localization></main> : <MemoBuilder initial={initial} config={config} catalog={catalog} />}
   </Live.Provider>;
 }
 
