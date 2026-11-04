@@ -104,6 +104,7 @@ class RecipeTransferTests(unittest.TestCase):
         app, client = self.setup_app(remote=True)
         revision = self.create(client)
         before = deepcopy(self.values(app)['Running'])
+        app.state.driver.poll()  # This fixture has no background acquisition loop; obtain a fresh sample after login/setup.
         result = self.dispatch(client, revision)
         identifier = result['transfer']['id']
         self.assertEqual(result['transaction']['state'], 'requested')

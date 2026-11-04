@@ -116,7 +116,8 @@ is retained, but a persistent hold prevents opening connections until a user
 explicitly applies the reviewed project. The Python entry file is saved alongside
 the database as `.handlers.py` for review, and is never executed on import/open.
 After review, select it explicitly with `openhmi --project PATH --handlers PATH`.
-Screen revision history, diff/rollback UI and installer packaging remain deferred.
+[Project revisions, comparison, staged rollback and merge recovery](project-recovery.md)
+are now available. Installer packaging remains M6 work.
 
 The new backend contracts have offline checks for batched polling, rate merging,
 UDT member reads, reconnect/write behavior, history quality/deadband and resolved

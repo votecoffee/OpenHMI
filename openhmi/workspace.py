@@ -13,12 +13,12 @@ import zipfile
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from .projects import Project, ProjectStore
+from .projects import Project, ProjectStore, default_project
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
           'security_settings', 'security_group', 'security_user', 'security_windows', 'security_audit', 'tag_history',
-          'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'operator_activity', 'command_transaction', 'command_event', 'recipe_transfer', 'sqlite_sequence'}
+          'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'operator_activity', 'command_transaction', 'command_event', 'recipe_transfer', 'project_storage', 'project_revision', 'project_recovery', 'sqlite_sequence'}
 
 
 class ProjectWorkspace:
@@ -119,7 +119,11 @@ class ProjectWorkspace:
                     Project.model_validate(state['active'])
                 # Construct without starting lifespan: validation cannot contact a PLC or execute handlers.
                 candidate = self._app(temporary)
-                candidate.state.store.close()
+                try:
+                    candidate.state.store.verify_history()
+                    candidate.state.store.fork_identity()
+                finally:
+                    candidate.state.store.close()
                 extras = {target.with_suffix('.hold'): b'Imported PLC connections require Apply live.\n'}
                 if 'handlers.py' in files:
                     extras[target.with_suffix('.handlers.py')] = files['handlers.py']
@@ -147,7 +151,9 @@ class ProjectWorkspace:
             raise HTTPException(422, 'Provide a project title of 1–120 characters')
         with target.open('xb'):
             pass
-        store = ProjectStore(target)
+        initial = default_project()
+        initial.title = title
+        store = ProjectStore(target, initial_project=initial)
         try:
             from .security import Security
             Security(store)
@@ -155,9 +161,6 @@ class ProjectWorkspace:
                 source = self.current.state.store._db
                 security = {table: source.execute(f'SELECT * FROM {table}').fetchall() for table in ('security_settings', 'security_group', 'security_user', 'security_windows')}
             with store.transaction() as db:
-                state = store._read()
-                state['draft']['title'] = state['active']['title'] = title
-                db.execute('UPDATE project SET state=? WHERE id=1', (json.dumps(state),))
                 for table, rows in security.items():
                     db.execute(f'DELETE FROM {table}')
                     if rows:

@@ -27,7 +27,9 @@ The editor and runtime use the same controls and show live tag values.
 Implemented: numeric displays, binary indicators, analog ranges, alarm indicators,
 action buttons, tag/action dropdowns,
 server-side draft autosave, validated screen data, explicit apply, revision
-conflict detection and automatic updates in already-open runtime viewers.
+conflict detection and automatic updates in already-open runtime viewers. Applied
+project revisions retain hashes, users/reasons and rollback provenance; engineers
+can compare/stage older screens and recover/merge stale editor candidates.
 Python modules can register custom named actions at startup. Project languages
 support translated operator text and a flag selector. A project-wide Python alarm
 service monitors tag triggers and retains occurrences, acknowledgement and history.
@@ -53,7 +55,8 @@ labels, subdued blue live values, flat navy commands and neutral normal states.
 Alarm symbols combine priority number, shape and the ME template palette.
 
 Current limits: configurable grids rather than free placement, best-effort polling,
-no integrated Python editor/hot reload and no screen-revision rollback UI.
+no integrated Python editor/hot reload. Project revisions and recovery have
+offline software checks; deployment and operator acceptance remain separate.
 The ControlLogix adapter has offline protocol and browser checks; live PLC
 commissioning and Windows/domain password logon still need validation with
 configured hardware/accounts. HMI recipe selection and PLC recipe transfer are
@@ -211,9 +214,12 @@ values reset when Python restarts. To use a separate project database:
 .\.venv\Scripts\openhmi.exe --project .local/another-project.sqlite3
 ```
 
-Concurrent editors use revision checks. A stale save/apply is rejected; the
-editor retains local changes and asks you to copy them before reloading. Conflict
-merging is not implemented. Previous browser-local GrapesJS prototype saves are
+Concurrent editors use revision checks. A stale save/apply opens a three-way
+recovery review with explicit choices for overlapping edits. Local candidates
+survive reload in per-project/account/tab browser storage, and can be retained or
+merged on the server. Revisions supports comparison, screen-only/full-project
+draft staging and rollback into a new applied revision. See
+[project history, migration and recovery](docs/project-recovery.md). Previous browser-local GrapesJS prototype saves are
 left in browser storage and are not automatically imported into this format.
 
 ### Login and security groups
@@ -301,7 +307,7 @@ The server validates a typed, versioned OpenHMI screen schema rather than storin
 raw HTML/CSS or Puck internals. SQLite transactions protect draft/active updates.
 Existing viewers poll for new active revisions; tag state remains owned by Python.
 
-Next work: [screen history/rollback and project lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
+Next work: [packaged installation and lifecycle](https://github.com/votecoffee/OpenHMI/issues/9),
 [Python IDE and reload (deferred)](https://github.com/votecoffee/OpenHMI/issues/2),
 [PLC hardware acceptance](https://github.com/votecoffee/OpenHMI/issues/3),
 and [equipment controls/operator validation](https://github.com/votecoffee/OpenHMI/issues/4).
@@ -313,8 +319,9 @@ See the [milestone-based development plan](docs/project-plan.md) and
 The verified software baseline and M1 operator activity/diagnostic workflows are
 complete as software checkpoints. M3 now includes offline-verified command
 contracts, no-code bindings and versioned recipe transfer/copy verification.
-Equipment acceptance remains open. Bench commissioning, project recovery,
-operator review and packaged pilot acceptance follow.
+Equipment acceptance remains open. M4 project revision/diff/staging, stale-editor
+merge recovery and migration/restore checks are also delivered offline. Bench
+commissioning, operator review and packaged pilot acceptance follow.
 The integrated Python IDE remains deferred.
 
 ## Maintainers

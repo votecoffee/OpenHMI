@@ -25,7 +25,8 @@ from .alarms import AlarmMonitor
 from .recipe_routes import add_recipe_routes
 from .security import Security
 from .security_routes import add_security_routes
-from .projects import Project, ProjectStore, RevisionConflict, RevisionRequest, SaveRequest
+from .projects import Project, ProjectStore, RevisionConflict, ApplyRequest, SaveRequest
+from .project_routes import add_project_routes
 
 
 class ActionRequest(BaseModel):
@@ -251,6 +252,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             return operation(request)
         except RevisionConflict as error:
             raise HTTPException(409, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
 
     @app.put("/api/project/draft")
     def save(request: SaveRequest, http: Request) -> dict:
@@ -259,13 +262,14 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         return transact(store.save, request)
 
     @app.post("/api/project/apply")
-    def apply(request: RevisionRequest, http: Request) -> dict:
-        security.require(http, 'project.edit')
+    def apply(request: ApplyRequest, http: Request) -> dict:
+        principal = security.require(http, 'project.edit')
+        identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
         with commands.lock, monitor.lock:
             def validate_apply(project):
                 validate_bindings(project)
                 commands.validate_apply(project.model_dump())
-            result = transact(lambda value: store.apply(value, validate_apply), request)
+            result = transact(lambda value: store.apply(value, validate_apply, identity), request)
             application.driver.plc_hold = False
             if hasattr(app.state, 'release_connections'):
                 app.state.release_connections()
@@ -273,6 +277,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             historian.configure(Project.model_validate(result['active']).historian.model_dump())
             sample_alarms()
             return result
+
+    add_project_routes(app, store, security, validate_bindings)
 
     @app.get("/api/alarms")
     def alarms() -> dict:
@@ -464,6 +470,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get('/activity', include_in_schema=False)
     @app.get('/diagnostics', include_in_schema=False)
     @app.get('/commands', include_in_schema=False)
+    @app.get('/revisions', include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 
