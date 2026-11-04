@@ -1,6 +1,6 @@
 # Live HMI builder architecture
 
-Decision date: 2026-11-04. Status: selected direction; implementation in progress.
+Decision date: 2026-11-04. Status: working local simulation prototype.
 
 OpenHMI is a live HMI builder for automation developers. A basic application
 must be possible without code: drop controls, select tags, configure formatting
@@ -97,3 +97,13 @@ faceplates, multiple screens and richer graphics remain future work.
 Track the next work in [project/editor lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
 [Python customization and subscriptions](https://github.com/votecoffee/OpenHMI/issues/2),
 and [first PLC adapter](https://github.com/votecoffee/OpenHMI/issues/3).
+
+## Current validation
+
+Local Python tests cover rejected bindings/schema data, draft/apply separation,
+stale revision rejection, persistence across server restarts, built-in actions
+and loading/invoking a custom Python action. Browser checks exercise actual
+drag/drop, property editing, autosave/reload, apply to an already-open viewer,
+live tag updates after a Python action, disconnected values and stale-editor
+conflicts. Editor preview actions stay disabled. These are simulation checks,
+not PLC, production deployment or arbitrary Python hot-reload acceptance.

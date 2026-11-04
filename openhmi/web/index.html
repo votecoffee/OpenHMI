@@ -3,21 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OpenHMI Designer</title>
-  <link rel="stylesheet" href="/static/vendor/grapes.min.css">
-  <link rel="stylesheet" href="/static/style.css">
-  <script defer src="/static/vendor/grapes.min.js"></script>
-  <script defer src="/static/designer.js"></script>
+  <title>OpenHMI Live Builder</title>
+  <link rel="stylesheet" href="/static/vendor/app.css">
+  <script type="module" src="/static/vendor/app.js"></script>
 </head>
 <body>
-  <header>
-    <strong>OpenHMI</strong><span>Python runtime / web designer</span>
-    <button id="save">Save locally</button><button id="load">Load saved</button>
-    <button id="run">Run screen</button><button id="design" hidden>Back to designer</button>
-  </header>
-  <p id="status" role="status">Simulation only. Drag controls onto the screen; select a control to edit its address in Settings.</p>
-  <div id="designer"></div>
-  <main id="runtime" hidden aria-label="Runtime screen"></main>
-  <footer>Experimental designer. Values come from Python's simulator. No PLC connection.</footer>
+  <div id="root">Opening OpenHMI...</div>
 </body>
 </html>

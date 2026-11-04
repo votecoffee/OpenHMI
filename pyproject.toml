@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openhmi"
 version = "0.1.0.dev0"
-description = "Python HMI runtime with an experimental web designer"
+description = "Live HMI builder with no-code screens and Python customization"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+dependencies = ["fastapi>=0.115,<1", "pydantic>=2.9,<3", "uvicorn>=0.30,<1"]
 
 [project.optional-dependencies]
 test = ["httpx>=0.27,<1"]

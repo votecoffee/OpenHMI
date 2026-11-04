@@ -1,7 +1,6 @@
 # OpenHMI
 
-Python HMI runtime with an experimental drag-and-drop web designer, inspired by
-AdvancedHMI's communication components and control-address bindings.
+Build and change an HMI live, without web development skills. Customize it with Python.
 
 ## Table of Contents
 
@@ -15,21 +14,31 @@ AdvancedHMI's communication components and control-address bindings.
 
 ## Background
 
-OpenHMI aims to combine Python drivers and application logic with familiar HMI
-screen design: a toolbox, property inspector, reusable controls and named driver
-instances. The selected direction is a Python runtime and browser designer.
+OpenHMI is becoming a visual HMI development environment for the automation
+community. Simple applications should need no code: drop controls, choose tags,
+configure formatting and actions, and apply the screen. Python is the extension
+language when an application needs custom behavior.
 
-The current prototype extends **GrapesJS core**, an open-source visual editor.
-It includes numeric-display and indicator controls, an address property,
-browser-local screen save/load, a runtime view and a Python simulator.
-It has no PLC connection, browser write endpoint, Python code-behind editor,
-subscription engine or AdvancedHMI project importer yet.
+The prototype uses Puck with an HMI control catalog. The developer sees screen,
+tag, units, decimal places and action properties rather than HTML, CSS or React.
+The editor and runtime use the same controls and show simulated values live.
+
+Implemented: numeric displays, indicators, action buttons, tag/action dropdowns,
+server-side draft autosave, validated screen data, explicit apply, revision
+conflict detection and automatic updates in already-open runtime viewers.
+Python modules can register custom named actions at startup.
+
+Current limits: one screen, a card-grid layout, simulation only, 500 ms polling,
+no integrated Python editor or Python hot reload, and no history/rollback UI.
+There is no PLC adapter or production authentication yet.
 
 ## Install
 
-Prerequisites: Python 3.11+, Node.js/npm for preparing editor assets, and a browser.
-Development has been checked on Windows with Python 3.14; older supported Python
-versions have not yet been exercised. Run these commands from the checkout:
+This is contributor setup, not the intended packaged end-user installation.
+Prerequisites: Python 3.11+, Node.js 20+/npm for building browser assets, and a
+browser. Windows/Python 3.14 is the locally checked environment.
+
+From the checkout:
 
 ```powershell
 python -m venv .venv
@@ -38,58 +47,89 @@ npm.cmd ci
 npm.cmd run build
 ```
 
-The build copies pinned GrapesJS core assets and its license into an ignored
-runtime asset folder. There is no CDN dependency at runtime. Node.js is needed
-for development/build preparation, not by the running Python server.
-The Python dependency ranges are not a reproducible deployment lockfile yet.
+Assets are bundled locally, with no CDN or cloud editor requirement. The running
+server needs Python and a browser; Node is a build/contributor dependency.
+Release packaging should eventually hide this setup from HMI developers.
+Python dependencies currently use version ranges rather than a deployment lockfile.
 
 ## Usage
 
-Start the loopback-only simulation server:
+Start the local simulation builder:
 
 ```powershell
 .\.venv\Scripts\openhmi.exe
 ```
 
-Open <http://127.0.0.1:8000>. The screen starts with a numeric display bound to
-`TankLevel` and an indicator bound to `MotorRunning`.
+Open <http://127.0.0.1:8000>. Keep [the live screen](http://127.0.0.1:8000/runtime)
+open in another tab while editing.
 
-1. Drag a control from the HMI controls toolbox onto the canvas.
-2. Select it, open Settings (the gear icon), and edit `PLCAddressValue`.
-3. Click **Save locally** to save in this browser's local storage. Click
-   **Load saved** to restore that screen, including after a page reload.
-4. Click **Run screen** to render controls with values from the Python simulator.
-   Click **Back to designer** to resume editing.
+1. Drag a numeric display, indicator or action button from the toolbox.
+2. Select a control. Choose a tag or action from its property dropdown; edit its
+   label, units and formatting as appropriate. No code is needed for these steps.
+3. Changes autosave to the Python server after a short pause. Wait for the saved
+   status or click **Save draft** before closing the editor.
+4. Click **Apply live**. The existing runtime tab updates without reloading the
+   page or restarting Python. Draft edits do not change the active screen until applied.
+5. In the runtime tab, **Toggle simulated motor** invokes a built-in Python action.
+   The indicator changes in both tabs. Editor preview buttons do not execute actions.
 
-Runtime uses flow layout and a subset of size/spacing properties. It does not
-reproduce arbitrary editor HTML/CSS. Unknown addresses and lost API connectivity
-are shown explicitly. Screen saving is browser-local and tied to this origin;
-it is not a portable application file or a server-side backup.
+The default project database is `.local/project.sqlite3`, relative to the working
+directory. It retains draft and active screens across restarts. Simulated tag
+values reset when Python restarts. To use a separate project database:
 
-The simulator's scalar Python contract is available independently of the UI:
-
-```python
-from openhmi.drivers import SimulatorDriver
-
-driver = SimulatorDriver()
-print(driver.read("TankLevel"))  # [42.0]
-driver.write("TankLevel", [17.5])
+```powershell
+.\.venv\Scripts\openhmi.exe --project .local/another-project.sqlite3
 ```
 
-The development server is an unauthenticated local simulation tool. Production
-deployment, real PLC access and operator writes are future implementation work.
-Stop the server with Ctrl+C.
+Concurrent editors use revision checks. A stale save/apply is rejected; the
+editor retains local changes and asks you to copy them before reloading. Conflict
+merging is not implemented. Previous browser-local GrapesJS prototype saves are
+left in browser storage and are not automatically imported into this format.
+
+### Python customization
+
+Start with the included example:
+
+```powershell
+.\.venv\Scripts\openhmi.exe --handlers examples/custom_actions.py
+```
+
+Select an action button and choose **Half fill simulated tank** in its Action
+property, then apply the screen. The example module contains:
+
+```python
+def half_fill(app):
+    app.driver.write("TankLevel", [50.0])
+
+def register(app):
+    app.register_action("half_fill", "Half fill simulated tank", half_fill)
+```
+
+The selected local module runs as trusted Python at startup. Project data stores
+only action names; the browser cannot upload/execute Python source. Handler edits
+currently require restarting the server. An integrated Python editor and deliberate
+module reload are planned. Screen-only changes already apply without a restart.
+If a saved screen uses a custom action, start with that handler module again.
+
+The server binds to loopback and provides unauthenticated simulation actions.
+Real equipment access, operator permissions and commissioning are separate work.
+Stop it with Ctrl+C.
 
 ## Architecture
 
-See [designer decision and roadmap](docs/architecture.md) for the evaluation of
-FUXA, GrapesJS, Eclipse Theia, WinForms/.NET interop and Qt Designer.
-See [AdvancedHMI compatibility targets](docs/advancedhmi-compatibility.md) for
-source observations, driver mapping and migration boundaries.
+See [the live builder architecture](docs/architecture.md) for requirements and the
+Anvil, Puck and Craft.js assessment. Puck is the current editor foundation; Anvil
+informs the Python-focused development experience; Craft.js remains an alternative
+for deeper editor customization. FUXA is a feature reference only and will not be adopted.
+AdvancedHMI interface/project compatibility is no longer a project requirement.
 
-We intend similar concepts and driver operations. There is no binary, VB source,
-WinForms-control or complete project compatibility claim. AdvancedHMI source,
-graphics and DLLs are not included.
+The server validates a typed, versioned OpenHMI screen schema rather than storing
+raw HTML/CSS or Puck internals. SQLite transactions protect draft/active updates.
+Existing viewers poll for new active revisions; tag state remains owned by Python.
+
+Next work: [screen/project lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
+[Python IDE and subscriptions](https://github.com/votecoffee/OpenHMI/issues/2),
+and [a first PLC adapter](https://github.com/votecoffee/OpenHMI/issues/3).
 
 ## Maintainers
 
@@ -97,8 +137,9 @@ graphics and DLLs are not included.
 
 ## Contributing
 
-Keep drivers independent of the web editor. Document unsupported addressing,
-quality, subscription and write semantics. Use simulated tags for development.
+Keep end-user workflows free of web implementation details. Prefer declarative
+bindings and common actions before requiring custom code. Keep drivers independent
+of editor controls and preserve active tag state during screen updates.
 
 Run local Python and browser checks (browser checks require installed Google Chrome):
 
@@ -107,13 +148,12 @@ Run local Python and browser checks (browser checks require installed Google Chr
 npx.cmd playwright test
 ```
 
-Browser checks start and stop their own simulation server on port 8765. No
-GitHub Actions workflows run automatically. Keep machine/customer data and
-credentials outside tracked source; `.local/` is ignored for local artifacts.
+Browser checks manage their own in-memory simulation server on port 8765.
+No automatic GitHub Actions workflows are configured. Keep machine/customer data
+and credentials outside tracked source; `.local/` is ignored for local artifacts.
 
 ## License
 
-[MIT](LICENSE), copyright 2026 votecoffee. GrapesJS core has its own BSD-3-Clause
-license, copied with the prepared web assets. Other dependencies retain their
-respective licenses. AdvancedHMI is a separate reference project with different
-terms; OpenHMI independently implements its code and controls.
+[MIT](LICENSE), copyright 2026 votecoffee. Puck, React and other dependencies retain
+their own licenses; the asset build includes dependency license texts and bundle
+notices. No Anvil, Craft.js, FUXA or AdvancedHMI code or assets are vendored.

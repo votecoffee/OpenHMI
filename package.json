@@ -2,15 +2,19 @@
   "name": "openhmi-designer",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=20" },
   "description": "Local browser assets for the OpenHMI Python runtime",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build-web.mjs"
   },
-  "dependencies": {
-    "grapesjs": "0.23.9"
-  },
   "devDependencies": {
-    "@playwright/test": "1.64.1"
+    "@playwright/test": "1.64.1",
+    "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "@puckeditor/core": "0.24.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }
