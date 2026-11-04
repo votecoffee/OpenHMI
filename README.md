@@ -8,6 +8,7 @@ Build and change an HMI live, without web development skills. Customize it with 
 - [Install](#install)
 - [Usage](#usage)
 - [Architecture](#architecture)
+- [Development plan](#development-plan)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
@@ -275,6 +276,15 @@ Next work: [screen history/rollback and project lifecycle](https://github.com/vo
 [Python IDE and reload (deferred)](https://github.com/votecoffee/OpenHMI/issues/2),
 [PLC hardware acceptance](https://github.com/votecoffee/OpenHMI/issues/3),
 and [equipment controls/operator validation](https://github.com/votecoffee/OpenHMI/issues/4).
+
+## Development plan
+
+See the [milestone-based development plan](docs/project-plan.md) and
+[GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
+The verified software baseline is complete. Current work adds operator activity
+traceability and runtime diagnostics; bench commissioning, PLC transactions/recipe
+transfer, project recovery, operator review and packaged pilot acceptance follow.
+The integrated Python IDE remains deferred.
 
 ## Maintainers
 
