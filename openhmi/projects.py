@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .runtime_models import Connection, TagDefinition, HistorianSettings
-from .runtime_models import CommandDefinition
+from .runtime_models import CommandDefinition, RecipeTransferDefinition
 
 
 class StrictModel(BaseModel):
@@ -169,6 +169,7 @@ class Project(StrictModel):
     tags: list[TagDefinition] = Field(default_factory=list, max_length=5000)
     historian: HistorianSettings = Field(default_factory=HistorianSettings)
     commands: list[CommandDefinition] = Field(default_factory=list, max_length=100)
+    recipe_transfers: list[RecipeTransferDefinition] = Field(default_factory=list, max_length=100)
     languages: list[Language] = Field(default_factory=lambda: [Language(code="en", name="English", flag="us")], min_length=1, max_length=30)
     default_language: str = "en"
     alarms: list[AlarmDefinition] = Field(default_factory=list, max_length=1000)
@@ -190,7 +191,7 @@ class Project(StrictModel):
             raise ValueError("Language codes must be unique and the default must be configured")
         if len({alarm.id for alarm in self.alarms}) != len(self.alarms):
             raise ValueError("Alarm IDs must be unique")
-        for name, items in [('screen', self.screens), ('faceplate', self.faceplates), ('connection', self.connections), ('command', self.commands)]:
+        for name, items in [('screen', self.screens), ('faceplate', self.faceplates), ('connection', self.connections), ('command', self.commands), ('recipe transfer', self.recipe_transfers)]:
             if len({item.id for item in items}) != len(items):
                 raise ValueError(f'{name} IDs must be unique')
         if any(screen.id == 'overview' for screen in self.screens):

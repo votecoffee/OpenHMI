@@ -104,3 +104,13 @@ class CommandDefinition(Model):
         if any(not name or len(name) > 160 for name in names) or len(set(names)) != len(names):
             raise ValueError('Command members must be nonempty and distinct')
         return self
+
+
+class RecipeTransferDefinition(Model):
+    id: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_-]{0,59}$')
+    name: str = Field(min_length=1, max_length=100)
+    command_id: str = Field(min_length=1, max_length=60)
+    staging_prefix: str = Field(default='Staging', min_length=1, max_length=100)
+    running_prefix: str = Field(default='Running', min_length=1, max_length=100)
+    parameters: dict[str, str] = Field(default_factory=dict, max_length=200)
+    max_string_length: int = Field(default=82, ge=64, le=1000)

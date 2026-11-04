@@ -5,6 +5,8 @@ docs/command-transactions.md, then bind Python buttons to these feedback actions
 This models the PLC side of the protocol; real PLC logic owns these members.
 """
 
+from copy import deepcopy
+
 
 def feedback(app, complete=False, result=0):
     driver = app.driver
@@ -19,6 +21,8 @@ def feedback(app, complete=False, result=0):
         # Intentionally models PLC-owned memory, outside ordinary HMI tag writes.
         values['AcceptedSequence'] = sequence
         if complete:
+            if result == 0 and 'Staging' in values and 'Running' in values:
+                values['Running'] = deepcopy(values['Staging'])
             values['ResultCode'] = result
             values['CompletedSequence'] = sequence  # Publish completion last.
 

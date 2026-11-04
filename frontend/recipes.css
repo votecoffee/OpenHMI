@@ -36,3 +36,5 @@
 .recipe-policy button { margin: 6px; }
 .project-tabs a { padding: 6px 12px; border: 1px solid #888; background: #ddd; color: #333; text-decoration: none; }
 @media (max-width: 750px) { .parameter-editor { display: block; overflow-x: auto; table-layout: auto; } .recipe-workspace { padding: 12px; } }
+
+.recipe-transfer-panel td { vertical-align: top; }

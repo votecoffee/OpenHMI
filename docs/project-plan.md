@@ -24,7 +24,7 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | M0 — Verified software baseline | Complete software checkpoint | Existing visual/runtime/project foundations verified at `8a2deb5`: 34 Python tests, 9 browser tests and package checks. No hardware/domain acceptance implied. | [M0](https://github.com/votecoffee/OpenHMI/milestone/1) |
 | M1 — Operational traceability and diagnostics | Complete software checkpoint | Durable journal and readable diagnostics delivered; 44 Python tests and 10 browser tests passed. Hardware/domain acceptance remains separate. | [M1](https://github.com/votecoffee/OpenHMI/milestone/2), [#5](https://github.com/votecoffee/OpenHMI/issues/5), [#6](https://github.com/votecoffee/OpenHMI/issues/6) |
 | M2 — ControlLogix bench acceptance | Awaiting identified bench inputs | Measured reads, data types, scan/load and reconnect behavior; subsequently controlled write acceptance with evidence. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
-| M3 — PLC transactions and recipe deployment | In progress; command software checkpoint delivered | Configurable sequence contracts and no-code command binding delivered offline; recipe transfer and hardware acceptance remain open. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
+| M3 — PLC transactions and recipe deployment | Software checkpoints delivered; hardware acceptance pending | Configurable command handshakes and versioned recipe staging/commit/copy verification delivered offline. Named PLC logic and bench acceptance remain open. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Planned; parallel software track | Persisted project revision history, useful diff/rollback, conflict recovery and migration/restore checks. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
 | M5 — Operator workflows and equipment library | Planned; equipment selection remains open | Agreed equipment faceplates, richer alarm workflows and target-display/operator review. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
 | M6 — Packaged pilot release | Planned | Clean-machine installation, local/Windows identity acceptance and documented pilot/recovery results. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
@@ -82,10 +82,12 @@ traceability for write tests. Do not choose a live machine or test tags implicit
 M3 [command software contracts](command-transactions.md) are implemented against
 a deterministic simulator while bench access is pending. Designer contracts,
 no-code bindings, persistent lifecycle records and restart/timeout handling are
-available; hardware acceptance and recipe staging/transfer remain open. The
+available. [Recipe staging/transfer and running-copy verification](recipe-transfers.md)
+are also delivered offline; hardware acceptance remains open. The
 configurable contract defines request/sequence/acknowledgement/result/timeout and
-reset ownership; the selected PLC implementation must be agreed at commissioning. Keep requested, accepted and completed states distinct; handle
-lost acknowledgements and restart without replay. Hardware completion requires
+reset ownership; the selected PLC implementation must be agreed at commissioning.
+Keep requested, accepted and completed states distinct; handle lost acknowledgements
+and restart without replay. Hardware completion requires
 the corresponding M2 evidence and agreed test tags.
 
 For recipes, stage parameters and associate revision/hash/production BOOL with one
@@ -122,8 +124,8 @@ close a bench, domain or pilot acceptance gate.
 M1's operator journal and runtime diagnostics are delivered; see
 [behavior and validation](activity-and-diagnostics.md). M2 read-only bench
 preparation can proceed when hardware details are supplied. M3 command contracts
-are delivered offline. Next develop recipe staging/transfer and M4 recovery
-features; hardware-dependent parts of M3 wait for M2. M5 choices/review can proceed alongside those tracks.
+and recipe staging/copy verification are delivered offline. Next develop M4
+project revision/recovery features; hardware-dependent parts of M3 wait for M2. M5 choices/review can proceed alongside those tracks.
 M6 closes only after the relevant preceding acceptance gates. M7 stays deferred
 and is not a dependency of the no-code/runtime milestones.
 

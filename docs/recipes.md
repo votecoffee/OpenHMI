@@ -43,7 +43,8 @@ content hash and production-approval state. The simulator exposes
 plus a copied parameter payload through `driver.recipe_copy()` / `app.recipes.selected()`.
 An approved library revision loads with the Boolean true; other states load false.
 New edits, approvals and withdrawals leave the already-loaded copy unchanged.
-Reload explicitly when the PLC copy or its approval flag should change.
+This selection is HMI-side. To change the PLC copy or its production BOOL, use an
+explicit [PLC recipe transfer](recipe-transfers.md); selection alone does not write it.
 
 ## Screens
 
@@ -107,6 +108,9 @@ inside the application's trust boundary.
 
 The current load publishes to the in-process simulator, not a real controller.
 Its last loaded copy is retained in SQL and restored to that simulator on restart.
-A real adapter needs a transfer/acknowledgement transaction and readback that
-associates parameters and `RecipeProductionApproved` with the same copied revision.
+The separate [PLC transfer workflow](recipe-transfers.md) now stages a full saved
+revision, verifies its parameters/hash/production BOOL, dispatches a commit last
+and verifies the acknowledged running copy. The designer provides transfer
+profiles/mapping and the viewer provides image/history/approval context.
+Its software contract is verified offline; actual PLC logic/commissioning remain open.
 The PLC's running copy and run/reject logic remain independent of library editing.

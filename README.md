@@ -33,6 +33,8 @@ support translated operator text and a flag selector. A project-wide Python alar
 service monitors tag triggers and retains occurrences, acknowledgement and history.
 SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.
+No-code transfer profiles stage/verify a revision and its production BOOL, commit
+through a dedicated PLC command and verify the PLC-owned running copy.
 HMI security supports local accounts and Windows user/group assignments to local
 application groups, with protected buttons and numeric value inputs.
 An operator journal records command/write/acknowledgement attempts and outcomes;
@@ -54,9 +56,9 @@ Current limits: configurable grids rather than free placement, best-effort polli
 no integrated Python editor/hot reload and no screen-revision rollback UI.
 The ControlLogix adapter has offline protocol and browser checks; live PLC
 commissioning and Windows/domain password logon still need validation with
-configured hardware/accounts. Recipe loads currently retain an HMI-side copy;
-controller recipe transfer remains future work. The command handshake has offline
-checks; its PLC logic and hardware acceptance remain open.
+configured hardware/accounts. HMI recipe selection and PLC recipe transfer are
+separate operations. Command/recipe handshakes have offline checks; their PLC
+logic, memory-copy behavior and hardware acceptance remain open.
 
 ## Install
 
@@ -115,7 +117,10 @@ a result code and an optional PLC permit. Choose **PLC command transaction** on
 an action button and select the contract. Runtime feedback and the **Commands**
 page distinguish dispatch, acceptance, completion, failure and uncertainty.
 Timeout/restart never replay a command. See the [contract and offline example](docs/command-transactions.md).
-Recipe staging and transfer are tracked separately from command dispatch.
+Use **PLC recipes** for dedicated recipe transfer profiles and complete parameter
+mapping, then **Transfer revision to PLC** in the recipe viewer/editor. The PLC
+keeps its running copy; test recipes carry production status false. See the
+[recipe transfer contract and workflow](docs/recipe-transfers.md).
 
 ### Connections, screens and reusable controls
 
@@ -307,9 +312,9 @@ See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
 The verified software baseline and M1 operator activity/diagnostic workflows are
 complete as software checkpoints. M3 now includes offline-verified command
-contracts and no-code bindings; equipment acceptance remains open. Bench
-commissioning, recipe transfer, project recovery, operator review and packaged
-pilot acceptance follow.
+contracts, no-code bindings and versioned recipe transfer/copy verification.
+Equipment acceptance remains open. Bench commissioning, project recovery,
+operator review and packaged pilot acceptance follow.
 The integrated Python IDE remains deferred.
 
 ## Maintainers

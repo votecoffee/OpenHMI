@@ -3,6 +3,7 @@ import { api, json } from './api.mjs';
 import { Live } from './controls.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext } from './security.jsx';
+import { RecipeTransferPanel } from './recipe-transfers.jsx';
 
 const blank = () => ({ title: '', description: '', image_id: null, parameters: [] });
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -167,6 +168,7 @@ export function RecipeWorkspace({ edit, catalog }) {
     {hmiSecurity?.session?.configured ? <p>Recipe permissions use the signed-in HMI account.</p> : <RecipeSession session={session} onChange={setSession} />}
     <p role="status" aria-label="Recipe operation">{message}</p>
     <div className="recipe-loaded"><h2>{ui('recipeLoadedCopy')}</h2><LoadedRecipe /></div>
+    <p>This HMI selection is separate from a PLC recipe transfer.</p>
     <div className="recipe-browser"><label>{ui('recipeLibrary')}<select aria-label="Recipe revision" value={source?.id || ''} onChange={event => {
       if (dirty && !window.confirm('Discard unsaved recipe changes?')) return;
       choose(state.revisions.find(revision => revision.id === Number(event.target.value)) || null);
@@ -204,6 +206,7 @@ export function RecipeWorkspace({ edit, catalog }) {
     <div className="recipe-actions"><button disabled={busy || !source || dirty || !(can('operator') || can('engineer')) || !state.gates.loading.allowed || !live.recipeConnected} onClick={() => load()}>{ui('recipeLoad')}</button>
       <button disabled={busy || !(can('operator') || can('engineer')) || !state.gates.loading.allowed || !live.recipeConnected} onClick={() => load(true)}>{ui('recipeClear')}</button></div>
     <p>{ui('recipePlcDecision')}</p>
+    <RecipeTransferPanel source={source} session={session} reason={reason} dirty={dirty} busy={busy} setBusy={setBusy} loadingAllowed={state.gates.loading.allowed} setMessage={setMessage} />
     <div className="recipe-gates">{Object.entries(state.gates).map(([operation, gate]) => <span key={operation}>{operation}: {gate.allowed ? 'allowed' : 'blocked'}{gate.permit_tag ? ` (${gate.permit_tag})` : ''}</span>)}</div>
     {edit && can('administrator') && policy && <details className="recipe-policy"><summary>Recipe change policy</summary>
       {['editing', 'approval', 'loading'].map(operation => <div key={operation}><label><input type="checkbox" checked={policy[`${operation}_enabled`]} onChange={event => setPolicy({ ...policy, [`${operation}_enabled`]: event.target.checked })} />{operation} enabled</label>

@@ -24,7 +24,7 @@ export function CommandConsole() {
   }, [permitted, before]);
   if (!permitted) return <p>Sign in with runtime operation permission to inspect command transactions.</p>;
   return <section className="engineering operations" aria-label="PLC command transactions"><h1>PLC command transactions</h1>
-    <p>Requested means dispatch started. Accepted means the PLC acknowledged this sequence. Completed / failed requires a matching PLC completion and result. Timeout is uncertain; it does not cancel or replay the request.</p>
+    <p>Staging means recipe parameters are being written; commit has not been sent. Requested means request/commit dispatch started. Accepted means the PLC acknowledged this sequence. Completed / failed requires a matching PLC completion and result. Timeout is uncertain; it does not cancel or replay the request.</p>
     {error && <p role="alert">Status unavailable: {error}. Retained rows may be outdated.</p>}
     <table className="activity-table"><thead><tr><th>Transaction / command</th><th>Sequence / state</th><th>Result</th><th>Evidence</th></tr></thead><tbody>{data?.items.map(item => <tr key={item.id}>
       <td>#{item.id} · {item.command_id}<br /><small>{item.created_at}</small></td><td>{item.sequence} · {item.state}</td><td>{item.result_code ?? 'Not completed'}</td><td>

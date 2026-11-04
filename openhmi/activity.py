@@ -77,7 +77,7 @@ class ActivityJournal:
                        WHERE status='pending'""", (utc_now(),))
 
     def start(self, request, operation, entity, context):
-        principal = self.security.user(request.cookies.get(COOKIE))
+        principal = self.security.user(request.cookies.get(COOKIE)) or getattr(getattr(request, 'state', None), 'activity_principal', None)
         configured = self.security.configured()
         actor = principal.name if principal else 'anonymous' if configured else 'unsecured-simulation'
         provider = principal.provider if principal else 'none' if configured else 'simulation'

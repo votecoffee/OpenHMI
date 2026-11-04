@@ -13,6 +13,7 @@ import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operation
 import { Live, ScreenControls, createConfig } from './controls.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
+import { RecipeTransferSettings } from './recipe-transfer-settings.jsx';
 import { WorkspacePage } from './workspace.jsx';
 import { api, json } from './api.mjs';
 import { Localization } from './localization.jsx';
@@ -139,9 +140,10 @@ function Builder({ initial, catalog }) {
         <a href="/runtime" target="_blank" rel="noreferrer">Open live screen ↗</a><a href="/projects">Projects</a><span>Editing: {scope}</span></div></div>
     <p role="status" aria-label="Draft status" className="save-status">{message}</p>
     {template && <label className="builder-guide">Faceplate preview UDT<select value={previewRoot} onChange={event => setPreviewRoot(event.target.value)}><option value="">Choose live UDT instance</option>{settings.tags.filter(tag => tag.type === 'struct' && (!template.udt_type || template.udt_type === tag.udt_type)).map(tag => <option key={tag.name}>{tag.name}</option>)}</select></label>}
-    <nav className="project-tabs" aria-label="Project tools">{[['screen', 'Screen'], ['screens', 'Screens'], ['connections', 'Connections'], ['tags', 'Tags'], ['faceplates', 'Faceplates'], ['history', 'History'], ['commands', 'Commands'], ['languages', 'Languages'], ['alarms', 'Alarm setup']].map(([key, label]) =>
+    <nav className="project-tabs" aria-label="Project tools">{[['screen', 'Screen'], ['screens', 'Screens'], ['connections', 'Connections'], ['tags', 'Tags'], ['faceplates', 'Faceplates'], ['history', 'History'], ['commands', 'Commands'], ['recipe_transfers', 'PLC recipes'], ['languages', 'Languages'], ['alarms', 'Alarm setup']].map(([key, label]) =>
       <button key={key} aria-pressed={tab === key} onClick={() => { clearTimeout(timer.current); save(latest.current); setSettings(metadata.current); setTab(key); }}>{label}</button>)}<a href="/recipe-editor">Recipes</a></nav>
     {['languages', 'alarms'].includes(tab) && <ProjectSettings tab={tab} settings={settings} controls={previewControls} title={previewProject.title} catalog={dynamicCatalog} onChange={settingsChanged} />}
+    {tab === 'recipe_transfers' && <RecipeTransferSettings settings={settings} onChange={settingsChanged} />}
     {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} />}
     <div hidden={tab !== 'screen'}><Puck key={scope} config={config} data={initialData} iframe={{ enabled: false }}
       headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed}

@@ -82,6 +82,7 @@ channel concurrently in the supported single-process project runtime.
 | State | Evidence / behavior |
 | --- | --- |
 | prepared | SQL reservation exists; driver dispatch has not begun |
+| staging | Recipe parameters are being written/verified; commit has not been sent |
 | requested | Dispatch marker committed; PLC acceptance not yet observed |
 | accepted | Fresh PLC accepted sequence matches the request; completion pending |
 | completed | Fresh request/accepted/completed sequences all match; result 0 |
@@ -105,8 +106,10 @@ Command records are retained for the project lifetime and included in complete
 backups; no automatic command retention pruning is performed. Restore never
 replays writes; imported PLC connections remain held. Applying a changed/remapped
 contract, UDT or connection is blocked while that channel has an unresolved record.
-Editing library recipes does not interact with command channels; recipe staging
-and revision-associated transfer remain the next M3 work item.
+Editing library recipes does not mutate command channels.
+[Recipe staging and revision-associated transfer](recipe-transfers.md) use a
+dedicated command channel and require running-copy verification before successful
+completion. Restart during staging retains uncertainty and sends no commit.
 
 ## Validation boundary
 

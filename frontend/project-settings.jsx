@@ -5,7 +5,7 @@ export function getSettings(project) {
   return { languages: project.languages || [{ code: 'en', name: 'English', flag: 'us', direction: 'ltr', translations: {} }],
     default_language: project.default_language || 'en', alarms: project.alarms || [], alarm_history_limit: project.alarm_history_limit || 1000,
     screens: project.screens || [], faceplates: project.faceplates || [], connections: project.connections || [], tags: project.tags || [],
-    commands: project.commands || [], update_ms: project.update_ms || 500, historian: project.historian || { tags: [], retention_days: 30, max_rows: 1000000 } };
+    commands: project.commands || [], recipe_transfers: project.recipe_transfers || [], update_ms: project.update_ms || 500, historian: project.historian || { tags: [], retention_days: 30, max_rows: 1000000 } };
 }
 
 export function ProjectSettings({ tab, settings, controls, title, catalog, onChange }) {

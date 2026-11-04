@@ -349,6 +349,29 @@ class RuntimeDriver(SimulatorDriver):
         definition = next(item for item in self.project['commands'] if item['id'] == identifier)
         return self._write(definition['root_tag'] + '.' + definition['request_member'], [sequence])
 
+    def write_recipe_member(self, profile, member, value):
+        from .recipe_transfers import META_TYPES
+        allowed = {profile['staging_prefix'] + '.' + path for path in [*META_TYPES, *profile['parameters'].values()]}
+        if member not in allowed:
+            raise ValueError('Recipe writes are limited to declared staging members')
+        command = next(item for item in self.project['commands'] if item['id'] == profile['command_id'])
+        return self._write(command['root_tag'] + '.' + member, [value])
+
+    def read_command_root(self, definition):
+        """Explicit verification read; it does not replace normal displayed samples."""
+        with self.io_lock:
+            tag = self.definitions[definition['root_tag']]
+            if not tag['connection']:
+                with self.lock:
+                    return deepcopy(self._tags[tag['name']])
+            connection = self.connections.get(tag['connection'])
+            if not connection:
+                raise ConnectionError('PLC connection is disabled')
+            result = connection.read([tag['address']], time.monotonic())[0]
+            if result.error or not isinstance(result.value, dict):
+                raise ValueError('Recipe verification root read failed')
+            return result.value
+
     def _write(self, address, values):
         with self.io_lock:
             root, member = self.sources.get(address, (None, ''))

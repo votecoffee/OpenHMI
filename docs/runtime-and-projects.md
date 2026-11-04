@@ -134,3 +134,8 @@ M3 [command transactions](command-transactions.md) add configurable no-code
 PLC handshakes, durable lifecycle records and continuously polled protocol UDTs.
 Command records/events are included in complete backups. Restore observes
 outstanding requests without replay; PLC feedback determines completion.
+
+M3 [recipe transfers](recipe-transfers.md) add complete staging/readback, commit-last
+dispatch, revision/hash/production association and acknowledged PLC-copy
+verification. Transfer snapshots, recipe audits and images are included in backups;
+startup/restore never replay staging or commit writes. HMI selection stays separate.

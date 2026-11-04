@@ -1,10 +1,12 @@
 """Recipe HTTP adapter. Identity and policy checks stay on the server."""
 
-from fastapi import HTTPException, Request, Response, Query
+from fastapi import HTTPException, Request, Response, Query, Path
+from types import SimpleNamespace
 from pydantic import Field
 from .projects import StrictModel
 from .recipe_auth import RecipeAuth
-from .recipe_models import ChangeReason, RecipeCreate, RecipeSave, RecipeTransition, RecipeSelect, PolicyChange, SimulationPermit
+from .recipe_models import ChangeReason, RecipeCreate, RecipeSave, RecipeTransition, RecipeSelect, RecipeTransfer, PolicyChange, SimulationPermit
+from .recipe_transfers import RecipeTransfers
 from .recipes import RecipeService, RecipeError
 from .security import COOKIE as APP_COOKIE
 from .security_routes import set_session
@@ -21,11 +23,12 @@ class Empty(StrictModel):
     pass
 
 
-def add_recipe_routes(app, store, application, users=None, security=None):
+def add_recipe_routes(app, store, application, users=None, security=None, commands=None, activity=None):
     auth = RecipeAuth(users)
     service = RecipeService(store, application)
     app.state.recipes = application.recipes = service
     app.state.recipe_auth = auth
+    transfers = app.state.recipe_transfers = RecipeTransfers(store, application, service, commands)
 
     def user(request):
         origin = request.headers.get('origin')
@@ -90,6 +93,36 @@ def add_recipe_routes(app, store, application, users=None, security=None):
     @app.get('/api/recipes/selected')
     def selected():
         return service.selected()
+
+    @app.get('/api/recipe-transfers')
+    def transfer_history(request: Request, limit: int = Query(default=25, ge=1, le=100),
+                         before_id: int | None = Query(default=None, ge=1, le=9223372036854775807)):
+        current = user(request)
+        if not current.roles:
+            raise HTTPException(403, 'Recipe permission is required')
+        return transfers.recent(limit, before_id)
+
+    @app.get('/api/recipe-transfers/{identifier}')
+    def transfer_record(request: Request, identifier: int = Path(ge=1, le=9223372036854775807)):
+        current = user(request)
+        if not current.roles:
+            raise HTTPException(403, 'Recipe permission is required')
+        return transfers.get(identifier)
+
+    @app.post('/api/recipe-transfers/{profile_id}/dispatch')
+    def transfer(profile_id: str, body: RecipeTransfer, request: Request):
+        if not security.configured():
+            current = auth.user(request.cookies.get(COOKIE))
+            if current:
+                request.state.activity_principal = SimpleNamespace(name=current.name, provider='recipe-local', groups=['recipe:' + role for role in current.roles])
+        def execute(ticket):
+            current = user(request)
+            def authorize(definition):
+                if security.configured() or definition['security_groups']:
+                    security.require(request, 'runtime.operate', definition['security_groups'])
+            return invoke(transfers.submit, profile_id, body, current, ticket, authorize)
+        return activity.run(request, 'recipe_transfer', profile_id,
+                            {'revision_id': body.revision_id, 'reason': body.reason}, execute)
 
     @app.post('/api/recipes')
     def create(body: RecipeCreate, request: Request):

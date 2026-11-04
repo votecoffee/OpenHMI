@@ -22,7 +22,11 @@ def contract(project, definition):
     connection = next((item for item in project['connections'] if item['id'] == root['connection']), None)
     # A physical channel keeps sequence ownership even if a logical name is changed.
     channel = json.dumps([connection['path'].casefold(), root['address'].casefold()] if connection else ['local', root['name']], sort_keys=True)
-    signature = hashlib.sha256(json.dumps([definition, root, connection], sort_keys=True).encode()).hexdigest()
+    transfer = [item for item in project.get('recipe_transfers', []) if item['command_id'] == definition['id']]
+    components = [definition, root, connection]
+    if transfer:
+        components.append(transfer)
+    signature = hashlib.sha256(json.dumps(components, sort_keys=True).encode()).hexdigest()
     return root, channel, signature
 
 
@@ -50,6 +54,7 @@ class CommandService:
     def __init__(self, store, driver):
         self.store, self.driver = store, driver
         self.lock = RLock()
+        self.completion_verifier = None
         with store.transaction() as db:
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS command_transaction(
@@ -63,7 +68,7 @@ class CommandService:
                   id INTEGER PRIMARY KEY AUTOINCREMENT,transaction_id INTEGER NOT NULL,
                   timestamp TEXT NOT NULL,state TEXT NOT NULL,detail TEXT NOT NULL);
             ''')
-            for identifier, state in db.execute("SELECT id,state FROM command_transaction WHERE state IN ('prepared','requested','accepted')").fetchall():
+            for identifier, state in db.execute("SELECT id,state FROM command_transaction WHERE state IN ('prepared','staging','requested','accepted')").fetchall():
                 self._update(db, identifier, 'interrupted' if state == 'prepared' else 'uncertain',
                              'Server restarted; request was not replayed')
 
@@ -99,14 +104,15 @@ class CommandService:
     def validate_apply(self, project):
         definitions = {item['id']: item for item in project.get('commands', [])}
         with self.store._lock:
-            rows = self.store._db.execute("SELECT command_id,signature FROM command_transaction WHERE state IN ('prepared','requested','accepted','uncertain')").fetchall()
+            rows = self.store._db.execute("SELECT command_id,signature FROM command_transaction WHERE state IN ('prepared','staging','requested','accepted','uncertain')").fetchall()
         for name, signature in rows:
             definition = definitions.get(name)
             if not definition or contract(project, definition)[2] != signature:
                 raise HTTPException(409, 'Resolve the outstanding command before changing its contract, UDT or connection')
 
-    def observation(self, definition, after=None):
-        sample = self.driver.sample_snapshot().get(definition['root_tag'], {})
+    def observation(self, definition, after=None, value=None, sample=None):
+        sample = ({'quality': 'good', 'timestamp': utc_now(), 'value': value} if value is not None else
+                  sample if sample is not None else self.driver.sample_snapshot().get(definition['root_tag'], {}))
         if sample.get('quality') != 'good':
             raise ValueError('Command UDT has no fresh good-quality sample')
         if after and sample.get('timestamp', '') <= after:
@@ -121,9 +127,11 @@ class CommandService:
         permit = not definition['permit_member'] or member_value(value, definition['permit_member']) is True
         return values, permit
 
-    def submit(self, definition, ticket):
+    def submit(self, definition, ticket, reservation=None, prepare=None):
         with self.lock, self.driver.io_lock:
             project = self.driver.project
+            if prepare is None and any(item['command_id'] == definition['id'] for item in project.get('recipe_transfers', [])):
+                raise HTTPException(409, 'Recipe commit channels require a validated recipe transfer')
             root, channel, signature = contract(project, definition)
             try:
                 values, permit = self.observation(definition)
@@ -134,7 +142,7 @@ class CommandService:
             if not values[0] == values[1] == values[2]:
                 raise HTTPException(409, 'PLC channel is busy or requires PLC-owned recovery')
             with self.store.transaction() as db:
-                if db.execute("SELECT 1 FROM command_transaction WHERE channel=? AND state IN ('prepared','requested','accepted','uncertain')", (channel,)).fetchone():
+                if db.execute("SELECT 1 FROM command_transaction WHERE channel=? AND state IN ('prepared','staging','requested','accepted','uncertain')", (channel,)).fetchone():
                     raise HTTPException(409, 'Command channel has an unresolved transaction; do not retry')
                 last = db.execute('SELECT MAX(sequence) FROM command_transaction WHERE channel=?', (channel,)).fetchone()[0] or 0
                 sequence = max(last, *values[:3]) + 1
@@ -147,6 +155,8 @@ class CommandService:
                     (ticket.id, definition['id'], channel, signature, json.dumps(definition), sequence, stamp, stamp, deadline))
                 identifier = cursor.lastrowid
                 self._update(db, identifier, 'prepared')
+                if reservation:
+                    reservation(db, identifier, sequence)
             ticket.confirm(transaction_id=identifier, sequence=sequence)
             try:
                 ticket.dispatch(command=definition['id'], sequence=sequence, transaction_id=identifier)
@@ -155,12 +165,16 @@ class CommandService:
                     self._update(db, identifier, 'interrupted', 'Activity dispatch unavailable; request was not written')
                 raise
             with self.store.transaction() as db:
-                self._update(db, identifier, 'requested', 'Dispatch started; awaiting PLC acceptance')
+                self._update(db, identifier, 'staging' if prepare else 'requested', 'Staging started; commit not sent' if prepare else 'Dispatch started; awaiting PLC acceptance')
             try:
+                if prepare:
+                    prepare(identifier, values)
+                    with self.store.transaction() as db:
+                        self._update(db, identifier, 'requested', 'Staging verified; commit dispatch started')
                 self.driver.write_command_request(definition['id'], sequence)
             except Exception as error:
                 with self.store.transaction() as db:
-                    self._update(db, identifier, 'uncertain', 'Request write/readback failed; verify PLC outcome before retrying')
+                    self._update(db, identifier, 'uncertain', 'Staging or request write/readback failed; verify PLC outcome before retrying')
                 raise HTTPException(409, f'Command transaction {identifier} is uncertain; request was not retried') from error
             ticket.confirm(verification='request_tag_readback', equipment_complete=False)
             return {'ok': True, 'transaction': self.get(identifier)}
@@ -176,11 +190,17 @@ class CommandService:
                 try:
                     if contract(self.driver.project, definition)[2] != signature:
                         raise ValueError('Active contract differs from the dispatched contract')
-                    values, _ = self.observation(definition, created)
+                    sample = self.driver.sample_snapshot().get(definition['root_tag'], {})
+                    values, _ = self.observation(definition, created, sample=sample)
                     request, accepted, completed, code = values
                     if request == accepted == completed == sequence:
                         new_state, result = ('completed' if code == 0 else 'failed'), code
                         detail = 'PLC published matching accepted/completed sequence and result'
+                        if code == 0 and self.completion_verifier:
+                            verified, verification_detail = self.completion_verifier(identifier, sample['value'])
+                            if not verified:
+                                new_state, result = 'uncertain', None
+                            detail = verification_detail or detail
                     elif accepted == sequence and request == sequence and state == 'requested':
                         new_state, detail = 'accepted', 'PLC accepted this sequence; equipment completion is still pending'
                     elif request != sequence or completed == sequence:

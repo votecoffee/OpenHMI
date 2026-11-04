@@ -81,6 +81,11 @@ class RecipeSelect(ChangeReason):
     expected_revision_version: int | None = Field(default=None, ge=1)
 
 
+class RecipeTransfer(ChangeReason):
+    revision_id: int = Field(ge=1, le=2147483647)
+    expected_revision_version: int = Field(ge=1)
+
+
 class RecipePolicy(StrictModel):
     editing_enabled: bool = True
     approval_enabled: bool = True

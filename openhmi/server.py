@@ -16,6 +16,7 @@ from .drivers import SimulatorDriver
 from .application import Application
 from .activity import ActivityJournal
 from .commands import CommandService, add_command_routes, validate_commands
+from .recipe_transfers import validate_transfers
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .historian import Historian
@@ -133,12 +134,13 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     add_command_routes(app, commands, security)
     add_operations_routes(app, activity, security, application.driver)
     add_security_routes(app, security)
-    add_recipe_routes(app, store, application, recipe_users, security)
+    add_recipe_routes(app, store, application, recipe_users, security, commands, activity)
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
         try:
             validate_commands(project.model_dump(), {group['name'] for group in security.snapshot()['groups']})
+            validate_transfers(project.model_dump())
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         tags = SimulatorDriver().snapshot()
@@ -199,6 +201,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 mode = control.get('mode', 'python')
                 if mode == 'command' and control['command'] not in {item.id for item in project.commands}:
                     raise HTTPException(422, 'Button references an unknown command')
+                if mode == 'command' and control['command'] in {item.command_id for item in project.recipe_transfers}:
+                    raise HTTPException(422, 'Recipe commit channels must be dispatched from the recipe transfer workflow')
                 if mode == 'python' and control['action'] not in actions:
                     raise HTTPException(422, f"Unknown action: {control['action']}")
                 if mode in ('navigate', 'popup'):
