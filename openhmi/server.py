@@ -49,7 +49,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
                 if control.action not in actions:
                     raise HTTPException(422, f"Unknown action: {control.action}")
             else:
-                expected = (float, int) if control.kind == "numeric" else (bool,)
+                expected = (float, int) if control.kind in ("numeric", "analog") else (bool,)
                 if type(tags.get(control.tag)) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control.tag}")
 

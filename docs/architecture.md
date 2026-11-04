@@ -78,13 +78,15 @@ HMI editor -> validated OpenHMI draft -> active screen revision -> runtime viewe
 Persist an OpenHMI schema with typed control properties, tag references and named
 actions, not raw HTML/CSS or Puck internals. An adapter translates between that
 schema and the editor. Use identical controls for editor previews and viewers.
-The initial layout is a configurable card grid; free placement, reusable
+The initial layout is a configurable control grid in a gray ME-derived screen
+frame; [the HMI style guide](hmi-style-guide.md) records its source decisions.
+Free placement, reusable
 faceplates, multiple screens and richer graphics remain future work.
 
 ## Priorities
 
 * No-code: tag browser, numeric display, indicator, action button, format/units,
-  screen navigation and reusable equipment controls.
+  analog ranges, explicit alarm indicators, screen navigation and reusable equipment controls.
 * Python customization: local handler modules first; later an integrated editor,
   event templates, diagnostics, dependency management and deliberate reload.
 * Live engineering: autosaved drafts, apply without viewer reload, revision conflict

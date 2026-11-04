@@ -46,7 +46,7 @@ class SimulatorTests(unittest.TestCase):
                 response = client.put('/api/project/draft', json={'expected_revision': 1, 'project': draft})
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()['draft_revision'], 2)
-                self.assertEqual(client.get('/api/project/active').json()['project']['title'], 'My live HMI')
+                self.assertEqual(client.get('/api/project/active').json()['project']['title'], 'Station overview')
                 for endpoint, method in [('/api/project/draft', client.put), ('/api/project/apply', client.post)]:
                     payload = {'expected_revision': 1}
                     if endpoint.endswith('draft'):
@@ -72,6 +72,12 @@ class SimulatorTests(unittest.TestCase):
                 lambda project: project['controls'][0].update(html='<script/>'),
                 lambda project: project['controls'][2].update(action='run_arbitrary_code'),
                 lambda project: project['controls'].append(project['controls'][0].copy()),
+                lambda project: project['controls'][3].update(minimum=100.0),
+                lambda project: project['controls'][3].update(normal_low=90.0, normal_high=20.0),
+                lambda project: project['controls'][3].update(maximum=0.0),
+                lambda project: project['controls'][3].update(tag='MotorRunning'),
+                lambda project: project['controls'][4].update(priority=5),
+                lambda project: project['controls'][4].update(tag='TankLevel'),
             ]:
                 project = client.get('/api/project').json()['draft']
                 mutate(project)
@@ -93,6 +99,20 @@ class SimulatorTests(unittest.TestCase):
             client.post('/api/actions/half_fill', json={}).raise_for_status()
             self.assertEqual(client.get('/api/tags').json()['values']['TankLevel'], 50.0)
             self.assertFalse(client.get('/api/tags').json()['values']['MotorRunning'])
+
+    def test_old_screen_defaults_and_new_control_round_trip(self):
+        with TestClient(create_app()) as client:
+            draft = client.get('/api/project').json()['draft']
+            draft['controls'][1].pop('on_text')
+            draft['controls'][1].pop('off_text')
+            draft['controls'][3].update(minimum=-10.0, maximum=150.0, normal_low=20.0, normal_high=80.0)
+            draft['controls'][4]['priority'] = 1
+            response = client.put('/api/project/draft', json={'expected_revision': 1, 'project': draft})
+            self.assertEqual(response.status_code, 200, response.text)
+            saved = response.json()['draft']['controls']
+            self.assertEqual(saved[1]['on_text'], 'ON')
+            self.assertEqual(saved[3]['minimum'], -10.0)
+            self.assertEqual(saved[4]['priority'], 1)
 
 
 if __name__ == '__main__':

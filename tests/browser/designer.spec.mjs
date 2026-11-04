@@ -4,13 +4,17 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
-  await expect(page.locator('[data-control]')).toHaveCount(3);
+  await expect(page.locator('[data-control]')).toHaveCount(5);
   await expect(page.locator('[data-control="numeric"]')).toContainText('42.0');
   if (process.env.OPENHMI_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_SCREENSHOT, fullPage: true });
   const viewer = await context.newPage();
   viewer.on('pageerror', error => errors.push(error.message));
   await viewer.goto('/runtime');
-  await expect(viewer.locator('[data-control]')).toHaveCount(3);
+  await expect(viewer.locator('[data-control]')).toHaveCount(5);
+  const numericBox = await viewer.locator('[data-control="numeric"]').boundingBox();
+  const indicatorBox = await viewer.locator('[data-control="indicator"]').boundingBox();
+  expect(indicatorBox.x).toBeGreaterThan(numericBox.x);
+  expect(Math.abs(indicatorBox.y - numericBox.y)).toBeLessThan(2);
   await page.locator('[data-control="numeric"]').click();
   await page.getByRole('textbox', { name: 'Label', exact: true }).fill('Live tank level');
   await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
@@ -31,16 +35,39 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
   await page.mouse.move(target.x + 100, target.y + 90, { steps: 10 });
   await page.mouse.move(target.x + 110, target.y + 100, { steps: 2 });
   await page.mouse.up();
-  await expect(page.locator('[data-control]')).toHaveCount(4);
+  await expect(page.locator('[data-control]')).toHaveCount(6);
   await page.getByRole('button', { name: 'Save draft', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
   await page.reload();
-  await expect(page.locator('[data-control]')).toHaveCount(4);
-  await expect(viewer.locator('[data-control]')).toHaveCount(3);
+  await expect(page.locator('[data-control]')).toHaveCount(6);
+  await expect(viewer.locator('[data-control]')).toHaveCount(5);
   await page.route('**/api/tags', route => route.abort());
   await expect(page.getByText('Simulator disconnected', { exact: true })).toBeVisible();
-  await expect(page.locator('[data-control="numeric"]').first()).toContainText('Unavailable');
+  await expect(page.locator('[data-control="numeric"]').first()).toContainText('COMM LOSS');
   expect(errors).toEqual([]);
+});
+
+test('analog context, redundant alarm priority and data quality remain explicit', async ({ page }) => {
+  let values = { TankLevel: 42.0, MotorRunning: true, ProcessAlarm: false };
+  await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
+  await page.goto('/runtime');
+  await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
+  await expect(page.getByLabel('Screen alarm status')).toContainText('No configured alarms active');
+  await expect(page.locator('[data-control="analog"]')).toContainText('Normal 20–80 %');
+  if (process.env.OPENHMI_NORMAL_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_NORMAL_SCREENSHOT, fullPage: true });
+  values = { TankLevel: 120.0, MotorRunning: false, ProcessAlarm: true };
+  await expect(page.locator('[data-control="analog"]')).toContainText('120.0');
+  await expect(page.locator('[data-control="analog"]')).toContainText('OUT OF SCALE');
+  await expect(page.locator('[data-control="alarm"]')).toContainText('P2 ACTIVE');
+  await expect(page.getByLabel('Screen alarm status')).toContainText('P2 Process alarm');
+  await expect(page.locator('[data-control="alarm"] svg text')).toHaveText('2');
+  await expect(page.locator('[data-control="indicator"]')).toContainText('OFF');
+  if (process.env.OPENHMI_ALARM_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_ALARM_SCREENSHOT, fullPage: true });
+  values = { TankLevel: 'bad', MotorRunning: null, ProcessAlarm: null };
+  await expect(page.locator('[data-control="analog"]')).toContainText('BAD DATA');
+  await expect(page.locator('[data-control="indicator"]')).toContainText('BAD DATA');
+  await expect(page.getByLabel('Screen alarm status')).toContainText('ALARM DATA UNAVAILABLE');
+  await expect(page.locator('[data-control="alarm"]')).not.toContainText('INACTIVE');
 });
 
 test('stale editor keeps its local draft and cannot overwrite another writer', async ({ page, context }) => {

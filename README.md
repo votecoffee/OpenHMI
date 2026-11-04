@@ -23,12 +23,19 @@ The prototype uses Puck with an HMI control catalog. The developer sees screen,
 tag, units, decimal places and action properties rather than HTML, CSS or React.
 The editor and runtime use the same controls and show simulated values live.
 
-Implemented: numeric displays, indicators, action buttons, tag/action dropdowns,
+Implemented: numeric displays, binary indicators, analog ranges, alarm indicators,
+action buttons, tag/action dropdowns,
 server-side draft autosave, validated screen data, explicit apply, revision
 conflict detection and automatic updates in already-open runtime viewers.
 Python modules can register custom named actions at startup.
 
-Current limits: one screen, a card-grid layout, simulation only, 500 ms polling,
+Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
+the supplied high-performance HMI references and FactoryTalk View ME templates.
+The default screen uses a gray header/body/sidebar/footer layout, compact Arial
+labels, subdued blue live values, flat navy commands and neutral normal states.
+Alarm symbols combine priority number, shape and the ME template palette.
+
+Current limits: one screen, a configurable control grid, simulation only, 500 ms polling,
 no integrated Python editor or Python hot reload, and no history/rollback UI.
 There is no PLC adapter or production authentication yet.
 
@@ -63,7 +70,8 @@ Start the local simulation builder:
 Open <http://127.0.0.1:8000>. Keep [the live screen](http://127.0.0.1:8000/runtime)
 open in another tab while editing.
 
-1. Drag a numeric display, indicator or action button from the toolbox.
+1. Drag a numeric display, binary indicator, analog range, alarm indicator or action
+   button from the toolbox.
 2. Select a control. Choose a tag or action from its property dropdown; edit its
    label, units and formatting as appropriate. No code is needed for these steps.
 3. Changes autosave to the Python server after a short pause. Wait for the saved
@@ -72,6 +80,13 @@ open in another tab while editing.
    page or restarting Python. Draft edits do not change the active screen until applied.
 5. In the runtime tab, **Toggle simulated motor** invokes a built-in Python action.
    The indicator changes in both tabs. Editor preview buttons do not execute actions.
+
+For an analog range, select scale endpoints and a normal band. The band supplies
+context and does not generate alarms. Alarm indicators require an explicit
+Boolean alarm tag and a priority. The header summarizes only configured alarm
+controls on that screen. Alarm acknowledgement/history are not implemented.
+Communication loss or invalid values are displayed explicitly. Existing saved
+screens are retained; the expanded five-control example appears in new projects.
 
 The default project database is `.local/project.sqlite3`, relative to the working
 directory. It retains draft and active screens across restarts. Simulated tag
@@ -129,7 +144,8 @@ Existing viewers poll for new active revisions; tag state remains owned by Pytho
 
 Next work: [screen/project lifecycle](https://github.com/votecoffee/OpenHMI/issues/1),
 [Python IDE and subscriptions](https://github.com/votecoffee/OpenHMI/issues/2),
-and [a first PLC adapter](https://github.com/votecoffee/OpenHMI/issues/3).
+[a first PLC adapter](https://github.com/votecoffee/OpenHMI/issues/3),
+and [equipment controls/operator validation](https://github.com/votecoffee/OpenHMI/issues/4).
 
 ## Maintainers
 

@@ -1,6 +1,7 @@
 """Editor-independent screen schema and transactional draft/apply persistence."""
 
 import json
+import math
 import sqlite3
 from pathlib import Path
 from threading import RLock
@@ -28,6 +29,28 @@ class NumericControl(ControlBase):
 class IndicatorControl(ControlBase):
     kind: Literal["indicator"]
     tag: str = Field(min_length=1, max_length=200)
+    on_text: str = Field(default="ON", min_length=1, max_length=30)
+    off_text: str = Field(default="OFF", min_length=1, max_length=30)
+
+
+class AnalogControl(NumericControl):
+    kind: Literal["analog"]
+    minimum: float = Field(default=0.0, allow_inf_nan=False)
+    maximum: float = Field(default=100.0, allow_inf_nan=False)
+    normal_low: float = Field(default=20.0, allow_inf_nan=False)
+    normal_high: float = Field(default=80.0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def ordered_range(self):
+        if not math.isfinite(self.maximum - self.minimum) or not self.minimum <= self.normal_low < self.normal_high <= self.maximum:
+            raise ValueError("Range must satisfy minimum <= normal low < normal high <= maximum")
+        return self
+
+
+class AlarmControl(ControlBase):
+    kind: Literal["alarm"]
+    tag: str = Field(min_length=1, max_length=200)
+    priority: Literal[1, 2, 3, 4] = 2
 
 
 class ButtonControl(ControlBase):
@@ -35,7 +58,7 @@ class ButtonControl(ControlBase):
     action: str = Field(min_length=1, max_length=100)
 
 
-Control = Annotated[NumericControl | IndicatorControl | ButtonControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl, Field(discriminator="kind")]
 
 
 class Project(StrictModel):
@@ -62,10 +85,12 @@ class SaveRequest(RevisionRequest):
 
 def default_project() -> Project:
     return Project.model_validate({
-        "title": "My live HMI", "columns": 2, "controls": [
+        "title": "Station overview", "columns": 2, "controls": [
             {"id": "level", "kind": "numeric", "label": "Tank level", "tag": "TankLevel", "unit": "%", "decimals": 1},
             {"id": "motor", "kind": "indicator", "label": "Motor", "tag": "MotorRunning"},
             {"id": "toggle", "kind": "button", "label": "Toggle simulated motor", "action": "toggle_motor"},
+            {"id": "range", "kind": "analog", "label": "Tank operating range", "tag": "TankLevel", "unit": "%", "decimals": 1},
+            {"id": "alarm", "kind": "alarm", "label": "Process alarm", "tag": "ProcessAlarm", "priority": 2},
         ],
     })
 

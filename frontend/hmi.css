@@ -1,0 +1,88 @@
+/* Independent high-performance HMI theme. Source decisions: docs/hmi-style-guide.md. */
+:root {
+  --hmi-background: #ddd;
+  --hmi-group: #d4d4d4;
+  --hmi-line: #999;
+  --hmi-text: #333;
+  --hmi-muted: #666;
+  --hmi-live: #002878;
+  --hmi-command: #002878;
+  --hmi-p1: #fa3232;
+  --hmi-p2: #fff546;
+  --hmi-p3: #ff9600;
+  --hmi-p4: #ff64c8;
+}
+body { background: #c6c6c6; color: var(--hmi-text); font-family: Arial, sans-serif; }
+.app-header { min-height: 48px; padding: 8px 20px; background: #ddd; color: #333; border-bottom: 1px solid #999; }
+.brand { color: #333; font-size: 21px; letter-spacing: 0; }
+.connection, .connection.connected { color: #333; border-color: #999; border-radius: 0; background: #ddd; }
+.builder-guide { padding: 5px 20px; background: #e8e8e8; border-color: #aaa; }
+.builder-guide button, .apply-button { border-radius: 0; color: #333; background: #ddd; border: 1px solid #999; min-height: 38px; }
+.builder-guide .apply-button { background: var(--hmi-command); color: white; border-color: #333; }
+.builder-guide a, .runtime-bar a { color: var(--hmi-command); }
+.save-status { padding: 8px 20px; min-height: 32px; background: #d4d4d4; color: #333; border-bottom: 1px solid #aaa; }
+.hmi-screen { padding: 0; min-height: 600px; background: var(--hmi-background); color: var(--hmi-text); font: 14px Arial, sans-serif; display: flex; flex-direction: column; border: 1px solid #999; }
+.station-header { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(160px, 2fr) minmax(100px, 1fr); gap: 8px; min-height: 70px; padding: 5px; border-bottom: 1px solid #999; background: #ddd; }
+.station-identity, .station-mode { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 2px 8px; font-size: 11px; }
+.station-identity > strong { color: #333; font-size: 20px; }
+.station-mode { text-align: right; }
+.station-mode strong { font-size: 12px; }
+.station-title { min-width: 0; }
+.station-title h1 { font: bold 19px Arial, sans-serif; text-transform: uppercase; text-align: center; letter-spacing: 0; margin: 5px 0 0; overflow-wrap: anywhere; }
+.screen-alarm-banner { min-height: 26px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px; background: #d4d4d4; color: #333; font-size: 11px; }
+.screen-alarm-banner.has-alarm { background: #f0f0f0; outline: 1px solid #666; }
+.screen-alarm-banner .priority-symbol { width: 23px; height: 23px; }
+.station-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 75px; flex: 1; }
+.station-workspace .hmi-grid { padding: 15px 10px; display: grid; gap: 12px; align-content: start; align-items: stretch; min-width: 0; }
+.hmi-grid > div { grid-column: 1 / -1; display: grid; grid-template-columns: inherit; gap: inherit; min-height: 180px; }
+.station-sidebar { padding: 15px 6px; border-left: 1px solid #999; background: #d4d4d4; display: flex; flex-direction: column; gap: 14px; font-size: 11px; }
+.station-sidebar > span { display: flex; align-items: center; gap: 5px; }
+.station-sidebar .sidebar-note { font-size: 10px; color: #555; }
+.station-footer { min-height: 75px; padding: 5px; display: flex; align-items: stretch; gap: 5px; border-top: 1px solid #999; font-size: 12px; }
+.station-location, .station-footer a, .station-footer > span:last-child:not(.footer-description) { display: flex; align-items: center; justify-content: center; min-width: 70px; padding: 10px; border: 1px solid #333; font-weight: bold; }
+.station-location { background: var(--hmi-command); color: white; }
+.station-footer a { color: white; background: var(--hmi-command); text-decoration: none; }
+.station-footer .footer-description { flex: 1; display: flex; align-items: center; justify-content: center; color: #555; }
+.hmi-control { min-width: 0; min-height: 82px; padding: 8px; display: flex; flex-direction: column; gap: 7px; align-items: flex-start; background: transparent; border: 0; border-bottom: 1px solid #bbb; border-radius: 0; box-shadow: none; font: 14px Arial, sans-serif; }
+.hmi-label { color: #333; font-size: 13px; font-weight: normal; overflow-wrap: anywhere; }
+.hmi-value { color: var(--hmi-live); font: 26px Arial, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.hmi-value small { color: #666; font-size: 13px; font-weight: normal; }
+.hmi-source { color: #555; font: 10px Arial, sans-serif; overflow-wrap: anywhere; }
+.hmi-state { display: flex; align-items: center; gap: 8px; padding: 0; color: #333; background: transparent; border-radius: 0; font: 15px Arial, sans-serif; }
+.hmi-state.is-on { background: transparent; color: #333; }
+.binary-symbol { width: 15px; height: 15px; border: 1px solid #555; background: #ddd; display: inline-block; flex-shrink: 0; }
+.hmi-state.is-on .binary-symbol, .binary-symbol.legend-on { background: #666; border: 1px solid #333; }
+.hmi-quality { display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px; background: #333; color: white; border: 1px dashed white; font: bold 12px Arial, sans-serif; overflow-wrap: anywhere; }
+.hmi-quality > span { font-size: 18px; line-height: 15px; }
+.hmi-action { color: white; background: var(--hmi-command); border: 1px solid #333; border-radius: 0; padding: 10px 12px; min-height: 44px; font: bold 13px Arial, sans-serif; cursor: pointer; }
+.hmi-action:disabled { color: #666; background: #c6c6c6; border-color: #999; opacity: 1; cursor: default; }
+.command-feedback { min-height: 13px; color: #555; font-size: 11px; }
+.analog-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; flex-wrap: wrap; }
+.hmi-analog { min-height: 125px; }
+.analog-track { width: 100%; height: 19px; margin-top: 7px; border-bottom: 1px solid #666; border-left: 1px solid #666; border-right: 1px solid #666; position: relative; }
+.normal-band { height: 10px; bottom: 0; position: absolute; background: #aaa; border: 1px solid #777; }
+.analog-pointer { position: absolute; top: -7px; color: var(--hmi-live); transform: translateX(-50%); font-size: 16px; line-height: 20px; }
+.analog-track.invalid { border-style: dashed; opacity: .5; }
+.analog-scale { display: flex; width: 100%; justify-content: space-between; gap: 5px; font-size: 10px; color: #555; }
+.range-deviation { border: 1px solid #666; padding: 2px 4px; font-size: 10px; color: #333; }
+.hmi-alarm { min-height: 82px; }
+.alarm-state { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #333; }
+.alarm-inactive { font-size: 12px; color: #555; }
+.alarm-active { background: #e8e8e8; outline: 1px solid #666; }
+.priority-symbol { width: 30px; height: 30px; flex-shrink: 0; }
+.priority-symbol > :first-child { stroke: #333; stroke-width: 1; }
+.priority-symbol text { fill: black; font: bold 16px Arial, sans-serif; }
+.priority-1 > :first-child { fill: var(--hmi-p1); }
+.priority-2 > :first-child { fill: var(--hmi-p2); }
+.priority-3 > :first-child { fill: var(--hmi-p3); }
+.priority-4 > :first-child { fill: var(--hmi-p4); }
+.runtime { max-width: 1100px; }
+.runtime-bar { padding: 10px 0; color: #333; }
+:is(button, a, input, select):focus-visible { outline: 2px solid #002878; outline-offset: 3px; }
+@media (max-width: 700px) {
+  .station-header { grid-template-columns: 1fr 2fr; }
+  .station-mode { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
+  .station-workspace { grid-template-columns: minmax(0, 1fr) 60px; }
+  .hmi-grid > div { grid-template-columns: 1fr !important; }
+  .station-title h1 { font-size: 16px; }
+}
