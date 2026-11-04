@@ -25,7 +25,8 @@ redistributed. The detailed local source audit remains outside tracked source.
 ## Default visual language
 
 * Screen background: `#DDDDDD`; grouping and boundaries use nearby gray tones.
-* Labels: Arial/sans-serif and dark gray. Live numeric values use subdued navy/blue.
+* Labels: bundled Noto Sans SC/sans-serif and dark gray, sized to retain the earlier
+  Arial x-height. Live numeric values use subdued navy/blue.
   Operator labels describe equipment; raw tag names are engineering details.
 * Controls are flat and rectangular. Numeric readouts blend into the display;
   borders identify groups, clickable commands or abnormal/quality conditions.
@@ -52,8 +53,9 @@ An analog normal band is operator context, not an alarm engine. An excursion
 outside the band is labeled as such and does not consume alarm colors. Alarm
 priority meanings must be set by the application's alarm philosophy. The initial
 alarm indicator has no acknowledgement, shelving, history or safety function.
-The screen banner summarizes only alarm controls present on that screen; it is
-not a plant-wide alarm summary.
+The screen banner now summarizes project-wide registered alarms through the
+[alarm monitoring service](languages-and-alarms.md). Legacy Boolean alarm controls
+remain graphics; registering a monitored trigger is a separate project setting.
 
 ## Reference conflicts and limits
 

@@ -16,7 +16,7 @@ class SimulatorDriver:
     """In-memory scalar tags, with no network or controller connection."""
 
     def __init__(self) -> None:
-        self._tags: dict[str, Value] = {"TankLevel": 42.0, "MotorRunning": True, "ProcessAlarm": False}
+        self._tags: dict[str, Value] = {"TankLevel": 42.0, "MotorRunning": True, "ProcessAlarm": False, "AlarmWord": 0}
 
     def read(self, address: str, count: int = 1) -> list[Value]:
         if type(count) is not int or count != 1:

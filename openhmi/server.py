@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 from contextlib import asynccontextmanager
 import logging
+import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .drivers import SimulatorDriver
 from .application import Application
+from .alarms import AlarmMonitor
 from .projects import Project, ProjectStore, RevisionConflict, RevisionRequest, SaveRequest
 
 
@@ -28,22 +30,57 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
             store.close()
             raise
 
+    def sample_values():
+        with application.lock:
+            return application.driver.snapshot()
+
+    monitor = AlarmMonitor(store, sample_values)
+
+    def sample_alarms():
+        try:
+            monitor.sample()
+        except Exception:
+            logging.exception("Alarm monitor sampling failed")
+            monitor.error = "Alarm sampling unavailable"
+
+    async def alarm_loop():
+        while True:
+            await asyncio.sleep(0.25)
+            sample_alarms()
+
     @asynccontextmanager
     async def lifespan(app):
+        sample_alarms()
+        task = asyncio.create_task(alarm_loop())
         try:
             yield
         finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
             store.close()
 
     app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifespan)
     app.state.driver = application.driver
     app.state.application = application
     app.state.store = store
+    app.state.alarms = monitor
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
         tags = application.driver.snapshot()
         actions = {action["name"] for action in application.actions()}
+        for language in project.languages:
+            if not (web / "assets" / "flags" / f"{language.flag}.svg").is_file():
+                raise HTTPException(422, f"Unknown flag: {language.flag}")
+        for alarm in project.alarms:
+            if alarm.enabled:
+                value = tags.get(alarm.tag)
+                expected = (bool, int, float) if alarm.trigger_type == "value" else (int,)
+                if type(value) not in expected:
+                    raise HTTPException(422, f"Unknown or incompatible alarm tag: {alarm.tag}")
         for control in project.controls:
             if control.kind == "button":
                 if control.action not in actions:
@@ -64,6 +101,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
             "tags": [{"name": name, "type": "boolean" if type(value) is bool else "number"}
                      for name, value in application.driver.snapshot().items()],
             "actions": application.actions(),
+            "flags": sorted(path.stem for path in (web / "assets" / "flags").glob("*.svg")),
         }
 
     @app.get("/api/project")
@@ -88,7 +126,25 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
 
     @app.post("/api/project/apply")
     def apply(request: RevisionRequest) -> dict:
-        return transact(lambda value: store.apply(value, validate_bindings), request)
+        with monitor.lock:
+            result = transact(lambda value: store.apply(value, validate_bindings), request)
+            sample_alarms()
+            return result
+
+    @app.get("/api/alarms")
+    def alarms() -> dict:
+        return monitor.snapshot()
+
+    @app.post("/api/alarms/acknowledge-all")
+    def acknowledge_all(request: ActionRequest) -> dict:
+        return monitor.acknowledge()
+
+    @app.post("/api/alarms/{occurrence_id}/acknowledge")
+    def acknowledge(occurrence_id: int, request: ActionRequest) -> dict:
+        try:
+            return monitor.acknowledge(occurrence_id)
+        except KeyError as error:
+            raise HTTPException(404, "Alarm occurrence not found") from error
 
     @app.post("/api/actions/{name}")
     def action(name: str, request: ActionRequest) -> dict:
@@ -102,10 +158,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None) -
         except Exception as error:
             logging.exception("Application action %s failed", name)
             raise HTTPException(500, "Python action failed; see server log") from error
+        sample_alarms()
         return {"ok": True}
 
     @app.get("/", include_in_schema=False)
     @app.get("/runtime", include_in_schema=False)
+    @app.get("/alarms", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 

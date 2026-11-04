@@ -92,7 +92,7 @@ faceplates, multiple screens and richer graphics remain future work.
 * Live engineering: autosaved drafts, apply without viewer reload, revision conflict
   feedback, later history/rollback and collaborative editing.
 * Industrial runtime: quality/timestamps, subscriptions, reconnect, typed writes,
-  alarms/trends, access control and a separately accepted first protocol adapter.
+  richer alarm workflows/trends, access control and a separately accepted first protocol adapter.
 * Installation: contributors may need Node; released end-user builds should ship
   assets and present project/open/run controls without web tooling.
 
@@ -109,3 +109,9 @@ drag/drop, property editing, autosave/reload, apply to an already-open viewer,
 live tag updates after a Python action, disconnected values and stale-editor
 conflicts. Editor preview actions stay disabled. These are simulation checks,
 not PLC, production deployment or arbitrary Python hot-reload acceptance.
+
+Project-wide [languages and alarm monitoring](languages-and-alarms.md) are now
+implemented separately from screen controls. The Python lifespan owns the alarm
+sampling task; SQLite retains alarm occurrences and events. Runtime graphics
+consume its status without driving the monitor. Draft language/alarm settings
+share the screen's validation, revision checks and Apply live boundary.

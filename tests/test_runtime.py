@@ -78,6 +78,13 @@ class SimulatorTests(unittest.TestCase):
                 lambda project: project['controls'][3].update(tag='MotorRunning'),
                 lambda project: project['controls'][4].update(priority=5),
                 lambda project: project['controls'][4].update(tag='TankLevel'),
+                lambda project: project['alarms'][0].update(trigger_value=0),
+                lambda project: project['alarms'][0].update(trigger_type='bit', trigger_value=33),
+                lambda project: project['alarms'][0].update(trigger_type='bit', tag='ProcessAlarm'),
+                lambda project: project.update(default_language='zh-CN'),
+                lambda project: project['languages'][0].update(flag='../private'),
+                lambda project: project['languages'][0].update(flag='not-a-real-flag'),
+                lambda project: project['languages'].append(project['languages'][0].copy()),
             ]:
                 project = client.get('/api/project').json()['draft']
                 mutate(project)

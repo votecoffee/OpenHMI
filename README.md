@@ -27,16 +27,18 @@ Implemented: numeric displays, binary indicators, analog ranges, alarm indicator
 action buttons, tag/action dropdowns,
 server-side draft autosave, validated screen data, explicit apply, revision
 conflict detection and automatic updates in already-open runtime viewers.
-Python modules can register custom named actions at startup.
+Python modules can register custom named actions at startup. Project languages
+support translated operator text and a flag selector. A project-wide Python alarm
+service monitors tag triggers and retains occurrences, acknowledgement and history.
 
 Initial controls follow [the HMI style guide](docs/hmi-style-guide.md), based on
 the supplied high-performance HMI references and FactoryTalk View ME templates.
-The default screen uses a gray header/body/sidebar/footer layout, compact Arial
+The default screen uses a gray header/body/sidebar/footer layout, compact Noto Sans SC
 labels, subdued blue live values, flat navy commands and neutral normal states.
 Alarm symbols combine priority number, shape and the ME template palette.
 
 Current limits: one screen, a configurable control grid, simulation only, 500 ms polling,
-no integrated Python editor or Python hot reload, and no history/rollback UI.
+no integrated Python editor or Python hot reload, and no screen-revision history/rollback UI.
 There is no PLC adapter or production authentication yet.
 
 ## Install
@@ -83,10 +85,42 @@ open in another tab while editing.
 
 For an analog range, select scale endpoints and a normal band. The band supplies
 context and does not generate alarms. Alarm indicators require an explicit
-Boolean alarm tag and a priority. The header summarizes only configured alarm
-controls on that screen. Alarm acknowledgement/history are not implemented.
+Boolean alarm tag and a priority. These legacy graphics remain indicators.
+Use **Alarm setup** to register project-wide tag monitoring separately from graphics.
+The header summarizes active/unacknowledged monitored alarms across the project.
 Communication loss or invalid values are displayed explicitly. Existing saved
 screens are retained; the expanded five-control example appears in new projects.
+
+### Languages
+
+Open **Languages** in the builder, enter a language code/name, choose a flag, and
+click **Add language**. Fill translations for the screen, controls, alarm messages
+and operator UI text. Apply the draft, then use the flag button in the live screen
+to switch languages. The dropdown contains only other configured languages;
+new projects start with English only. Missing translations use source text.
+
+The supplied Noto Sans SC font and 4:3 flag-icons SVGs are bundled locally. HMI
+font sizes are reduced by approximately 4.5% to match Arial's x-height. The font
+covers the tested Latin/Chinese/Japanese samples, but does not cover every script;
+browser/system fallback remains available. The engineering editor stays in English.
+
+### Alarm tag monitoring
+
+In **Alarm setup**, add a trigger tag, type (`value`, `bit`, `lsbit`), trigger
+value/position, message, priority and acknowledgement policy. Apply the draft.
+The service samples the active configuration every 250 ms with no browser required.
+Bit positions are one-based: position 1 represents PLC bit 0 in a 32-bit word.
+
+Open [Alarms](http://127.0.0.1:8000/alarms) for outstanding alarms, individual/all
+acknowledgement and event history. Acknowledgement never clears the source tag.
+Returned but unacknowledged occurrences remain visible. The project database
+retains alarm state/history across restarts; simulator tag values themselves reset.
+The built-in **Toggle simulated process alarm** action can be assigned to a button
+for testing. Polling can miss short pulses. Remote PLC handshakes, audible/silence
+behavior, shelving and production operator authentication are not implemented.
+
+See [language and alarm semantics](docs/languages-and-alarms.md) for trigger,
+translation, persistence, quality and retention details and the FactoryTalk ME references.
 
 The default project database is `.local/project.sqlite3`, relative to the working
 directory. It retains draft and active screens across restarts. Simulated tag

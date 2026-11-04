@@ -12,6 +12,7 @@ await build({
   entryPoints: [fileURLToPath(new URL('frontend/app.jsx', root))],
   outdir: fileURLToPath(target), bundle: true, format: 'esm', minify: true,
   target: 'es2022', define: { 'process.env.NODE_ENV': '"production"' },
+  external: ['/static/*'],
   legalComments: 'linked',
 });
 for (const [source, name] of [

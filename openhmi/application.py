@@ -16,6 +16,7 @@ class Application:
         self._actions: dict[str, tuple[str, Callable]] = {}
         self.register_action("toggle_motor", "Toggle simulated motor", self._toggle_motor)
         self.register_action("reset_level", "Reset simulated tank level", self._reset_level)
+        self.register_action("toggle_alarm", "Toggle simulated process alarm", self._toggle_alarm)
 
     def register_action(self, name: str, label: str, callback: Callable):
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,99}", name) or name in self._actions:
@@ -38,6 +39,10 @@ class Application:
     @staticmethod
     def _reset_level(app):
         app.driver.write("TankLevel", [0.0])
+
+    @staticmethod
+    def _toggle_alarm(app):
+        app.driver.write("ProcessAlarm", [not app.driver.read("ProcessAlarm")[0]])
 
     def load_handlers(self, path: Path):
         spec = importlib.util.spec_from_file_location("openhmi_user_handlers", path.resolve())

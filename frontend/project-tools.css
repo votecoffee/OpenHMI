@@ -1,0 +1,36 @@
+@font-face {
+  font-family: "OpenHMI Noto";
+  src: url('/static/assets/fonts/NotoSansSC.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+:root { --puck-font-family: "OpenHMI Noto", Arial, sans-serif; }
+.project-tabs { display: flex; gap: 4px; padding: 6px 20px; background: #ddd; border-bottom: 1px solid #999; }
+.project-tabs button, .project-settings button, .alarm-console button { font: inherit; min-height: 36px; padding: 6px 12px; border: 1px solid #888; background: #ddd; color: #333; cursor: pointer; }
+.project-tabs button[aria-pressed="true"] { background: #002878; color: white; }
+.project-settings, .alarm-console { padding: 20px; background: #ddd; color: #333; font-family: "OpenHMI Noto", Arial, sans-serif; }
+.project-settings h2, .alarm-console h1 { margin-top: 0; }
+.project-settings label { display: inline-flex; flex-direction: column; gap: 5px; margin: 5px 12px 8px 0; font-size: 12px; }
+.project-settings input, .project-settings select { font: inherit; padding: 6px; min-height: 34px; border: 1px solid #888; background: #f4f4f4; color: #333; }
+.project-settings input[type="checkbox"] { min-height: auto; align-self: flex-start; }
+.settings-add, .language-list > div { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.flag-preview, .language-list img, .language-selector img { width: 32px; height: 24px; object-fit: contain; }
+.language-list { padding: 10px 0; }
+.project-settings table, .alarm-console table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; text-align: start; }
+.project-settings td, .project-settings th, .alarm-console td, .alarm-console th { border-bottom: 1px solid #aaa; padding: 8px; text-align: start; overflow-wrap: anywhere; }
+.project-settings table td input { width: 100%; min-width: 150px; }
+.project-settings fieldset { margin: 12px 0; border: 1px solid #999; }
+.alarm-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.language-selector { position: relative; display: inline-flex; align-self: flex-end; font-family: "OpenHMI Noto", Arial, sans-serif; z-index: 20; }
+.language-button { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border: 1px solid #999; background: #ddd; cursor: pointer; min-height: 32px; }
+.language-button:disabled { opacity: 1; cursor: default; }
+.language-menu { position: absolute; inset-inline-end: 0; top: 100%; border: 1px solid #666; background: #eee; min-width: 140px; }
+.language-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; width: 100%; border: 0; border-bottom: 1px solid #aaa; background: #eee; color: #333; font: inherit; cursor: pointer; text-align: start; }
+.language-menu button:hover { background: #ccc; }
+.station-mode { gap: 3px; }
+.station-header { min-height: 86px; }
+.alarm-console-heading { display: flex; justify-content: space-between; align-items: center; }
+.alarm-console table .priority-symbol { vertical-align: middle; margin-inline-end: 6px; }
+.alarm-console button:disabled, .project-settings button:disabled { color: #666; cursor: default; background: #ccc; }
+.alarm-console [role="status"] { margin-inline-start: 15px; }

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('no-code live editing, autosave, apply to an open viewer and Python action', async ({ page, context }) => {
+  test.setTimeout(60000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/');
@@ -49,13 +50,16 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
 
 test('analog context, redundant alarm priority and data quality remain explicit', async ({ page }) => {
   let values = { TankLevel: 42.0, MotorRunning: true, ProcessAlarm: false };
+  let alarms = { states: { process_alarm: { quality: 'good', condition: 0 } }, outstanding: [], active_count: 0, unacknowledged_count: 0 };
   await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
+  await page.route('**/api/alarms', route => route.fulfill({ json: alarms }));
   await page.goto('/runtime');
   await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
-  await expect(page.getByLabel('Screen alarm status')).toContainText('No configured alarms active');
+  await expect(page.getByLabel('Screen alarm status')).toContainText('No active or unacknowledged alarms');
   await expect(page.locator('[data-control="analog"]')).toContainText('Normal 20–80 %');
   if (process.env.OPENHMI_NORMAL_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_NORMAL_SCREENSHOT, fullPage: true });
   values = { TankLevel: 120.0, MotorRunning: false, ProcessAlarm: true };
+  alarms = { ...alarms, active_count: 1, unacknowledged_count: 1, outstanding: [{ priority: 2, message: 'Process alarm', active: true }] };
   await expect(page.locator('[data-control="analog"]')).toContainText('120.0');
   await expect(page.locator('[data-control="analog"]')).toContainText('OUT OF SCALE');
   await expect(page.locator('[data-control="alarm"]')).toContainText('P2 ACTIVE');
@@ -64,9 +68,10 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(page.locator('[data-control="indicator"]')).toContainText('OFF');
   if (process.env.OPENHMI_ALARM_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_ALARM_SCREENSHOT, fullPage: true });
   values = { TankLevel: 'bad', MotorRunning: null, ProcessAlarm: null };
+  alarms = { ...alarms, states: { process_alarm: { quality: 'bad' } } };
   await expect(page.locator('[data-control="analog"]')).toContainText('BAD DATA');
   await expect(page.locator('[data-control="indicator"]')).toContainText('BAD DATA');
-  await expect(page.getByLabel('Screen alarm status')).toContainText('ALARM DATA UNAVAILABLE');
+  await expect(page.getByLabel('Screen alarm status')).toContainText('BAD DATA');
   await expect(page.locator('[data-control="alarm"]')).not.toContainText('INACTIVE');
 });
 

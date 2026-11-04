@@ -11,8 +11,9 @@ export function toEditor(project) {
   };
 }
 
-export function toProject(data) {
+export function toProject(data, settings = {}) {
   return {
+    ...settings,
     schema_version: 1, title: data.root.props.title, columns: Number(data.root.props.columns),
     controls: data.content.map(({ type, props }) => {
       const base = { kind: kinds[type], id: props.id, label: props.label };
