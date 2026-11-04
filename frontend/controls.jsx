@@ -102,30 +102,44 @@ function AlarmIndicator({ id, label, tag, priority, puck }) {
   </article>;
 }
 
-function ActionButton({ id, label, action, security_groups = [], puck, enabled_tag = '' }) {
+function ActionButton({ id, label, action, mode = 'python', command = '', security_groups = [], puck, enabled_tag = '' }) {
   const live = useContext(Live);
   const { session } = useContext(SecurityContext) || {};
-  const permitted = allowed(session, 'runtime.operate', security_groups);
+  const definition = mode === 'command' ? live.project?.commands?.find(item => item.id === command) : null;
+  const permitted = allowed(session, 'runtime.operate', security_groups) && (mode !== 'command' || !!definition && allowed(session, 'runtime.operate', definition.security_groups));
   const { text, ui } = useLocalization();
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [failed, setFailed] = useState(false);
+  const [transaction, setTransaction] = useState(null);
+  useEffect(() => {
+    if (mode !== 'command' || puck?.isEditing || !permitted) return;
+    let stopped = false, timer;
+    async function refresh() {
+      try { const data = await api(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`); if (!stopped) setTransaction(data.items[0] || null); }
+      catch { if (!stopped) setTransaction(previous => previous ? { ...previous, unavailable: true } : null); }
+      if (!stopped) timer = setTimeout(refresh, 1000);
+    }
+    refresh(); return () => { stopped = true; clearTimeout(timer); };
+  }, [command, mode, permitted, puck?.isEditing]);
   async function invoke() {
     setBusy(true);
     setFailed(false);
     try {
       const result = await api(`/api/controls/${encodeURIComponent(id)}/activate`, json('POST', {}));
+      if (result.transaction) setTransaction(result.transaction);
       if (result.mode) window.dispatchEvent(new CustomEvent('openhmi-navigate', { detail: result }));
-      setFeedback(result.audit_status === 'pending' ? `Completed; activity finalization pending. Operation ${result.operation_id}` : ui('completed'));
+      setFeedback(result.transaction ? `Request dispatched. Transaction ${result.transaction.id}${result.audit_status === 'pending' ? `; activity finalization pending. Operation ${result.operation_id}` : ''}` : result.audit_status === 'pending' ? `Completed; activity finalization pending. Operation ${result.operation_id}` : ui('completed'));
     } catch (error) { setFeedback(error.message); setFailed(true); }
     finally { setBusy(false); }
   }
   return <article className="hmi-control hmi-command" data-control="button">
-    <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy || !permitted || !!enabled_tag && live.values[enabled_tag] !== true} onClick={invoke}>
+    <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy || !permitted || !!enabled_tag && live.values[enabled_tag] !== true || !!definition?.permit_member && live.values[`${definition.root_tag}.${definition.permit_member}`] !== true || mode === 'command' && !!transaction && ['prepared', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
       {busy ? ui('working') : text(`control.${id}.label`, label)}
     </button><span className={failed ? 'hmi-quality' : 'command-feedback'}>
       {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : !permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
+    {mode === 'command' && transaction && <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>}
   </article>;
 }
 
@@ -261,7 +275,8 @@ export function createConfig(catalog) {
       },
       ActionButton: {
         label: 'Action button', fields: { label: labelField, security_groups: groupsField,
-          mode: { type: 'select', label: 'Action type', options: [['python', 'Python action'], ['set', 'Set tag'], ['toggle', 'Toggle Boolean tag'], ['navigate', 'Navigate to screen'], ['popup', 'Open popup'], ['close_popup', 'Close popup']].map(([value, label]) => ({ value, label })) },
+          mode: { type: 'select', label: 'Action type', options: [['python', 'Python action'], ['command', 'PLC command transaction'], ['set', 'Set tag'], ['toggle', 'Toggle Boolean tag'], ['navigate', 'Navigate to screen'], ['popup', 'Open popup'], ['close_popup', 'Close popup']].map(([value, label]) => ({ value, label })) },
+          command: { type: 'select', label: 'PLC command contract', options: (catalog.commands || []).map(item => ({ label: item.name, value: item.id })) },
           target: { type: 'select', label: 'Target tag', options: catalog.tags.filter(tag => tag.type !== 'struct').map(tag => ({ label: tag.name, value: tag.name })) },
           value: { type: 'custom', render: ({ value = false, onChange }) => <fieldset><legend>Value to write</legend><select aria-label="Action value type" value={typeof value} onChange={event => onChange(event.target.value === 'boolean' ? false : event.target.value === 'number' ? 0 : '')}><option value="boolean">Boolean</option><option value="number">Number</option><option value="string">Text</option></select>{typeof value === 'boolean' ? <label><input type="checkbox" checked={value} onChange={event => onChange(event.target.checked)} />True</label> : <input aria-label="Action value" type={typeof value === 'number' ? 'number' : 'text'} value={value} onChange={event => onChange(typeof value === 'number' ? Number(event.target.value) : event.target.value)} />}</fieldset> },
           screen: { type: 'select', label: 'Target screen / popup', options: (catalog.screens || [{ id: 'overview', title: 'Overview' }]).map(screen => ({ label: `${screen.title}${screen.popup ? ' (popup)' : ''}`, value: screen.id })) },

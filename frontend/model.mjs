@@ -23,7 +23,7 @@ export function toProject(data, settings = {}) {
       if (type === 'Faceplate') return { ...base, template: props.template, root_tag: props.root_tag };
       if (type === 'Trend') return { ...base, tags: props.tags || ['TankLevel'], seconds: Number(props.seconds || 300) };
       if (type === 'SelectedRecipe') return base;
-      if (type === 'ActionButton') return { ...base, action: props.action || '', mode: props.mode || 'python', target: props.target || '', value: props.value ?? false, screen: props.screen || 'overview', security_groups: props.security_groups || [] };
+      if (type === 'ActionButton') return { ...base, action: props.action || '', mode: props.mode || 'python', command: props.command || '', target: props.target || '', value: props.value ?? false, screen: props.screen || 'overview', security_groups: props.security_groups || [] };
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
       if (type === 'Indicator') return { ...base, tag: props.tag, on_text: props.on_text ?? 'ON', off_text: props.off_text ?? 'OFF' };
       const numeric = { ...base, tag: props.tag, unit: props.unit, decimals: Number(props.decimals) };

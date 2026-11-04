@@ -81,3 +81,26 @@ class HistorianSettings(Model):
         if len({tag.tag for tag in self.tags}) != len(self.tags):
             raise ValueError('History tags must be unique')
         return self
+
+
+class CommandDefinition(Model):
+    id: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_-]{0,59}$')
+    name: str = Field(min_length=1, max_length=100)
+    root_tag: str = Field(min_length=1, max_length=200)
+    request_member: str = 'RequestSequence'
+    accepted_member: str = 'AcceptedSequence'
+    completed_member: str = 'CompletedSequence'
+    result_member: str = 'ResultCode'
+    permit_member: str = Field(default='', max_length=160)
+    timeout_seconds: float = Field(default=30.0, ge=1, le=3600, allow_inf_nan=False)
+    update_ms: int = Field(default=250, ge=100, le=5000)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def distinct_members(self):
+        names = [self.request_member, self.accepted_member, self.completed_member, self.result_member]
+        if self.permit_member:
+            names.append(self.permit_member)
+        if any(not name or len(name) > 160 for name in names) or len(set(names)) != len(names):
+            raise ValueError('Command members must be nonempty and distinct')
+        return self

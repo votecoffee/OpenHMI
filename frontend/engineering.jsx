@@ -20,7 +20,7 @@ export function engineeringCatalog(catalog, settings, template = null) {
     for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type });
   }
   if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type });
-  return { ...catalog, tags, faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
+  return { ...catalog, tags, commands: settings.commands || [], faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
 }
 
 function Members({ value, change }) {
@@ -33,7 +33,7 @@ function Members({ value, change }) {
   </fieldset>;
 }
 
-export function EngineeringSettings({ tab, settings, onChange, editScope }) {
+export function EngineeringSettings({ tab, settings, onChange, editScope, catalog }) {
   const [message, setMessage] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
@@ -56,6 +56,20 @@ export function EngineeringSettings({ tab, settings, onChange, editScope }) {
     if (settings[field].some(item => (item.id || item.name) === (value.id || value.name))) { setMessage('That ID/name already exists.'); return; }
     onChange({ ...settings, [field]: [...settings[field], value] }); setIdentifier(''); setName(''); setMessage('Added to the draft. Apply live to activate.');
   }
+  if (tab === 'commands') return <section className="engineering" aria-label="Command contracts"><h2>PLC command contracts</h2>
+    <p>The HMI owns the request sequence. The PLC owns acceptance, completion and result (0 means success). Each command uses its own UDT channel. Timeout does not cancel or retry a command.</p>
+    {(settings.commands || []).map((item, i) => <fieldset key={item.id}><legend>{item.name} ({item.id})</legend>
+      <label>Command UDT<select aria-label={`${item.id} UDT`} value={item.root_tag} onChange={event => update('commands', i, { root_tag: event.target.value })}>{settings.tags.filter(tag => tag.type === 'struct' && tag.writable).map(tag => <option key={tag.name}>{tag.name}</option>)}</select></label>
+      {['request_member', 'accepted_member', 'completed_member', 'result_member', 'permit_member'].map(field => <label key={field}>{field.replaceAll('_', ' ')}<select aria-label={`${item.id} ${field}`} value={item[field]} onChange={event => update('commands', i, { [field]: event.target.value })}><option value="">{field === 'permit_member' ? 'No additional permit' : 'Choose member'}</option>{Object.entries(settings.tags.find(tag => tag.name === item.root_tag)?.members || {}).filter(([, type]) => type === (field === 'permit_member' ? 'boolean' : 'integer')).map(([member]) => <option key={member}>{member}</option>)}</select></label>)}
+      <label>Completion timeout (s)<input type="number" min="1" max="3600" value={item.timeout_seconds} onChange={event => update('commands', i, { timeout_seconds: Number(event.target.value) })} /></label>
+      <label>Protocol update rate (ms)<input type="number" min="100" max="5000" value={item.update_ms} onChange={event => update('commands', i, { update_ms: Number(event.target.value) })} /></label>
+      <label>Required HMI groups<select multiple value={item.security_groups} onChange={event => update('commands', i, { security_groups: [...event.target.selectedOptions].map(option => option.value) })}>{(catalog.security_groups || []).map(group => <option key={group}>{group}</option>)}</select></label>
+      <button onClick={() => onChange({ ...settings, commands: settings.commands.filter((_, index) => index !== i) })}>Remove {item.id}</button>
+    </fieldset>)}
+    <label>Command ID<input value={identifier} onChange={event => setIdentifier(event.target.value)} /></label><label>Command name<input value={name} onChange={event => setName(event.target.value)} /></label>
+    <label>New command UDT<select aria-label="New command UDT" value={path} onChange={event => setPath(event.target.value)}><option value="">Choose writable UDT</option>{settings.tags.filter(tag => tag.type === 'struct' && tag.writable).map(tag => <option key={tag.name}>{tag.name}</option>)}</select></label>
+    <button disabled={!path} onClick={() => add('commands', { id: identifier, name: name || identifier, root_tag: path, request_member: 'RequestSequence', accepted_member: 'AcceptedSequence', completed_member: 'CompletedSequence', result_member: 'ResultCode', permit_member: '', timeout_seconds: 30, update_ms: 250, security_groups: [] })}>Add command</button><p role="status">{message}</p>
+  </section>;
   if (tab === 'screens') return <section className="engineering" aria-label="Screen settings"><h2>Screens and popups</h2>
     <p>Each screen requests its own tag update rate. Shared tags use the fastest active request.</p>
     <label>Overview tag update rate (ms)<input type="number" min="100" max="60000" value={settings.update_ms} onChange={event => onChange({ ...settings, update_ms: Number(event.target.value) })} /></label>

@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict
 from .drivers import SimulatorDriver
 from .application import Application
 from .activity import ActivityJournal
+from .commands import CommandService, add_command_routes, validate_commands
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .historian import Historian
@@ -79,6 +80,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         while not stopping.is_set():
             try:
                 await asyncio.to_thread(application.driver.poll)
+                await asyncio.to_thread(commands.poll)
                 await asyncio.to_thread(historian.sample)
                 await asyncio.to_thread(activity.maintenance)
             except Exception:
@@ -127,12 +129,18 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.historian = historian
     security = app.state.security = Security(store)
     activity = app.state.activity = ActivityJournal(store, security)
+    commands = app.state.commands = CommandService(store, application.driver)
+    add_command_routes(app, commands, security)
     add_operations_routes(app, activity, security, application.driver)
     add_security_routes(app, security)
     add_recipe_routes(app, store, application, recipe_users, security)
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
+        try:
+            validate_commands(project.model_dump(), {group['name'] for group in security.snapshot()['groups']})
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
         tags = SimulatorDriver().snapshot()
         kinds = {name: 'boolean' if type(value) is bool else 'string' if type(value) is str else 'number' for name, value in tags.items()}
         for tag in project.tags:
@@ -189,6 +197,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 continue
             if control['kind'] == "button":
                 mode = control.get('mode', 'python')
+                if mode == 'command' and control['command'] not in {item.id for item in project.commands}:
+                    raise HTTPException(422, 'Button references an unknown command')
                 if mode == 'python' and control['action'] not in actions:
                     raise HTTPException(422, f"Unknown action: {control['action']}")
                 if mode in ('navigate', 'popup'):
@@ -247,8 +257,11 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.post("/api/project/apply")
     def apply(request: RevisionRequest, http: Request) -> dict:
         security.require(http, 'project.edit')
-        with monitor.lock:
-            result = transact(lambda value: store.apply(value, validate_bindings), request)
+        with commands.lock, monitor.lock:
+            def validate_apply(project):
+                validate_bindings(project)
+                commands.validate_apply(project.model_dump())
+            result = transact(lambda value: store.apply(value, validate_apply), request)
             application.driver.plc_hold = False
             if hasattr(app.state, 'release_connections'):
                 app.state.release_connections()
@@ -339,10 +352,15 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     @app.post('/api/controls/{control_id}/activate')
     def activate(control_id: str, request: ActionRequest, http: Request):
+        # Hold the active contract stable through authorization, reservation and dispatch.
+        with commands.lock:
+            return activate_locked(control_id, request, http)
+
+    def activate_locked(control_id, request, http):
         control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] == 'button'), None)
         if control and control.get('mode', 'python') == 'python':
             return action(control['action'], ActionRequest(control_id=control_id), http)
-        context = {field: control.get(field) for field in ('mode', 'target', 'value', 'screen', '_screen')} if control else {}
+        context = {field: control.get(field) for field in ('mode', 'command', 'target', 'value', 'screen', '_screen')} if control else {}
         if control and control.get('target'):
             context['before'] = application.driver.sample_snapshot().get(control['target'])
         return activity.run(http, 'button_action', control_id, context, lambda ticket: activate_runtime(control, http, ticket))
@@ -360,6 +378,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         if not enabled(control, values):
             raise HTTPException(423, 'Control is disabled by its tag bindings')
         mode = control.get('mode', 'python')
+        if mode == 'command':
+            definition = next((item for item in application.driver.project.get('commands', []) if item['id'] == control['command']), None)
+            if not definition:
+                raise HTTPException(409, 'Active command definition is unavailable')
+            security.require(http, 'runtime.operate', definition['security_groups'])
+            return commands.submit(definition, ticket)
         if mode in ('navigate', 'popup', 'close_popup'):
             ticket.dispatch()
             ticket.confirm(verification='navigation_response')
@@ -435,6 +459,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get('/projects', include_in_schema=False)
     @app.get('/activity', include_in_schema=False)
     @app.get('/diagnostics', include_in_schema=False)
+    @app.get('/commands', include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(web / "index.html")
 

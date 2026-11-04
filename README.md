@@ -37,6 +37,8 @@ HMI security supports local accounts and Windows user/group assignments to local
 application groups, with protected buttons and numeric value inputs.
 An operator journal records command/write/acknowledgement attempts and outcomes;
 protected Activity and Diagnostics pages expose traceability and cached runtime state.
+Configurable no-code PLC command buttons track requested, accepted and completed
+sequences with durable outcomes, timeout uncertainty and no automatic replay.
 The runtime includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
 multiple screens/popups, UDT-bound faceplate definitions, conditional bindings,
 no-code tag/navigation actions and SQL history/trends. A project library supports
@@ -53,7 +55,8 @@ no integrated Python editor/hot reload and no screen-revision rollback UI.
 The ControlLogix adapter has offline protocol and browser checks; live PLC
 commissioning and Windows/domain password logon still need validation with
 configured hardware/accounts. Recipe loads currently retain an HMI-side copy;
-controller recipe transfer and application acknowledgement remain future work.
+controller recipe transfer remains future work. The command handshake has offline
+checks; its PLC logic and hardware acceptance remain open.
 
 ## Install
 
@@ -104,6 +107,15 @@ Use **Alarm setup** to register project-wide tag monitoring separately from grap
 The header summarizes active/unacknowledged monitored alarms across the project.
 Communication loss or invalid values are displayed explicitly. Existing saved
 screens are retained; the expanded five-control example appears in new projects.
+
+### PLC command transactions
+
+Use **Commands** to map a writable UDT to request/accepted/completed sequences,
+a result code and an optional PLC permit. Choose **PLC command transaction** on
+an action button and select the contract. Runtime feedback and the **Commands**
+page distinguish dispatch, acceptance, completion, failure and uncertainty.
+Timeout/restart never replay a command. See the [contract and offline example](docs/command-transactions.md).
+Recipe staging and transfer are tracked separately from command dispatch.
 
 ### Connections, screens and reusable controls
 
@@ -294,8 +306,10 @@ and [equipment controls/operator validation](https://github.com/votecoffee/OpenH
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
 The verified software baseline and M1 operator activity/diagnostic workflows are
-complete as software checkpoints. Bench commissioning, PLC transactions/recipe
-transfer, project recovery, operator review and packaged pilot acceptance follow.
+complete as software checkpoints. M3 now includes offline-verified command
+contracts and no-code bindings; equipment acceptance remains open. Bench
+commissioning, recipe transfer, project recovery, operator review and packaged
+pilot acceptance follow.
 The integrated Python IDE remains deferred.
 
 ## Maintainers

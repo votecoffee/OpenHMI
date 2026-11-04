@@ -129,3 +129,8 @@ M1 [activity and diagnostic workflows](activity-and-diagnostics.md) add durable
 operator attempts/outcomes, interruption/uncertainty handling and protected
 connection/tag-quality inspection. These views read cached runtime data without
 adding screen scan demand. The journal is included in project backup/restore.
+
+M3 [command transactions](command-transactions.md) add configurable no-code
+PLC handshakes, durable lifecycle records and continuously polled protocol UDTs.
+Command records/events are included in complete backups. Restore observes
+outstanding requests without replay; PLC feedback determines completion.

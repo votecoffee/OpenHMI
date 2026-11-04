@@ -239,6 +239,8 @@ class RuntimeDriver(SimulatorDriver):
                 demand(alarm['tag'], 250)
         for history in project.get('historian', {}).get('tags', []):
             demand(history['tag'], history['sample_ms'])
+        for command in project.get('commands', []):
+            demand(command['root_tag'], command['update_ms'])
         return rates
 
     def poll(self, now=None):
@@ -338,6 +340,16 @@ class RuntimeDriver(SimulatorDriver):
         return [self.snapshot()[address]]
 
     def write(self, address, values):
+        root, _ = self.sources.get(address, (None, ''))
+        if any(item['root_tag'] == root for item in (self.project or {}).get('commands', [])):
+            raise ValueError('Command UDT is protocol-owned; use a command button')
+        return self._write(address, values)
+
+    def write_command_request(self, identifier, sequence):
+        definition = next(item for item in self.project['commands'] if item['id'] == identifier)
+        return self._write(definition['root_tag'] + '.' + definition['request_member'], [sequence])
+
+    def _write(self, address, values):
         with self.io_lock:
             root, member = self.sources.get(address, (None, ''))
             tag = self.definitions.get(root)

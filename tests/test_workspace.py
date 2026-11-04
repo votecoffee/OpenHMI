@@ -21,6 +21,11 @@ class WorkspaceTests(unittest.TestCase):
                 operation = client.post('/api/controls/toggle/activate', json={})
                 self.assertEqual(operation.status_code, 200, operation.text)
                 operation_id = operation.headers['X-OpenHMI-Operation-ID']
+                from tests.test_commands import command_project, install
+                install(client, command_project(client.get('/api/project').json()['draft']))
+                dispatched = client.post('/api/controls/cycle/activate', json={})
+                self.assertEqual(dispatched.status_code, 200, dispatched.text)
+                command_id = dispatched.json()['transaction']['id']
                 with app.state.store.transaction() as db:
                     db.execute("INSERT INTO recipe_image VALUES('fixture',?,1,1)", (b'synthetic-image',))
                     db.execute("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES('TankLevel',?,'42','good')", (time.time(),))
@@ -39,6 +44,10 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertNotIn('test', [action['name'] for action in client.get('/api/catalog').json()['actions']])
                 self.assertEqual(workspace.current.state.recipes.image('fixture'), b'synthetic-image')
                 self.assertEqual(workspace.current.state.activity.query(search=operation_id)['items'][0]['status'], 'succeeded')
+                restored_command = workspace.current.state.commands.get(command_id)
+                self.assertEqual(restored_command['state'], 'uncertain')
+                self.assertEqual(restored_command['sequence'], 1)
+                self.assertEqual(workspace.current.state.driver._tags['CycleCommand']['RequestSequence'], 0)
                 self.assertEqual(len(workspace.current.state.historian.query(['TankLevel'], time.time() - 60, time.time() + 60)['samples']), 1)
                 state = client.get('/api/project').json()
                 self.assertEqual(client.post('/api/project/apply', json={'expected_revision': state['draft_revision']}).status_code, 200)

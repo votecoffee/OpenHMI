@@ -9,7 +9,7 @@ import './recipes.css';
 import './security.css';
 import './engineering.css';
 import './operations.css';
-import { ActivityConsole, DiagnosticsConsole } from './operations.jsx';
+import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operations.jsx';
 import { Live, ScreenControls, createConfig } from './controls.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
@@ -139,10 +139,10 @@ function Builder({ initial, catalog }) {
         <a href="/runtime" target="_blank" rel="noreferrer">Open live screen ↗</a><a href="/projects">Projects</a><span>Editing: {scope}</span></div></div>
     <p role="status" aria-label="Draft status" className="save-status">{message}</p>
     {template && <label className="builder-guide">Faceplate preview UDT<select value={previewRoot} onChange={event => setPreviewRoot(event.target.value)}><option value="">Choose live UDT instance</option>{settings.tags.filter(tag => tag.type === 'struct' && (!template.udt_type || template.udt_type === tag.udt_type)).map(tag => <option key={tag.name}>{tag.name}</option>)}</select></label>}
-    <nav className="project-tabs" aria-label="Project tools">{[['screen', 'Screen'], ['screens', 'Screens'], ['connections', 'Connections'], ['tags', 'Tags'], ['faceplates', 'Faceplates'], ['history', 'History'], ['languages', 'Languages'], ['alarms', 'Alarm setup']].map(([key, label]) =>
+    <nav className="project-tabs" aria-label="Project tools">{[['screen', 'Screen'], ['screens', 'Screens'], ['connections', 'Connections'], ['tags', 'Tags'], ['faceplates', 'Faceplates'], ['history', 'History'], ['commands', 'Commands'], ['languages', 'Languages'], ['alarms', 'Alarm setup']].map(([key, label]) =>
       <button key={key} aria-pressed={tab === key} onClick={() => { clearTimeout(timer.current); save(latest.current); setSettings(metadata.current); setTab(key); }}>{label}</button>)}<a href="/recipe-editor">Recipes</a></nav>
     {['languages', 'alarms'].includes(tab) && <ProjectSettings tab={tab} settings={settings} controls={previewControls} title={previewProject.title} catalog={dynamicCatalog} onChange={settingsChanged} />}
-    {['screens', 'connections', 'tags', 'faceplates', 'history'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} />}
+    {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} />}
     <div hidden={tab !== 'screen'}><Puck key={scope} config={config} data={initialData} iframe={{ enabled: false }}
       headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed}
       overrides={editorOverrides} /></div>
@@ -221,8 +221,8 @@ function App({ initial, catalog }) {
     {projectChanged && <p role="alert" className="save-status">A different project was opened. Saves from this editor are blocked; copy any unsaved work before reloading. <button onClick={() => location.reload()}>Reload opened project</button></p>}
     {live.plcHold && <p role="status" className="save-status">Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.</p>}
     {runtime ? <main className="runtime"><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
-      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
-      <Localization project={active.project}>{location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
+      <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/commands">Commands</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
+      <Localization project={active.project}>{location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
         <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
         <ScreenControls.Provider value={currentScreen.controls}><Render config={config} data={toEditor(currentScreen)} /></ScreenControls.Provider>
         {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenControls.Provider value={screen.controls}><Render config={config} data={toEditor(screen)} /></ScreenControls.Provider></section></div>; })}

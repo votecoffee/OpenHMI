@@ -1,11 +1,12 @@
 """Explicit browser-test entry point with synthetic accounts; never used by the CLI."""
 from openhmi.recipe_auth import hash_password
 from openhmi.server import create_app
+from pathlib import Path
 
 
 def create_test_app():
     encoded = hash_password('RecipeTestOnly-2026!')
-    app = create_app(recipe_users={'users': [
+    app = create_app(handlers=Path(__file__).resolve().parents[1] / 'examples' / 'command_simulator.py', recipe_users={'users': [
         {'name': 'engineer', 'roles': ['engineer', 'approver', 'operator'], 'password_hash': encoded},
         {'name': 'manager', 'roles': ['administrator'], 'password_hash': encoded},
     ]})

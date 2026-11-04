@@ -55,7 +55,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await page.getByRole('button', { name: 'Design Generic unit', exact: true }).click();
     await drop('Numeric display');
     await page.locator('[data-control="numeric"]').click();
-    await page.getByRole('combobox', { name: 'Tag', exact: true }).selectOption('$.Speed');
+    await page.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: '$.Speed' });
     await page.getByRole('textbox', { name: 'Label', exact: true }).fill('Unit speed');
     await page.getByRole('combobox', { name: 'Faceplate preview UDT', exact: true }).selectOption('UnitA');
     await expect(page.locator('[data-control="numeric"]')).toContainText('12.5');
