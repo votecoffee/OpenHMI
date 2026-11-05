@@ -31,7 +31,7 @@ conflict detection and automatic updates in already-open runtime viewers. Applie
 project revisions retain hashes, users/reasons and rollback provenance; engineers
 can compare/stage older screens and recover/merge stale editor candidates.
 Python modules can register custom named actions at startup. Project languages
-support translated operator text and a flag selector. A project-wide Python alarm
+support translated operator text and a keyboard-accessible flag selector. A project-wide Python alarm
 service monitors tag triggers and retains occurrences, acknowledgement and history.
 SQL recipes include a generic editor/viewer, product images, typed parameters,
 revision history, recorded approvals and an independent loaded recipe copy.

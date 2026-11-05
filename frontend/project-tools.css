@@ -23,11 +23,12 @@
 .project-settings fieldset { margin: 12px 0; border: 1px solid #999; }
 .alarm-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .language-selector { position: relative; display: inline-flex; align-self: flex-end; font-family: "OpenHMI Noto", Arial, sans-serif; z-index: 20; }
-.language-button { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border: 1px solid #999; background: #ddd; cursor: pointer; min-height: 32px; }
+.language-button { display: flex; align-items: center; gap: 5px; padding: 3px 6px; border: 1px solid #999; background: #ddd; cursor: pointer; min-height: 44px; }
 .language-button:disabled { opacity: 1; cursor: default; }
-.language-menu { position: absolute; inset-inline-end: 0; top: 100%; border: 1px solid #666; background: #eee; min-width: 140px; }
-.language-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; width: 100%; border: 0; border-bottom: 1px solid #aaa; background: #eee; color: #333; font: inherit; cursor: pointer; text-align: start; }
+.language-menu { position: absolute; inset-inline-end: 0; top: 100%; border: 1px solid #666; background: #eee; min-width: 140px; width: max-content; max-width: 80vw; max-height: min(50dvh, 24rem); overflow: auto; }
+.language-menu button { display: flex; align-items: center; gap: 8px; padding: 8px; width: 100%; min-height: 44px; border: 0; border-bottom: 1px solid #aaa; background: #eee; color: #333; font: inherit; cursor: pointer; text-align: start; overflow-wrap: anywhere; }
 .language-menu button:hover { background: #ccc; }
+.language-selector button:focus-visible { outline: 2px solid #002878; outline-offset: -2px; }
 .station-mode { gap: 3px; }
 .station-header { min-height: 86px; }
 .alarm-console-heading { display: flex; justify-content: space-between; align-items: center; }

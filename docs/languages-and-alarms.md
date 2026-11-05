@@ -22,6 +22,9 @@ Use **Languages** in the builder to add a language code, native display name and
 an explicit flag. Flags represent the project's chosen association, not a claim
 that a language belongs to one country. New projects initially configure English
 only. The runtime flag button lists only other configured project languages.
+With the flag button focused, press Enter or an arrow key to open the menu.
+Use Up/Down or Home/End to move through the flags and Enter to select.
+Escape closes the menu and returns focus to the flag button.
 Each browser remembers its own selection and falls back to the configured default
 if that language is removed.
 

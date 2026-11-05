@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 
 export const uiText = {
+  languageSelector: 'Language: {name}', configuredLanguages: 'Configured languages',
   canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
   clearTrendCursor: 'Clear trend cursor',
   trendTimeline: '{label} timeline. Use left and right arrows to move the cursor.',
@@ -116,16 +117,67 @@ export function formatLocalDateTime(date, code, options) {
 }
 
 export function LanguageSelector() {
-  const { language, languages, choose } = useLocalization();
-  const [open, setOpen] = useState(false);
+  const { language, languages, choose, ui } = useLocalization();
+  const [index, setIndex] = useState(null);
+  const selector = useRef(null);
+  const trigger = useRef(null);
+  const menu = useRef(null);
+  const menuId = useId();
   const others = languages.filter(item => item.code !== language.code);
-  return <div className="language-selector" onKeyDown={event => { if (event.key === 'Escape') setOpen(false); }}>
-    <button className="language-button" aria-label={`Language: ${language.name}`} aria-expanded={open && !!others.length}
-      aria-haspopup="menu" disabled={!others.length} onClick={() => setOpen(!open)}>
+  const last = others.length - 1;
+  const active = index === null || last < 0 ? null : Math.min(index, last);
+  const activeCode = active === null ? null : others[active].code;
+  const open = active !== null;
+  useLayoutEffect(() => {
+    if (active !== null) menu.current.children[active]?.focus();
+    else if (index !== null) setIndex(null);
+  }, [active, activeCode, index]);
+  useEffect(() => {
+    if (!open) return;
+    function dismiss(event) {
+      if (!selector.current?.contains(event.target)) setIndex(null);
+    }
+    document.addEventListener('pointerdown', dismiss, true);
+    return () => document.removeEventListener('pointerdown', dismiss, true);
+  }, [open]);
+  function close() {
+    setIndex(null);
+    trigger.current.focus();
+  }
+  function key(event) {
+    if (open && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (open && event.key === 'Tab') {
+      close();
+      return;
+    }
+    let next;
+    switch (event.key) {
+      case 'ArrowDown': next = active === null || active === last ? 0 : active + 1; break;
+      case 'ArrowUp': next = active === null || active === 0 ? last : active - 1; break;
+      case 'Home': if (open) next = 0; break;
+      case 'End': if (open) next = last; break;
+      default: break;
+    }
+    if (next === undefined || last < 0) return;
+    event.preventDefault();
+    setIndex(next);
+  }
+  return <div ref={selector} className="language-selector" onKeyDown={key} onBlur={event => {
+    if (open && !event.currentTarget.contains(event.relatedTarget)) setIndex(null);
+  }}>
+    <button ref={trigger} type="button" className="language-button" aria-label={ui('languageSelector', { name: language.name })}
+      aria-expanded={open} aria-haspopup="menu" aria-controls={open ? menuId : undefined}
+      disabled={last < 0} onClick={() => open ? close() : setIndex(0)}>
       <img src={`/static/assets/flags/${language.flag}.svg`} alt={language.name} /><span aria-hidden="true">▾</span>
     </button>
-    {open && !!others.length && <div className="language-menu" role="menu" aria-label="Configured languages">
-      {others.map(item => <button key={item.code} role="menuitem" lang={item.code} onClick={() => { choose(item.code); setOpen(false); }}>
+    {open && <div ref={menu} id={menuId} className="language-menu" role="menu" aria-label={ui('configuredLanguages')}>
+      {others.map(item => <button key={item.code} type="button" role="menuitem" tabIndex={-1} lang={item.code}
+        onClick={() => { choose(item.code); close(); }}>
         <img src={`/static/assets/flags/${item.flag}.svg`} alt="" /><span>{item.name}</span>
       </button>)}
     </div>}
