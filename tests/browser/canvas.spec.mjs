@@ -306,3 +306,49 @@ test('copy and paste moves a reusable selection between freeform screens', async
     await save(page, original.draft, false);
   }
 });
+
+test('match object dimensions to a selected reference without moving objects', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    await save(page, { ...original.active, controls: ['reference', 'target', 'edge'].map(id => ({
+      kind: 'indicator', id, label: id, tag: 'MotorRunning',
+    })), layout: { width: 500, height: 300, boxes: {
+      reference: { x: 20, y: 20, width: 128, height: 80 },
+      target: { x: 220, y: 80, width: 88, height: 48 },
+      edge: { x: 408, y: 160, width: 80, height: 50 },
+    } } });
+    await page.goto('/');
+    const objects = page.getByRole('group', { name: 'Objects', exact: true });
+    const select = (name, modifiers = []) => objects.getByRole('button', { name, exact: true }).click({ modifiers });
+    const match = name => page.getByRole('button', { name, exact: true });
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    const target = page.locator('[data-canvas-object="target"]');
+    await select('target');
+    await select('reference', ['Shift']);
+    await page.getByRole('combobox', { name: 'Size reference' }).selectOption('reference');
+    await match('Match width').click();
+    await expect(target).toHaveCSS('width', '128px');
+    await expect(target).toHaveCSS('height', '48px');
+    await undo.click();
+    await expect(target).toHaveCSS('width', '88px');
+    await match('Match height').click();
+    await expect(target).toHaveCSS('width', '88px');
+    await expect(target).toHaveCSS('height', '80px');
+    await match('Match size').click();
+    await expect(target).toHaveCSS('width', '128px');
+    await expect(target).toHaveCSS('height', '80px');
+    await expect(target).toHaveCSS('left', '220px');
+    await expect(target).toHaveCSS('top', '80px');
+    await select('edge', ['Shift']);
+    await expect(match('Match width')).toBeDisabled();
+    await expect(match('Match size')).toBeDisabled();
+    await expect(match('Match height')).toBeEnabled();
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    const current = (await (await page.request.get('/api/project')).json()).active;
+    expect(current.layout.boxes.target).toMatchObject({ x: 220, y: 80, width: 128, height: 80 });
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});

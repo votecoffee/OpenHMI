@@ -147,6 +147,7 @@ function Properties({ item, component, onChange }) {
 export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCopy }) {
   const { layout } = data.root.props;
   const [selected, select] = useState([]);
+  const [sizeReference, setSizeReference] = useState('');
   const [palette, setPalette] = useState(Object.keys(config.components)[0]);
   const [zoom, setZoom] = useState(1);
   const [preview, setPreview] = useState(null);
@@ -169,6 +170,29 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   const freeSelection = selected.filter(key => !members.has(key) && (lookup(layout.boxes, key) || lookup(layout.containers, key) || lookup(layout.decorations, key)));
   const top = topObjects(layout);
   const objects = Object.fromEntries(objectEntries(layout));
+  const referenceID = freeSelection.includes(sizeReference) ? sizeReference : freeSelection[0];
+  const reference = objects[referenceID];
+
+  function objectLabel(key) {
+    return lookup(layout.decorations, key)?.label || data.content.find(block => block.props.id === key)?.props.label
+      || (objects[key]?.mode === 'grid' ? 'Grid container' : 'Scrollable stack');
+  }
+
+  function matchSizeOptions() {
+    if (freeSelection.length < 2) return [];
+    return [
+      ['Match width', { width: reference.width }],
+      ['Match height', { height: reference.height }],
+      ['Match size', { width: reference.width, height: reference.height }],
+    ].map(([label, dimensions]) => {
+      const changed = freeSelection.filter(key => Object.entries(dimensions).some(([field, value]) => objects[key][field] !== value));
+      const fits = changed.every(key => {
+        const box = { ...objects[key], ...dimensions };
+        return maxX(box) <= layout.width && maxY(box) <= layout.height;
+      });
+      return { label, dimensions, changed, fits };
+    });
+  }
 
   function publish(next) {
     latest.current.data = next;
@@ -572,7 +596,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
         <fieldset><legend>Objects</legend>
           {top.map(([key, box]) => <React.Fragment key={key}>
             <button type="button" aria-pressed={selected.includes(key)} onClick={event => select(selectionFor(key, event.shiftKey))}>
-              {lookup(layout.decorations, key)?.label || data.content.find(block => block.props.id === key)?.props.label || (box.mode === 'grid' ? 'Grid container' : 'Scrollable stack')}
+              {objectLabel(key)}
             </button>
             {box.members?.map(member => <button type="button" className="canvas-outline-member" key={member}
               aria-pressed={selected.includes(member)} onClick={() => select([member])}>{data.content.find(block => block.props.id === member)?.props.label}</button>)}
@@ -610,6 +634,18 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
               disabled={freeSelection.length < 2} onClick={() => align(axis, index / 2)}>{label}</button>))}
           <button type="button" disabled={freeSelection.length < 3} onClick={() => distribute('x')}>Space horizontally</button>
           <button type="button" disabled={freeSelection.length < 3} onClick={() => distribute('y')}>Space vertically</button>
+          {freeSelection.length > 1 && <>
+            <label>Size reference<select value={referenceID} onChange={event => setSizeReference(event.target.value)}>
+              {freeSelection.map(key => <option key={key} value={key}>
+                {objectLabel(key)} ({objects[key].width} × {objects[key].height})
+              </option>)}
+            </select></label>
+            {matchSizeOptions().map(({ label, dimensions, changed, fits }) => <button key={label} type="button"
+              title={!fits ? 'The new size would extend outside the canvas' : undefined}
+              disabled={!changed.length || !fits}
+              onClick={() => change(boxesChanged(Object.fromEntries(changed.map(key => [key, dimensions]))))}>{label}</button>)}
+          </>}
+
           <button type="button" disabled={!canPack} onClick={() => pack('grid')}>Pack into grid</button>
           <button type="button" disabled={!canPack} onClick={() => pack('stack')}>Pack into scrollable stack</button>
           <button type="button" disabled={!selected.length} onClick={remove}>{selectedContainer ? 'Unpack container' : 'Remove selected'}</button>

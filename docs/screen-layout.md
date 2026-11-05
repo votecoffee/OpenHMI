@@ -33,6 +33,11 @@ You can also Shift-click individual objects. Align their edges or centers, or sp
 or more objects evenly. **Group** makes a selection move together and
 **Ungroup** restores individual selection.
 
+Select two or more objects and pick a **Size reference** in **Selection**.
+**Match width**, **Match height**, and **Match size** copy the reference
+dimensions in one undoable edit. Objects keep their positions. A match that
+would extend past the canvas edge is unavailable.
+
 Use **Duplicate selection** or **Ctrl+D** to copy selected canvas objects.
 Copies retain their tag bindings and relative positions and receive new IDs.
 Duplicating a container also copies its contents. **Copy selection** and
