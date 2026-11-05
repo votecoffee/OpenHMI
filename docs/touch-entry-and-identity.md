@@ -20,6 +20,9 @@ Use **Open numeric keypad** or **Open keyboard** on an edit control. The modal
 supports touch keys, backspace, clear, cancel and explicit acceptance. Set the
 cursor or select text in the entry field to correct part of an existing value.
 On-screen Backspace deletes the selection or the character before the cursor.
+On narrow displays the key rows wrap to retain targets at least 44 CSS pixels
+wide. On short displays scroll within the dialog to reach the remaining keys
+and the acceptance buttons.
 Physical typing and native Unicode/IME entry remain available. The text keyboard provides
 a US Latin layout with Shift, punctuation and Space. Password keyboard fields
 are masked. Acceptance validates the latest limits and keeps the dialog open on

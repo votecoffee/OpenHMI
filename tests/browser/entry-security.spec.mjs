@@ -15,11 +15,25 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
       data: { expected_revision: (await draft.json()).draft_revision },
     })).ok()).toBe(true);
   }
+  async function expectCompactDialog(dialog) {
+    const layout = await dialog.evaluate(element => ({
+      overflow: element.scrollWidth > element.clientWidth,
+      left: element.getBoundingClientRect().left,
+      right: element.getBoundingClientRect().right,
+      narrowestKey: Math.min(...Array.from(element.querySelectorAll('.touch-keys button'),
+        button => button.getBoundingClientRect().width)),
+    }));
+    expect(layout.left).toBeGreaterThanOrEqual(0);
+    expect(layout.right).toBeLessThanOrEqual(360);
+    expect(layout.overflow).toBe(false);
+    expect(layout.narrowestKey).toBeGreaterThanOrEqual(44);
+  }
   try {
     const project = structuredClone(original.active);
     project.languages.push({ code: 'es', name: 'Español', flag: 'es', translations: {
       'ui.hmiLogin': 'Acceso HMI', 'ui.openHmiLogin': 'Abrir acceso HMI', 'ui.signOutHmi': 'Cerrar sesión HMI',
       'ui.hmiUser': 'Usuario HMI', 'ui.passwordKeyboard': 'Teclado de contraseña', 'ui.passwordEntry': 'Contraseña',
+      'ui.backspaceKey': 'Borrar el carácter anterior a la posición del cursor',
       'ui.signInHmi': 'Iniciar sesión', 'ui.acceptEntry': 'Aceptar entrada', 'ui.entryLabel': 'Entrada',
       'ui.openNumericKeypad': 'Abrir teclado numérico para {label}', 'ui.numericEntryTitle': 'Entrada numérica: {label}',
       'ui.allowedNumericRange': 'Rango permitido: {low} a {high}', 'control.localized_number.label': 'Nivel',
@@ -38,9 +52,12 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
     await page.getByRole('button', { name: 'Cerrar sesión HMI', exact: true }).click();
     await page.getByRole('button', { name: 'Abrir acceso HMI', exact: true }).click();
     const login = page.getByRole('dialog', { name: 'Acceso HMI', exact: true });
+    await page.setViewportSize({ width: 360, height: 600 });
+    await expectCompactDialog(login);
     await login.getByLabel('Usuario HMI', { exact: true }).fill('admin');
     await login.getByRole('button', { name: 'Teclado de contraseña', exact: true }).click();
     const keyboard = page.getByRole('dialog', { name: 'Teclado de contraseña', exact: true });
+    await expectCompactDialog(keyboard);
     const secret = keyboard.getByLabel('Contraseña', { exact: true });
     await expect(secret).toHaveAttribute('type', 'password');
     await secret.fill(password.slice(1));
@@ -54,6 +71,7 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
 
     await page.getByRole('button', { name: 'Abrir teclado numérico para Nivel', exact: true }).click();
     const numeric = page.getByRole('dialog', { name: 'Entrada numérica: Nivel', exact: true });
+    await expectCompactDialog(numeric);
     const numberEntry = numeric.getByLabel('Entrada', { exact: true });
     await numberEntry.fill('55');
     await numeric.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
@@ -65,12 +83,13 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
     await numeric.press('Escape');
     await page.getByRole('button', { name: 'Abrir teclado para Mensaje', exact: true }).click();
     const text = page.getByRole('dialog', { name: 'Entrada de texto: Mensaje', exact: true });
+    await expectCompactDialog(text);
     await expect(text.getByRole('group', { name: 'Teclado de texto' })).toBeVisible();
     const entry = text.getByLabel('Entrada', { exact: true });
     await entry.fill('设备🛠x');
     await entry.press('End');
     await entry.press('ArrowLeft');
-    await text.getByRole('button', { name: 'Backspace', exact: true }).tap();
+    await text.getByRole('button', { name: 'Borrar el carácter anterior a la posición del cursor', exact: true }).tap();
     await expect(entry).toHaveValue('设备x');
     await entry.press('Shift+ArrowRight');
     const aKey = text.getByRole('button', { name: 'a', exact: true });

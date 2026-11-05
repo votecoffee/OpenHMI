@@ -1,10 +1,18 @@
 .hmi-popup { border: 1px solid #777; background: #ddd; color: #333; padding: 20px; width: min(850px, 94vw); max-height: 92vh; overflow: auto; font: inherit; }
+dialog.hmi-popup { box-sizing: border-box; max-height: 92dvh; overflow-wrap: anywhere; }
 .hmi-popup::backdrop { background: #0008; }
 .hmi-popup header, .hmi-popup footer, .key-row { display: flex; justify-content: space-between; gap: 6px; margin: 8px 0; }
+dialog.hmi-popup > header button { flex-shrink: 0; }
+dialog.hmi-popup footer, .key-row { flex-wrap: wrap; }
 .hmi-popup h2 { margin: 0; }.hmi-popup input { width: 100%; min-height: 46px; font: inherit; box-sizing: border-box; }
 .hmi-popup button { min-width: 42px; min-height: 46px; font: inherit; background: #eee; border: 1px solid #888; color: #222; cursor: pointer; }
-.hmi-popup button:focus-visible { outline: 3px solid #002878; }.key-row button { flex: 1; }.numeric-keys { max-width: 420px; margin: auto; }
+.hmi-popup button:focus-visible { outline: 3px solid #002878; }
+.touch-keys { min-inline-size: 0; }
+.touch-keys legend { max-inline-size: 100%; }
+.key-row button { flex: 1 1 44px; min-inline-size: 44px; max-inline-size: 100%; }
+.key-row:last-child button { flex-basis: auto; }
+.numeric-keys { max-width: 420px; margin: auto; }
 .security-protected { position: relative; }.security-lock-cover { position: absolute; inset: 0; border: 2px solid var(--security-color, #62616e); background: transparent; cursor: pointer; display: flex; align-items: flex-start; justify-content: flex-end; z-index: 2; }
 .security-lock-cover span { padding: 3px 7px; background: var(--security-color, #62616e); color: white; font-weight: bold; }.security-swatch { display: inline-block; width: 18px; height: 18px; border: 1px solid #444; margin-right: 8px; vertical-align: middle; }
 .hmi-current-user button { min-height: 44px; }.hmi-popup label { display: block; margin: 10px 0; }.hmi-popup select { min-height: 44px; }
-@media(max-width: 650px) { .hmi-popup { padding: 8px; }.key-row { gap: 2px; }.hmi-popup .key-row button { min-width: 0; padding: 6px 2px; } }
+@media(max-width: 650px) { .hmi-popup { padding: 8px; }.key-row { gap: 4px; } }
