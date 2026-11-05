@@ -124,7 +124,7 @@ project restore and preservation of data/security. Test actual local/Windows
 credentials and intended group membership in the target environment. Automatic
 browser SSO is optional future scope, not a pilot prerequisite.
 
-The pilot acceptance matrix covers operation, permissions, commands/recipes,
+The [pilot acceptance matrix](pilot-acceptance.md) covers operation, permissions, commands/recipes,
 alarms/history, live engineering, language/display behavior and recovery. Record
 results, limitations and owner acceptance. Passing software tests alone does not
 close a bench, domain or pilot acceptance gate.

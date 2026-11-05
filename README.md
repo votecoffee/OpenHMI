@@ -403,7 +403,8 @@ contracts, no-code bindings and versioned recipe transfer/copy verification.
 Equipment acceptance remains open. M4 project revision/diff/staging, stale-editor
 merge recovery and migration/restore checks are also delivered offline. Bench
 commissioning, operator review and packaged pilot acceptance follow. Use the
-[read-only PLC bench procedure](docs/plc-bench-acceptance.md) for M2 evidence.
+[read-only PLC bench procedure](docs/plc-bench-acceptance.md) for M2 evidence
+and the [Windows pilot acceptance matrix](docs/pilot-acceptance.md) for M6.
 The integrated Python IDE remains deferred.
 
 ## Maintainers

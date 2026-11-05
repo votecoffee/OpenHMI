@@ -251,6 +251,33 @@ def main():
             assert json.loads(request('/api/alarms'))['unacknowledged_count'] == 1
             report['shelf_restart_backup_expiry_and_early_restore'] = True
             report['backup_restore_preserved_project_and_hold'] = True
+            # Apply only to the restored, PLC-free copy used by this drill.
+            state = json.loads(request('/api/project'))
+            assert state['active']['connections'] == [] and state['draft']['connections'] == []
+            restored_revision = state['active_revision']
+            state['draft']['title'] = 'Temporary pilot edit'
+            saved = json.loads(request('/api/project/draft', {
+                'expected_revision': state['draft_revision'], 'project': state['draft'],
+            }, 'PUT'))
+            edited = json.loads(request('/api/project/apply', {'expected_revision': saved['draft_revision']}, 'POST'))
+            reason = 'Pilot fixture screen rollback'
+            staged = json.loads(request(f'/api/project/revisions/{restored_revision}/stage', {
+                'expected_revision': edited['draft_revision'], 'scope': 'screens', 'reason': reason,
+            }, 'POST'))
+            assert staged['active']['title'] == 'Temporary pilot edit'
+            assert staged['draft']['title'] == 'Packaged restart fixture'
+            recovered = json.loads(request(f'/api/project/recoveries/{staged["preserved_recovery_id"]}'))
+            assert recovered['local']['title'] == 'Temporary pilot edit'
+            rolled_back = json.loads(request('/api/project/apply', {'expected_revision': staged['draft_revision']}, 'POST'))
+            assert rolled_back['active_revision'] > edited['active_revision']
+            assert rolled_back['active']['title'] == 'Packaged restart fixture'
+            revision = json.loads(request(f'/api/project/revisions/{rolled_back["active_revision"]}'))
+            assert revision['source_revision'] == restored_revision and revision['reason'] == reason
+            assert request(asset_path) == canvas_image and request(capture_path + '/csv') == trend_csv
+            report['restored_copy_screen_rollback'] = {
+                'source_revision': restored_revision, 'edited_revision': edited['active_revision'],
+                'new_revision': rolled_back['active_revision'], 'recovery_copy_verified': True,
+            }
         finally:
             child.kill(); child.wait(timeout=10)
     assert (project.parent / 'logs/runtime.log').stat().st_size > 0
