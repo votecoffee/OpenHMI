@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export const uiText = {
   canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
+  clearTrendCursor: 'Clear trend cursor',
   closeDialog: 'Close {title}', closePopup: 'Close popup', entryLabel: 'Entry', passwordEntry: 'Password entry', numericKeypad: 'Numeric keypad',
   textKeyboard: 'Text keyboard', shiftKey: 'Shift', spaceKey: 'Space', backspaceKey: 'Backspace', clearEntry: 'Clear',
   cancelEntry: 'Cancel', acceptEntry: 'Accept entry', invalidNumericEntry: 'Enter a finite number',

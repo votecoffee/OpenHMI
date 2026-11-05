@@ -122,8 +122,11 @@ Export is limited to 20,000 records per requested tag.
 
 Set the default viewing window in the designer. In runtime, choose a preset
 such as **10 s** or **1 min**, or enter a custom window of 1 to 604,800 seconds.
-Hover or tap a trace to align the cursor across all lanes. With the timeline
-focused, use Left/Right to move it and Escape to clear it. Analog cursor values
+Hover over a trace to align the cursor across all lanes. Tap a trace or use
+Left/Right with the timeline focused to pin the cursor to a timestamp as the
+live window advances. Use **Clear trend cursor** or press Escape with the
+timeline focused to clear it. The marker disappears when its timestamp leaves
+the viewing window. Analog cursor values
 interpolate between good points. Boolean values follow the preceding good state
 between good points. Gaps and times outside the recorded traces show a dash.
 The live value column remains separate.

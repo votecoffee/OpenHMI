@@ -142,25 +142,33 @@ const Trace = React.memo(function Trace({ series, start, seconds }) {
     && before.dash === after.dash && before.range?.[0] === after.range?.[0] && before.range?.[1] === after.range?.[1];
 });
 
-function TrendPlot({ analog, digital, start, seconds, historical, label, cursor, setCursor }) {
+function TrendPlot({ analog, digital, start, seconds, historical, label, cursor, pinned, setCursor, hasHistory }) {
   const clipId = useId();
+  function inspect(fraction, pinned) {
+    const position = Math.max(0, Math.min(1, fraction));
+    if (!pinned) setCursor({ fraction: position });
+    else if (hasHistory) setCursor({ epoch: start + position * seconds });
+  }
   function point(event) {
+    if (!event.isPrimary || pinned && event.pointerType === 'mouse' && event.type === 'pointermove') return;
     const matrix = event.currentTarget.getScreenCTM();
     if (!matrix) return;
     const location = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
-    if (Number.isFinite(location.x)) setCursor(Math.max(0, Math.min(1, location.x / 600)));
+    if (Number.isFinite(location.x)) inspect(location.x / 600, event.pointerType !== 'mouse');
   }
   function key(event) {
-    if (event.key === 'Escape') { setCursor(null); return; }
+    if (event.key === 'Escape' && cursor !== null) { event.preventDefault(); setCursor(null); return; }
     if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
     event.preventDefault();
-    setCursor(previous => Math.max(0, Math.min(1, (previous ?? 0.5) + (event.key === 'ArrowLeft' ? -0.01 : 0.01))));
+    inspect((cursor ?? 0.5) + (event.key === 'ArrowLeft' ? -0.01 : 0.01), true);
   }
   const pointer = { onPointerMove: point, onPointerDown: point };
   const line = height => cursor != null && <line className="trend-cursor" data-trend-cursor=""
     x1={cursor * 600} x2={cursor * 600} y1="0" y2={height} vectorEffect="non-scaling-stroke" />;
   return <div className="trend-plot" dir="ltr" tabIndex={0} aria-label={label + ' timeline. Use left and right arrows to move the cursor.'}
-    onPointerLeave={event => { if (event.pointerType === 'mouse') setCursor(null); }} onKeyDown={key}>
+    onPointerLeave={event => {
+      if (event.pointerType === 'mouse') setCursor(previous => previous?.epoch === undefined ? null : previous);
+    }} onKeyDown={key}>
     {analog.length > 0 && <div className="trend-plot-row">
       <span>Analog</span>
       <svg role="img" aria-label={label + ' trend'} viewBox="0 0 600 160" preserveAspectRatio="none" {...pointer}>
@@ -258,7 +266,10 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const analog = plotted.filter(item => !item.digital);
   const digital = plotted.filter(item => item.digital);
   const hasSamples = plotted.some(item => item.samples.some(row => goodSample(row, item.digital)));
-  const cursorEpoch = cursor === null || !history ? null : history.start + cursor * (history.end - history.start);
+  const span = history ? history.end - history.start : 0;
+  const position = history && cursor?.epoch !== undefined ? (cursor.epoch - history.start) / span : cursor?.fraction;
+  const cursorFraction = position >= 0 && position <= 1 ? position : null;
+  const cursorEpoch = cursorFraction === null || !history ? null : cursor.epoch ?? history.start + cursorFraction * span;
   const cursorDate = cursorEpoch === null ? null : new Date(cursorEpoch * 1000);
   const cursorTime = cursorDate?.toLocaleTimeString(undefined, {
     hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3,
@@ -300,10 +311,11 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     {!puck?.isEditing && <CaptureTools state={captures} recording={recording} endTime={endTime} setEndTime={setEndTime} />}
     {plotted.length > 0 && <TrendPlot analog={analog} digital={digital} start={history?.start ?? 0}
       seconds={history ? history.end - history.start : windowSeconds} historical={!follow} label={label}
-      cursor={cursor} setCursor={setCursor} />}
-    {cursorDate && <span className="trend-cursor-time" data-trend-cursor-time="">
+      cursor={cursorFraction} pinned={cursorFraction !== null && cursor?.epoch !== undefined}
+      setCursor={setCursor} hasHistory={!!history} />}
+    {cursorDate && <div className="trend-cursor-readout"><span className="trend-cursor-time" data-trend-cursor-time="">
       Cursor: {cursorDate.toLocaleDateString()} {cursorTime}
-    </span>}
+    </span>{cursor.epoch !== undefined && <button type="button" onClick={() => setCursor(null)}>{ui('clearTrendCursor')}</button>}</div>}
     {plotted.length > 0 && <table className="trend-legend"><thead><tr><th>Tag</th><th>Current (live)</th>
       <th>At cursor</th><th>Y-axis range</th></tr></thead>
       <tbody>{plotted.map(item => {

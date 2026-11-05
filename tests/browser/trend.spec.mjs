@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 
+test.use({ hasTouch: true });
+
 async function save(page, project, apply = true) {
   const state = await (await page.request.get('/api/project')).json();
   const result = await page.request.put('/api/project/draft', { data: { expected_revision: state.draft_revision, project } });
@@ -17,9 +19,10 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
     project.controls.push({ id: 'sparse_trend', kind: 'trend', label: 'On-change trend',
       tags: ['TankLevel', 'MotorRunning'], seconds: 10 });
     await save(page, project);
+    let windowOffset = 0;
     await page.route(url => url.pathname === '/api/history' && url.searchParams.get('trend_context') === 'true',
       route => route.fulfill({ json: {
-        start: 100, end: 110, truncated: false,
+        start: 100 + windowOffset, end: 110 + windowOffset, truncated: false,
         samples: [{ tag: 'TankLevel', epoch: 108, value: 20, quality: 'good' }],
         change_context: {
           TankLevel: { hold_seconds: 61, previous: { epoch: 45, value: 10, quality: 'good' } },
@@ -41,6 +44,27 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
     await expect(chart.locator('[data-trend-value="MotorRunning"] [data-trend-cursor-value]')).toHaveText('OFF');
     await analog.hover({ position: { x: bounds.width * 0.7, y: bounds.height / 2 } });
     await expect(atLevel).toHaveText('—');
+    const lane = chart.getByRole('img', { name: 'MotorRunning Boolean history' });
+    await lane.tap();
+    const readout = chart.locator('[data-trend-cursor-time]');
+    await expect(readout).toBeVisible();
+    await expect(atLevel).toHaveText('10.0');
+    const selectedTime = await readout.textContent();
+    const marker = analog.locator('[data-trend-cursor]');
+    const originalX = Number(await marker.getAttribute('x1'));
+    windowOffset = 1;
+    await expect.poll(async () => Number(await marker.getAttribute('x1'))).toBeCloseTo(originalX - 60);
+    await expect(readout).toHaveText(selectedTime.trim());
+    await expect(atLevel).toHaveText('10.0');
+    await analog.hover({ position: { x: bounds.width / 4, y: bounds.height / 2 } });
+    await expect(readout).toHaveText(selectedTime.trim());
+    await chart.getByRole('button', { name: 'Clear trend cursor', exact: true }).tap();
+    await expect(readout).toHaveCount(0);
+    const timeline = chart.locator('.trend-plot');
+    await timeline.press('ArrowRight');
+    await expect(readout).toBeVisible();
+    await timeline.press('Escape');
+    await expect(readout).toHaveCount(0);
     await expect(chart.getByRole('link', { name: 'Export history CSV' })).not.toHaveAttribute('href', /trend_context/);
   } finally {
     await save(page, original.active);

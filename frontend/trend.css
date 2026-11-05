@@ -21,6 +21,8 @@
 .trend-plot-row svg { touch-action: pan-y; cursor: crosshair; }
 .trend-cursor { stroke: #222; stroke-dasharray: 3 2; pointer-events: none; }
 .trend-cursor-time { font-variant-numeric: tabular-nums; }
+.trend-cursor-readout { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.trend-cursor-readout button { min-height: 44px; }
 .trend-captures { display: flex; flex-direction: column; gap: 5px; width: 100%; }
 .trend-seek { display: flex; align-items: center; gap: 8px; }
 .trend-seek input { flex: 1; min-width: 0; }

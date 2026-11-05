@@ -211,7 +211,8 @@ keeps its running copy; test recipes carry production status false. See the
    expires. The control shows current live values alongside time-range/end-time
    selection and CSV export.
    Set a 10-second, 1-minute or custom viewing window and move the cursor
-   across the plot to read every tag at the same time. Enable **Saved trend
+   across the plot to read every tag at the same time. Tap or use the arrow keys
+   to pin the cursor to a timestamp. Enable **Saved trend
    recording** for manual Run/Stop or optional Boolean triggers, independent
    rolling sample retention, saved capture review and full capture CSV export.
 7. In the **Live charts** palette section, drop in a **Tank level indicator**
