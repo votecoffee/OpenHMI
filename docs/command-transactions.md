@@ -64,6 +64,9 @@ are rejected. Trusted Python and other PLC clients remain outside this boundary.
    Filter history by exact command ID and transaction state. **All unresolved**
    includes prepared, staging, requested, accepted and uncertain transactions.
    The list updates as transactions change state.
+   Use **Download transaction JSON** in the detail view to save the stored
+   transaction and its event timeline for commissioning records. The download
+   includes the project ID and export time and performs no controller access.
 5. For manual offline feedback, start with
    `openhmi --handlers examples/command_simulator.py` and bind three additional
    Python buttons to its simulated acceptance, success and rejection actions.

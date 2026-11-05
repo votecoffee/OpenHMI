@@ -234,6 +234,7 @@ class CommandService:
 
 def add_command_routes(app, service, security):
     from fastapi import Path, Query, Request
+    from fastapi.responses import JSONResponse
 
     @app.get('/api/commands')
     def recent(request: Request, limit: int = Query(default=100, ge=1, le=200),
@@ -243,6 +244,16 @@ def add_command_routes(app, service, security):
         return service.recent(limit, before_id, command_id, state)
 
     @app.get('/api/commands/{identifier}')
-    def transaction(request: Request, identifier: int = Path(ge=1, le=9223372036854775807)):
+    def transaction(request: Request, identifier: int = Path(ge=1, le=9223372036854775807), download: bool = False):
         security.require(request, 'runtime.operate')
-        return service.get(identifier)
+        record = service.get(identifier)
+        if not download:
+            return record
+        return JSONResponse({
+            'format': 'openhmi.command-transaction',
+            'version': 1,
+            'project_id': service.store.snapshot()['project_id'],
+            'exported_at': utc_now(),
+            'transaction': record,
+        }, headers={'Content-Disposition': f'attachment; filename="openhmi-command-{identifier}.json"',
+                    'Cache-Control': 'no-store'})

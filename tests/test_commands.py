@@ -84,6 +84,14 @@ class CommandTests(unittest.TestCase):
         result = client.get(f"/api/commands/{first['id']}").json()
         self.assertEqual((result['state'], result['result_code']), ('completed', 0))
         self.assertEqual([item['state'] for item in result['events']], ['prepared', 'requested', 'accepted', 'completed'])
+        export = client.get(f"/api/commands/{first['id']}?download=true")
+        self.assertEqual(export.status_code, 200)
+        self.assertEqual(export.headers['Content-Disposition'], f'attachment; filename="openhmi-command-{first["id"]}.json"')
+        evidence = export.json()
+        self.assertEqual((evidence['format'], evidence['version']), ('openhmi.command-transaction', 1))
+        self.assertEqual(evidence['project_id'], client.get('/api/project').json()['project_id'])
+        self.assertEqual(evidence['transaction'], result)
+        self.assertNotIn('definition_json', evidence['transaction'])
         app.state.driver._tags['CycleCommand'].update(RequestSequence=0, AcceptedSequence=0, CompletedSequence=0)
         second = self.dispatch(client)
         self.assertEqual(second['sequence'], 2)  # A PLC reset never reuses a sequence.
@@ -129,6 +137,7 @@ class CommandTests(unittest.TestCase):
         app.state.driver._tags['CycleCommand']['Permit'] = True
         bootstrap(app)
         self.assertEqual(client.get('/api/commands').status_code, 401)
+        self.assertEqual(client.get('/api/commands/1?download=true').status_code, 401)
         self.assertEqual(client.post('/api/controls/cycle/activate', json={}).status_code, 401)
         client.post('/api/security/login', json={'name': 'admin', 'password': PASSWORD, 'provider': 'local'}).raise_for_status()
         project = client.get('/api/project').json()['draft']

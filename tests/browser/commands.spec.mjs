@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 test.use({ actionTimeout: 15000 });
 
@@ -59,6 +60,12 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   const row = page.locator('.activity-table tbody tr').first();
   await expect(row).toContainText('completed');
   await expect(row.getByText(/PLC accepted this sequence/)).toBeVisible();
+  const [download] = await Promise.all([page.waitForEvent('download'),
+    page.getByRole('link', { name: 'Download transaction JSON', exact: true }).click()]);
+  const evidence = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(download.suggestedFilename()).toBe(`openhmi-command-${evidence.transaction.id}.json`);
+  expect(evidence.transaction).toMatchObject({ command_id: 'cycle_demo', sequence: 1, state: 'completed', result_code: 0 });
+  expect(evidence.transaction.events.map(event => event.state)).toEqual(['prepared', 'requested', 'accepted', 'completed']);
   await row.getByRole('link', { name: 'Operator activity', exact: true }).click();
   await expect(page.locator('.activity-table tbody tr')).toHaveCount(1);
   await page.locator('.activity-table tbody tr').getByText('Operation details', { exact: true }).click();

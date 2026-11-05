@@ -45,6 +45,7 @@ export function CommandConsole() {
   return <section className="engineering operations" aria-label="PLC command transactions"><h1>PLC command transactions</h1>
     {exact && <p><a href="/commands">All command transactions</a></p>}
     {exact && valid && <h2>Transaction #{identifier}</h2>}
+    {exact && data?.items.length > 0 && <p><a href={`${endpoint}?download=true`}>Download transaction JSON</a></p>}
     {!valid && <p role="alert">Enter a valid command transaction ID.</p>}
     <p>Staging means recipe parameters are being written; commit has not been sent. Requested means request/commit dispatch started. Accepted means the PLC acknowledged this sequence. Completed / failed requires a matching PLC completion and result. Timeout is uncertain; it does not cancel or replay the request.</p>
     {!exact && <form className="operations-filters" onSubmit={event => {
