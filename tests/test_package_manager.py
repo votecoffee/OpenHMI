@@ -82,7 +82,7 @@ class PackageTests(unittest.TestCase):
         file.write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'hash mismatch'):
             self.packages.activate(digest)
-        with patch('subprocess.call') as run, self.assertRaises(SystemExit) as error:
+        with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
             main(['--root', str(self.packages.root), 'launch', '--self-check'])
         self.assertEqual(error.exception.code, 1)
         run.assert_not_called()
@@ -119,13 +119,26 @@ class PackageTests(unittest.TestCase):
     def test_launch_forwards_arguments_and_refuses_data_inside_application_root(self):
         archive, digest = self.archive()
         self.packages.install(archive, digest); self.packages.activate(digest)
-        with patch('subprocess.call', return_value=0) as run, self.assertRaises(SystemExit) as error:
+        with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
+            runtime = run.return_value.__enter__.return_value
+            runtime.wait.return_value = 0
             main(['--root', str(self.packages.root), 'launch', '--project', str(self.root / 'projects/Machine.sqlite3'), '--port', '8012', '--open-browser'])
         self.assertEqual(error.exception.code, 0)
         self.assertIn('--open-browser', run.call_args.args[0])
-        with patch('subprocess.call') as run, self.assertRaises(SystemExit):
+        with patch('subprocess.Popen') as run, self.assertRaises(SystemExit):
             main(['--root', str(self.packages.root), 'launch', '--project', str(self.packages.root / 'data.sqlite3')])
         run.assert_not_called()
+
+    def test_managed_launch_waits_for_shutdown_after_console_interrupt(self):
+        archive, digest = self.archive()
+        self.packages.install(archive, digest); self.packages.activate(digest)
+        with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
+            runtime = run.return_value.__enter__.return_value
+            runtime.wait.side_effect = [KeyboardInterrupt, 7]
+            main(['--root', str(self.packages.root), 'launch'])
+        self.assertEqual(error.exception.code, 7)
+        self.assertEqual(runtime.wait.call_count, 2)
+        runtime.kill.assert_not_called()
 
     def test_launcher_package_dispatch_and_manager_lock(self):
         with redirect_stdout(StringIO()) as output:

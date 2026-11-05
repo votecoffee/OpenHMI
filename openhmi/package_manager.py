@@ -243,7 +243,16 @@ def main(argv=None):
             if args.open_browser: arguments += ['--open-browser']
             if args.self_check: arguments += ['--self-check']
             executable = packages.release(selection['release']) / 'OpenHMI/OpenHMI.exe'
-            raise SystemExit(subprocess.call([str(executable), *arguments]))
+            with subprocess.Popen([str(executable), *arguments]) as runtime:
+                while True:
+                    try:
+                        exit_code = runtime.wait()
+                        break
+                    except KeyboardInterrupt:
+                        # The runtime shares this console and handles Ctrl+C itself.
+                        # Keep waiting so it can finish shutdown and release its library.
+                        continue
+            raise SystemExit(exit_code)
         print(json.dumps(result, indent=2))
     except (OSError, ValueError, RuntimeError, zipfile.BadZipFile) as error:
         parser.exit(1, f'OpenHMI package: {error}\n')

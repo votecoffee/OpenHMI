@@ -46,6 +46,8 @@ Use a separate local application root when needed; put `--root` before the comma
 The selected package is verified before execution. Projects and logs explicitly
 placed inside the application installation are rejected. The runtime's existing
 library lock prevents simultaneous launchers from owning the same project library.
+When running in a console, press Ctrl+C and wait for the managed launch command
+to return. The runtime handles shutdown and the manager returns its exit code.
 
 ## Update and rollback
 

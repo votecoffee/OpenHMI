@@ -87,7 +87,8 @@ project selection, logs, update/rollback and data preservation. No public releas
 installer is published yet.
 
 The bundled `package` commands provide verified side-by-side installation, version
-selection and rollback while retaining project data. See
+selection and rollback while retaining project data. To stop a managed launch,
+press Ctrl+C and wait for the command to return. See
 [managed package installation](docs/package-management.md).
 
 ### Contributor installation
