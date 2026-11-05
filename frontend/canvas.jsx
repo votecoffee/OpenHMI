@@ -144,7 +144,7 @@ function Properties({ item, component, onChange }) {
   })}</fieldset>;
 }
 
-export function CanvasEditor({ data, config, onChange, canEdit }) {
+export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCopy }) {
   const { layout } = data.root.props;
   const [selected, select] = useState([]);
   const [palette, setPalette] = useState(Object.keys(config.components)[0]);
@@ -217,9 +217,15 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     if (command && (key === 'z' || key === 'y')) {
       event.preventDefault();
       restore(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+    } else if (command && key === 'c' && canCopy) {
+      event.preventDefault();
+      if (!event.repeat) copySelection();
+    } else if (command && key === 'v' && canPaste) {
+      event.preventDefault();
+      if (!event.repeat) paste(clipboard);
     } else if (command && key === 'd' && canDuplicate) {
       event.preventDefault();
-      if (!event.repeat) duplicate();
+      if (!event.repeat) paste(selection);
     } else if (!command && freeSelection.length && Object.hasOwn(NUDGE, event.key)) {
       event.preventDefault();
       const [x, y] = NUDGE[event.key];
@@ -311,26 +317,49 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     element.addEventListener('lostpointercapture', finish);
   }
 
-  const duplicateRoots = top.filter(([key]) => freeSelection.includes(key));
-  const duplicateControls = duplicateRoots.flatMap(([key, object]) =>
-    object.members ?? (lookup(layout.boxes, key) ? [key] : []));
-  const canDuplicate = duplicateRoots.length > 0 && duplicateRoots.length === selected.length
-    && data.content.length + duplicateControls.length <= 100
-    && Object.keys(layout.containers).length + duplicateRoots.filter(([, object]) => object.members).length <= 30
-    && decorationEntries(layout).length + duplicateRoots.filter(([, object]) => object.kind).length <= 60;
+  const roots = top.filter(([key]) => freeSelection.includes(key));
+  const controlIDs = new Set(roots.flatMap(([key, object]) =>
+    object.members ?? (lookup(layout.boxes, key) ? [key] : [])));
+  const selection = {
+    roots,
+    boxes: Object.fromEntries([...controlIDs].map(key => [key, layout.boxes[key]])),
+    content: data.content.filter(block => controlIDs.has(block.props.id)),
+  };
+  const canCopy = roots.length > 0 && roots.length === selected.length;
+  const canDuplicate = canCopy && fits(selection);
+  const canPaste = clipboard && fits(clipboard);
 
-  function duplicate() {
-    if (!canDuplicate) return;
-    const copies = new Map([...new Set([...freeSelection, ...duplicateControls])].map(key => [key, id()]));
+  function fits(source) {
+    const area = bounds(source.roots.map(([, object]) => object));
+    return area.width <= layout.width && area.height <= layout.height
+      && Object.values(source.boxes).every(box => box.width <= layout.width && box.height <= layout.height)
+      && data.content.length + source.content.length <= 100
+      && Object.keys(layout.containers).length + source.roots.filter(([, object]) => object.members).length <= 30
+      && decorationEntries(layout).length + source.roots.filter(([, object]) => object.kind).length <= 60;
+  }
+
+  function copySelection() {
+    if (!canCopy) return;
+    onCopy(structuredClone(selection));
+    setMessage('Copied selection. Paste on this screen or another freeform screen in this project.');
+  }
+
+  function paste(source) {
+    if (!source || !fits(source)) return;
+    const copies = new Map([...new Set([...source.roots.map(([key]) => key), ...Object.keys(source.boxes)])]
+      .map(key => [key, id()]));
     const groups = new Map();
-    const area = bounds(duplicateRoots.map(([, object]) => object));
+    const area = bounds(source.roots.map(([, object]) => object));
     const step = layout.snap ? layout.grid : 8;
-    const offset = (before, after) => after >= step ? step : before >= step ? -step : after || -before;
+    const offset = (before, after) => {
+      const preferred = after >= step ? step : before >= step ? -step : after || -before;
+      return clamp(preferred, -before, after);
+    };
     const dx = offset(area.x, layout.width - maxX(area));
     const dy = offset(area.y, layout.height - maxY(area));
     const next = boxesChanged(Object.fromEntries(top.map(([key], z) => [key, { z }])));
-    for (const key of duplicateControls) next.boxes[copies.get(key)] = { ...layout.boxes[key], group: '' };
-    duplicateRoots.forEach(([key, original], index) => {
+    for (const [key, box] of Object.entries(source.boxes)) next.boxes[copies.get(key)] = { ...box, group: '' };
+    source.roots.forEach(([key, original], index) => {
       if (original.group && !groups.has(original.group)) groups.set(original.group, id());
       const copy = { ...original, x: original.x + dx, y: original.y + dy,
         z: top.length + index, group: groups.get(original.group) ?? '' };
@@ -345,12 +374,11 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
       } else if (original.kind) next.decorations[newKey] = copy;
       else next.boxes[newKey] = copy;
     });
-    const controls = new Set(duplicateControls);
-    const content = data.content.filter(block => controls.has(block.props.id))
-      .map(block => ({ ...block, props: { ...structuredClone(block.props), id: copies.get(block.props.id) } }));
+    const content = source.content.map(block => ({ ...block, props: { ...structuredClone(block.props), id: copies.get(block.props.id) } }));
     change(next, [...data.content, ...content]);
-    select(duplicateRoots.map(([key]) => copies.get(key)));
+    select(source.roots.map(([key]) => copies.get(key)));
     editorRegion.current?.focus({ preventScroll: true });
+    setMessage('');
   }
 
   function nudge(dx, dy, field) {
@@ -564,7 +592,10 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
           <small>Drag a box from empty canvas or Shift-click to select multiple objects. Use arrows to nudge.</small>
-          <button type="button" disabled={!canDuplicate} onClick={duplicate}>Duplicate selection</button>
+          <button type="button" disabled={!canDuplicate} onClick={() => paste(selection)}>Duplicate selection</button>
+          <button type="button" disabled={!canCopy} onClick={copySelection}>Copy selection</button>
+          <button type="button" disabled={!canPaste} onClick={() => paste(clipboard)}>Paste selection</button>
+          {clipboard && !canPaste && <small>The copied objects exceed this canvas size or its object limits.</small>}
           <button type="button" disabled={!canLock} onClick={lockBackground}>Lock as background</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(true)}>Bring to front</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(false)}>Send to back</button>

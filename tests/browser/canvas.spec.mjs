@@ -254,3 +254,55 @@ test('marquee selects overlapping objects and groups at editor zoom', async ({ p
     await save(page, original.draft, false);
   }
 });
+
+test('copy and paste moves a reusable selection between freeform screens', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  const box = (x, y, width, height, z = 0) => ({ x, y, width, height, z });
+  try {
+    const uploaded = await page.request.post('/api/canvas-images', { data: pixel });
+    expect(uploaded.ok(), await uploaded.text()).toBe(true);
+    const image = (await uploaded.json()).id;
+    await save(page, { ...original.active,
+      controls: [
+        { kind: 'indicator', id: 'motor', label: 'Motor fixture', tag: 'MotorRunning' },
+        { kind: 'numeric', id: 'level', label: 'Level fixture', tag: 'TankLevel', unit: '%' },
+      ],
+      layout: { width: 900, height: 480, boxes: {
+        motor: box(505, 185, 85, 45), level: box(605, 185, 75, 45),
+      }, containers: { panel: { ...box(500, 180, 190, 105), mode: 'grid', columns: 2, members: ['motor', 'level'] } },
+      decorations: { image: { ...box(700, 180, 50, 40, 1), kind: 'image', image, label: 'Station picture' } } },
+      screens: [{ id: 'destination', title: 'Destination', layout: { width: 320, height: 240 }, controls: [] }],
+    });
+    await page.goto('/');
+    const outline = page.getByRole('group', { name: 'Objects', exact: true });
+    await outline.getByRole('button', { name: 'Grid container', exact: true }).click();
+    await outline.getByRole('button', { name: 'Station picture', exact: true }).click({ modifiers: ['Shift'] });
+    await page.keyboard.press('Control+c');
+    await expect(page.getByText(/Copied selection/)).toBeVisible();
+    await page.getByRole('button', { name: 'Screens', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Destination', exact: true }).click();
+    const paste = page.getByRole('button', { name: 'Paste selection', exact: true });
+    await paste.focus();
+    await page.keyboard.press('Control+v');
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    await expect(canvas.locator('.canvas-member')).toHaveCount(2);
+    await expect(canvas.locator('.canvas-object').filter({ has: page.locator('.canvas-container-grid') })).toHaveCSS('left', '70px');
+    await expect(canvas.locator('img.canvas-decoration-art')).toHaveAttribute('src', '/api/canvas-images/' + image);
+    await expect(canvas.locator('.canvas-object').filter({ has: page.locator('img.canvas-decoration-art') })).toHaveCSS('left', '270px');
+    await expect(canvas.locator('.canvas-selected')).toHaveCount(2);
+    await page.keyboard.press('Control+z');
+    await expect(canvas.locator('[data-canvas-object]')).toHaveCount(0);
+    await page.keyboard.press('Control+y');
+    await expect(canvas.locator('.canvas-member')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    const project = (await (await page.request.get('/api/project')).json()).active;
+    const destination = project.screens.find(screen => screen.id === 'destination');
+    expect(project.controls.map(item => item.id)).toEqual(['motor', 'level']);
+    expect(destination.controls.map(item => item.tag)).toEqual(['MotorRunning', 'TankLevel']);
+    expect(destination.controls.every(item => !['motor', 'level'].includes(item.id))).toBe(true);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});

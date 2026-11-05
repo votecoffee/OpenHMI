@@ -35,7 +35,10 @@ or more objects evenly. **Group** makes a selection move together and
 
 Use **Duplicate selection** or **Ctrl+D** to copy selected canvas objects.
 Copies retain their tag bindings and relative positions and receive new IDs.
-Duplicating a container also copies its contents. With focus on the canvas
+Duplicating a container also copies its contents. **Copy selection** and
+**Paste selection** (Ctrl+C and Ctrl+V) work between freeform screens in the
+same project while the designer stays open. A paste is one undoable edit.
+With focus on the canvas
 or an editor button, use the arrow keys to move the selection by one pixel,
 or hold **Shift** to move it by one grid interval.
 

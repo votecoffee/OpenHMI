@@ -53,6 +53,7 @@ function Builder({ initial, catalog }) {
   const document = useRef(starting);
   const [initialData, setInitialData] = useState(toEditor(starting));
   const [canvasData, setCanvasData] = useState(initialData);
+  const [canvasClipboard, setCanvasClipboard] = useState(null);
   const revision = useRef(cached?.base_revision || initial.draft_revision);
   const latest = useRef(toEditor(starting));
   const [generation, setGeneration] = useState(0);
@@ -208,7 +209,8 @@ function Builder({ initial, catalog }) {
     {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} />}
     <div hidden={tab !== 'screen'}>
       {canvasData.root.props.layout
-        ? <CanvasEditor key={`${scope}:${generation}`} data={canvasData} config={config} onChange={changed} canEdit={canEdit && !recovery} />
+        ? <CanvasEditor key={`${scope}:${generation}`} data={canvasData} config={config} onChange={changed}
+          canEdit={canEdit && !recovery} clipboard={canvasClipboard} onCopy={setCanvasClipboard} />
         : <Puck key={`${scope}:${generation}`} config={config} data={initialData} iframe={{ enabled: false }}
           headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed} overrides={editorOverrides} />}
     </div>
