@@ -189,9 +189,13 @@ def main(argv=None):
             import uvicorn
             url = f'http://127.0.0.1:{args.port}'
             logging.info('OpenHMI %s; project=%s; logs=%s; URL=%s; stop with Ctrl+C', application_version(), project, logs, url)
-            workspace = ProjectWorkspace(project, args.handlers, args.recipe_users)
+            try:
+                workspace = ProjectWorkspace(project, args.handlers, args.recipe_users)
+            except Exception:
+                logging.exception('Could not initialize project %s', project)
+                raise SystemExit(1)
             config = uvicorn.Config(workspace, host='127.0.0.1', port=args.port, log_config=None,
-                                    loop='asyncio', http='h11', ws='none')
+                                    loop='asyncio', http='h11', ws='none', lifespan='on')
             server = uvicorn.Server(config)
             finished = threading.Event()
             def open_when_started():

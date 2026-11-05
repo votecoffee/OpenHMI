@@ -24,6 +24,9 @@ console; stop it with **Ctrl+C** and wait for application shutdown to complete.
 Closing the browser leaves the runtime running. Restart by running the same
 command. OpenHMI reserves its local port before opening the project or running
 custom Python handlers. If the port is occupied, select a free one with `--port`.
+The runtime begins serving HTTP after the workspace finishes startup. If
+workspace initialization fails, the executable exits with an error recorded in
+the runtime log.
 This preview binds only to the local computer, using one server process.
 It does not configure remote HTTP/HTTPS access or automatic startup.
 

@@ -39,7 +39,7 @@ def main():
     project = work / 'project library' / 'Pilot.openhmi.sqlite3'
     handler = work / 'startup-probe.py'
     marker = work / 'handler-ran'
-    handler.write_text(f'from pathlib import Path\nPath({str(marker)!r}).touch()\n', encoding='utf-8')
+    handler.write_text(f'from pathlib import Path\ndef register(app):\n    Path({str(marker)!r}).touch()\n', encoding='utf-8')
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0))
         reservation.listen()
@@ -49,6 +49,39 @@ def main():
         assert conflict.returncode == 1 and f'Cannot bind 127.0.0.1:{port}' in conflict.stderr
         assert not project.parent.exists() and not marker.exists()
     report['port_conflict_rejected_before_opening_project_or_handlers'] = True
+    # Simulate a failure before the ASGI workspace reports startup complete.
+    handler.write_text(
+        'from openhmi.workspace import ProjectWorkspace\n'
+        'original = ProjectWorkspace.__call__\n'
+        'async def fail_startup(self, scope, receive, send):\n'
+        '    if scope["type"] == "lifespan":\n'
+        '        raise RuntimeError("Synthetic workspace startup failure")\n'
+        '    return await original(self, scope, receive, send)\n'
+        'def register(app):\n'
+        '    ProjectWorkspace.__call__ = fail_startup\n',
+        encoding='utf-8',
+    )
+    failed_project = work / 'failed startup library' / 'Fault.openhmi.sqlite3'
+    failed_start = subprocess.run(
+        [str(executable), '--project', str(failed_project), '--port', str(port), '--handlers', str(handler)],
+        cwd=work, env=env, capture_output=True, text=True, timeout=15, creationflags=hidden,
+    )
+    assert failed_start.returncode != 0 and 'Synthetic workspace startup failure' in failed_start.stderr
+    assert 'Application startup failed' in failed_start.stderr
+    assert 'Uvicorn running on' not in failed_start.stderr
+    report['workspace_initialization_failure_prevents_serving_http'] = True
+    invalid_project = work / 'invalid project library' / 'Invalid.openhmi.sqlite3'
+    invalid_project.parent.mkdir()
+    invalid_data = b'Synthetic invalid SQLite file'
+    invalid_project.write_bytes(invalid_data)
+    invalid_start = subprocess.run(
+        [str(executable), '--project', str(invalid_project), '--port', str(port)],
+        cwd=work, env=env, capture_output=True, text=True, timeout=15, creationflags=hidden,
+    )
+    invalid_log = (invalid_project.parent / 'logs/runtime.log').read_text(encoding='utf-8')
+    assert invalid_start.returncode == 1 and 'Could not initialize project' in invalid_log
+    assert 'file is not a database' in invalid_log and invalid_project.read_bytes() == invalid_data
+    report['invalid_database_startup_error_logged_with_original_preserved'] = True
     project.parent.mkdir()
     logs = project.parent / 'logs'
     logs.mkdir()
