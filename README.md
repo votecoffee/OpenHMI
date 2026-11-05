@@ -323,6 +323,7 @@ checks the same permissions and active binding on every action or value write.
 Project editing, alarm acknowledgement and recipe operations also use HMI permissions.
 New projects show **Unsecured simulation** until the first administrator exists.
 Numeric/text edits support HMI limits or limit-tag bindings and touch entry.
+Runtime keypad and login text can be translated in **Languages**.
 The **Current login user** control displays the signed-in user. **PLC login**
 settings optionally publish a claimed station's user and mapped DINT privilege bits.
 See [touch entry and PLC identity](docs/touch-entry-and-identity.md) and

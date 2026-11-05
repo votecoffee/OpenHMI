@@ -1,6 +1,74 @@
 import { test, expect } from '@playwright/test';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
+
+test('runtime language applies to login, keypad, and Unicode text entry', async ({ page }) => {
+  const password = 'SecurityTestOnly-2026!';
+  const admin = await page.request.post('/api/security/login', { data: { name: 'admin', password } });
+  expect(admin.ok()).toBe(true);
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply) {
+    const state = await (await page.request.get('/api/project')).json();
+    const draft = await page.request.put('/api/project/draft', { data: { project, expected_revision: state.draft_revision } });
+    expect(draft.ok(), await draft.text()).toBe(true);
+    if (apply) expect((await page.request.post('/api/project/apply', {
+      data: { expected_revision: (await draft.json()).draft_revision },
+    })).ok()).toBe(true);
+  }
+  try {
+    const project = structuredClone(original.active);
+    project.languages.push({ code: 'es', name: 'Español', flag: 'es', translations: {
+      'ui.hmiLogin': 'Acceso HMI', 'ui.openHmiLogin': 'Abrir acceso HMI', 'ui.signOutHmi': 'Cerrar sesión HMI',
+      'ui.hmiUser': 'Usuario HMI', 'ui.passwordKeyboard': 'Teclado de contraseña', 'ui.passwordEntry': 'Contraseña',
+      'ui.signInHmi': 'Iniciar sesión', 'ui.acceptEntry': 'Aceptar entrada', 'ui.entryLabel': 'Entrada',
+      'ui.openNumericKeypad': 'Abrir teclado numérico para {label}', 'ui.numericEntryTitle': 'Entrada numérica: {label}',
+      'ui.allowedNumericRange': 'Rango permitido: {low} a {high}', 'control.localized_number.label': 'Nivel',
+      'ui.openTextKeyboard': 'Abrir teclado para {label}', 'ui.textEntryTitle': 'Entrada de texto: {label}',
+      'ui.textKeyboard': 'Teclado de texto', 'control.localized_text.label': 'Mensaje',
+    } });
+    project.tags.push({ name: 'LocalizedEntry', type: 'string', initial: '', writable: true });
+    project.controls.push(
+      { id: 'localized_number', kind: 'input', label: 'Level', tag: 'TankLevel', minimum: 0, maximum: 50 },
+      { id: 'localized_text', kind: 'text_input', label: 'Message', tag: 'LocalizedEntry', max_length: 8 },
+    );
+    await save(project, true);
+    await page.goto('/runtime');
+    await page.getByRole('button', { name: 'Language: English', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Español', exact: true }).click();
+    await page.getByRole('button', { name: 'Cerrar sesión HMI', exact: true }).click();
+    await page.getByRole('button', { name: 'Abrir acceso HMI', exact: true }).click();
+    const login = page.getByRole('dialog', { name: 'Acceso HMI', exact: true });
+    await login.getByLabel('Usuario HMI', { exact: true }).fill('admin');
+    await login.getByRole('button', { name: 'Teclado de contraseña', exact: true }).click();
+    const keyboard = page.getByRole('dialog', { name: 'Teclado de contraseña', exact: true });
+    const secret = keyboard.getByLabel('Contraseña', { exact: true });
+    await expect(secret).toHaveAttribute('type', 'password');
+    await secret.fill(password);
+    await keyboard.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
+    await login.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await expect(login).not.toBeVisible();
+
+    await page.getByRole('button', { name: 'Abrir teclado numérico para Nivel', exact: true }).click();
+    const numeric = page.getByRole('dialog', { name: 'Entrada numérica: Nivel', exact: true });
+    await numeric.getByLabel('Entrada', { exact: true }).fill('55');
+    await numeric.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
+    await expect(numeric.getByRole('alert')).toHaveText('Rango permitido: 0 a 50');
+    await numeric.press('Escape');
+    await page.getByRole('button', { name: 'Abrir teclado para Mensaje', exact: true }).click();
+    const text = page.getByRole('dialog', { name: 'Entrada de texto: Mensaje', exact: true });
+    await expect(text.getByRole('group', { name: 'Teclado de texto' })).toBeVisible();
+    const entry = text.getByLabel('Entrada', { exact: true });
+    await entry.fill('设备');
+    await text.getByRole('button', { name: 'a', exact: true }).click();
+    await text.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
+    await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.LocalizedEntry).toBe('设备a');
+  } finally {
+    await page.request.post('/api/security/login', { data: { name: 'admin', password } });
+    await save(original.active, true);
+    await save(original.draft, false);
+  }
+});
+
 test('touch entry, colored lock legend, login popup and explicit PLC identity station', async ({ page }) => {
   test.setTimeout(90000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));

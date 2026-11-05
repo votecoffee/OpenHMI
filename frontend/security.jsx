@@ -2,23 +2,26 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
 import { PublicationStation } from './publication-station.jsx';
 import { Popup, TouchEntry } from './touch-entry.jsx';
+import { useUi } from './localization.jsx';
 
 export const SecurityContext = createContext(null);
 export function openLogin() { window.dispatchEvent(new Event('openhmi-login')); }
 export function CurrentUser({ label = 'Current user' }) {
   const { session } = useContext(SecurityContext) || {};
-  return <article className="hmi-control hmi-current-user" data-control="current_user"><span>{label}</span><strong>{session?.user?.name || (session?.configured ? 'Signed out' : 'Unsecured simulation')}</strong><button onClick={openLogin}>Open HMI login</button></article>;
+  const ui = useUi();
+  return <article className="hmi-control hmi-current-user" data-control="current_user"><span>{label}</span><strong>{session?.user?.name || (session?.configured ? ui('hmiSignedOut') : 'Unsecured simulation')}</strong><button onClick={openLogin}>{ui('openHmiLogin')}</button></article>;
 }
 
 export function SecurityLock({ label, permission, groups = [], additionalGroups = [] }) {
   const { session } = useContext(SecurityContext) || {};
+  const ui = useUi();
   const [show, setShow] = useState(false);
   const required = [...new Set([...groups, ...additionalGroups])];
   const legend = (session?.groups || []).filter(group => required.length ? required.includes(group.name) : group.permissions.includes(permission));
   return <><div role="button" tabIndex={0} onKeyDown={event => { if (['Enter', ' '].includes(event.key)) { event.preventDefault(); setShow(true); } }} className="security-lock-cover" style={{ '--security-color': legend[0]?.color }} aria-label={`Locked: ${label}`} onClick={() => setShow(true)}>{legend.length ? legend.map(group => <span key={group.name} title={group.name} style={{ background: group.color }}>🔒</span>) : <span>🔒</span>}</div>
     {show && <Popup title="Security group legend" close={() => setShow(false)}><p>{label} requires permission <strong>{permission}</strong>.</p>
       {!!groups.length && <p>Button/edit groups (any): {groups.join(', ')}</p>}{!!additionalGroups.length && <p>Command groups (any, also required): {additionalGroups.join(', ')}</p>}<p>Security administrators may override group membership; the operation permission is still required.</p>
-      <ul>{legend.map(group => <li key={group.name}><i className="security-swatch" style={{ background: group.color }} />{group.name}</li>)}</ul><p>Color and group names identify the required access. PLC enable conditions are checked separately.</p><button onClick={() => { setShow(false); openLogin(); }}>Open HMI login</button></Popup>}</>;
+      <ul>{legend.map(group => <li key={group.name}><i className="security-swatch" style={{ background: group.color }} />{group.name}</li>)}</ul><p>Color and group names identify the required access. PLC enable conditions are checked separately.</p><button onClick={() => { setShow(false); openLogin(); }}>{ui('openHmiLogin')}</button></Popup>}</>;
 }
 export function allowed(session, permission, groups = []) {
   if (!session) return false;
@@ -28,6 +31,7 @@ export function allowed(session, permission, groups = []) {
 }
 
 export function SecurityBar({ session, refresh, plcConfigured }) {
+  const ui = useUi();
   const [loginOpen, setLoginOpen] = useState(false), [keyboard, setKeyboard] = useState('');
   useEffect(() => { const open = () => setLoginOpen(true); window.addEventListener('openhmi-login', open); return () => window.removeEventListener('openhmi-login', open); }, []);
   const [name, setName] = useState('');
@@ -41,20 +45,20 @@ export function SecurityBar({ session, refresh, plcConfigured }) {
     catch (error) { setMessage(error.message); }
     finally { setPassword(''); setBusy(false); }
   }
-  return <section className="security-bar" aria-label="HMI login">
-    {!session ? <span>Login status unavailable — controls are locked.</span> : session.user ? <>
-      <span>Signed in: <strong>{session.user.name}</strong> ({session.user.provider}) · {session.user.groups.join(', ')}</span>
-      <button disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/security/logout', json('POST', {})); await refresh(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } }}>Sign out of HMI</button>
-    </> : session.configured ? <span>Signed out</span> : <span>{plcConfigured ? 'Unsecured HMI' : 'Unsecured simulation'} — create an administrator with openhmi-security to enable HMI login.</span>}
-    {session?.configured && <button onClick={() => setLoginOpen(true)}>Open HMI login</button>}
-    {loginOpen && <Popup title="HMI login" close={() => { setLoginOpen(false); setPassword(''); }}><form onSubmit={login}>
-      <label>Account type<select value={provider} onChange={event => setProvider(event.target.value)}><option value="local">Local HMI account</option>{session?.windows_enabled && session?.windows_available && <option value="windows">Windows account</option>}</select></label>
-      <label>HMI user<input autoComplete="username" value={name} onChange={event => setName(event.target.value)} required /></label>
-      <label>HMI password<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label>
-      <button type="button" onClick={() => setKeyboard('name')}>User keyboard</button><button type="button" onClick={() => setKeyboard('password')}>Password keyboard</button>
-      <button disabled={busy}>Sign in to HMI</button>
+  return <section className="security-bar" aria-label={ui('hmiLogin')}>
+    {!session ? <span>{ui('loginStatusUnavailable')}</span> : session.user ? <>
+      <span>{ui('hmiSignedIn')} <strong>{session.user.name}</strong> ({session.user.provider}) · {session.user.groups.join(', ')}</span>
+      <button disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/security/logout', json('POST', {})); await refresh(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } }}>{ui('signOutHmi')}</button>
+    </> : session.configured ? <span>{ui('hmiSignedOut')}</span> : <span>{plcConfigured ? 'Unsecured HMI' : 'Unsecured simulation'} — create an administrator with openhmi-security to enable HMI login.</span>}
+    {session?.configured && <button onClick={() => setLoginOpen(true)}>{ui('openHmiLogin')}</button>}
+    {loginOpen && <Popup title={ui('hmiLogin')} close={() => { setLoginOpen(false); setPassword(''); }}><form onSubmit={login}>
+      <label>{ui('loginAccountType')}<select value={provider} onChange={event => setProvider(event.target.value)}><option value="local">{ui('localHmiAccount')}</option>{session?.windows_enabled && session?.windows_available && <option value="windows">{ui('windowsAccount')}</option>}</select></label>
+      <label>{ui('hmiUser')}<input autoComplete="username" value={name} onChange={event => setName(event.target.value)} required /></label>
+      <label>{ui('hmiPassword')}<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label>
+      <button type="button" onClick={() => setKeyboard('name')}>{ui('userKeyboard')}</button><button type="button" onClick={() => setKeyboard('password')}>{ui('passwordKeyboard')}</button>
+      <button disabled={busy}>{ui('signInHmi')}</button>
       {message && <p role="alert">{message}</p>}</form></Popup>}
-    {keyboard && <TouchEntry title={keyboard === 'name' ? 'User keyboard' : 'Password keyboard'} initial={keyboard === 'name' ? name : password} secret={keyboard === 'password'} close={() => setKeyboard('')} accept={value => keyboard === 'name' ? setName(value) : setPassword(value)} />}
+    {keyboard && <TouchEntry title={ui(keyboard === 'name' ? 'userKeyboard' : 'passwordKeyboard')} initial={keyboard === 'name' ? name : password} secret={keyboard === 'password'} close={() => setKeyboard('')} accept={value => keyboard === 'name' ? setName(value) : setPassword(value)} />}
     <PublicationStation session={session} /><a href="/security">Security</a>{message && <span role="alert">{message}</span>}
   </section>;
 }

@@ -23,6 +23,11 @@ a US Latin layout with Shift, punctuation and Space. Password keyboard fields
 are masked. Acceptance validates the latest limits and keeps the dialog open on
 failure; cancel performs no write. Manual typed entry remains available too.
 
+Use **Languages** to translate the runtime keypad, edit messages and login
+dialogs. Templates such as `ui.openNumericKeypad` use `{label}` for the
+translated control label. Missing strings use English. Translation changes the
+operator text while the built-in key layout and numeric input syntax stay fixed.
+
 Character limits count Unicode code points, consistently in Python and the
 browser, rather than UTF-16 units. PLC STRING byte capacities are a separate
 constraint and can reject an otherwise valid character count. New example

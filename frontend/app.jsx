@@ -290,7 +290,7 @@ function App({ initial, catalog }) {
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
   const plcConnected = live.connected && live.connections?.some(connection => connection.connected);
   const plcStatus = live.plcHold ? 'PLC acquisition held' : plcConnected ? 'PLC data available' : 'PLC disconnected';
-  return <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project }}>
+  const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
       <span className={`connection ${(plcConfigured ? plcConnected : live.connected) ? 'connected' : ''}`}>{plcConfigured ? plcStatus : live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
     <SecurityBar session={session} refresh={refreshSession} plcConfigured={plcConfigured} />
@@ -299,12 +299,13 @@ function App({ initial, catalog }) {
     {live.plcHold && <p role="status" className="save-status">Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.</p>}
     {runtime ? <main className={currentScreen.layout && location.pathname === '/runtime' ? 'runtime canvas-runtime' : 'runtime'}><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
       <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/commands">Commands</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/revisions">Revisions</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
-      <Localization project={active.project}>{location.pathname === '/revisions' ? <ProjectHistory /> : location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
+      {location.pathname === '/revisions' ? <ProjectHistory /> : location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
         <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
         <ScreenView screen={currentScreen} config={config} />
         {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenView screen={screen} config={config} /></section></div>; })}
-      </>}</Localization></main> : editorStarted.current ? <MemoBuilder initial={initial} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
+      </>}</main> : editorStarted.current ? <MemoBuilder initial={initial} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
   </Live.Provider></SecurityContext.Provider>;
+  return runtime ? <Localization project={active.project}>{station}</Localization> : station;
 }
 
 try {

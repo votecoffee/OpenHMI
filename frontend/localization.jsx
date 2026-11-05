@@ -2,6 +2,21 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export const uiText = {
   canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
+  closeDialog: 'Close {title}', entryLabel: 'Entry', passwordEntry: 'Password entry', numericKeypad: 'Numeric keypad',
+  textKeyboard: 'Text keyboard', shiftKey: 'Shift', spaceKey: 'Space', backspaceKey: 'Backspace', clearEntry: 'Clear',
+  cancelEntry: 'Cancel', acceptEntry: 'Accept entry', invalidNumericEntry: 'Enter a finite number',
+  allowedNumericRange: 'Allowed range: {low} to {high}', allowedTextLength: 'Allowed length: {low} to {high}',
+  numericRange: 'Range: {low} – {high}', textLength: 'Length: {low} – {high}', editLimitsUnavailable: 'Edit limits unavailable',
+  editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',
+  newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',
+  valueWritePending: 'Value written; activity finalization pending. Operation {id}',
+  openTextKeyboard: 'Open keyboard for {label}', openNumericKeypad: 'Open numeric keypad for {label}',
+  textEntryTitle: 'Text entry: {label}', numericEntryTitle: 'Numeric entry: {label}',
+  hmiLogin: 'HMI login', openHmiLogin: 'Open HMI login', hmiUser: 'HMI user', hmiPassword: 'HMI password',
+  loginAccountType: 'Account type', localHmiAccount: 'Local HMI account', windowsAccount: 'Windows account',
+  userKeyboard: 'User keyboard', passwordKeyboard: 'Password keyboard', signInHmi: 'Sign in to HMI',
+  signOutHmi: 'Sign out of HMI', hmiSignedOut: 'Signed out', hmiSignedIn: 'Signed in:',
+  loginStatusUnavailable: 'Login status unavailable — controls are locked.',
   alarmShelving: 'Alarm shelving', shelfExplanation: 'Shelving applies to this alarm and its retriggers until expiry. Monitoring and history continue. Global counts and Acknowledge all include shelved alarms. This registry is independent of list filters.',
   shelfReason: 'Reason for shelving or restoring', shelfDuration: 'Shelf duration', shelfMinutes: '{count} minutes', shelfExpiry: 'Shelved until',
   shelfFilter: 'Shelving filter', unshelved: 'Unshelved', shelved: 'Shelved', allShelving: 'All shelving states',
@@ -41,6 +56,9 @@ export const uiText = {
 };
 const Context = createContext(null);
 const english = { code: 'en', name: 'English', flag: 'us', direction: 'ltr', translations: {} };
+const format = (value, params = {}) => value.replace(/\{(\w+)\}/g, (match, name) =>
+  Object.hasOwn(params, name) ? String(params[name]) : match);
+const defaultUi = (key, params) => format(uiText[key] ?? key, params);
 
 export function Localization({ project, children }) {
   const languages = project.languages?.length ? project.languages : [english];
@@ -60,12 +78,13 @@ export function Localization({ project, children }) {
   }
   function text(key, fallback, params = {}) {
     const value = language.translations?.[key] || (fallback ?? key);
-    return value.replace(/\{(\w+)\}/g, (match, name) => Object.hasOwn(params, name) ? String(params[name]) : match);
+    return format(value, params);
   }
   return <Context.Provider value={{ language, languages, choose, text, ui: (key, params) => text(`ui.${key}`, uiText[key], params) }}>{children}</Context.Provider>;
 }
 
 export function useLocalization() { return useContext(Context); }
+export function useUi() { return useContext(Context)?.ui ?? defaultUi; }
 
 export function LanguageSelector() {
   const { language, languages, choose } = useLocalization();
