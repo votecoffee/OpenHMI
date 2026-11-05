@@ -27,7 +27,7 @@ export function allowed(session, permission, groups = []) {
   return !!user?.permissions.includes(permission) && (!groups.length || user.permissions.includes('security.manage') || groups.some(group => user.groups.includes(group)));
 }
 
-export function SecurityBar({ session, refresh }) {
+export function SecurityBar({ session, refresh, plcConfigured }) {
   const [loginOpen, setLoginOpen] = useState(false), [keyboard, setKeyboard] = useState('');
   useEffect(() => { const open = () => setLoginOpen(true); window.addEventListener('openhmi-login', open); return () => window.removeEventListener('openhmi-login', open); }, []);
   const [name, setName] = useState('');
@@ -45,7 +45,7 @@ export function SecurityBar({ session, refresh }) {
     {!session ? <span>Login status unavailable — controls are locked.</span> : session.user ? <>
       <span>Signed in: <strong>{session.user.name}</strong> ({session.user.provider}) · {session.user.groups.join(', ')}</span>
       <button disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/security/logout', json('POST', {})); await refresh(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } }}>Sign out of HMI</button>
-    </> : session.configured ? <span>Signed out</span> : <span>Unsecured simulation — create an administrator with openhmi-security to enable HMI login.</span>}
+    </> : session.configured ? <span>Signed out</span> : <span>{plcConfigured ? 'Unsecured HMI' : 'Unsecured simulation'} — create an administrator with openhmi-security to enable HMI login.</span>}
     {session?.configured && <button onClick={() => setLoginOpen(true)}>Open HMI login</button>}
     {loginOpen && <Popup title="HMI login" close={() => { setLoginOpen(false); setPassword(''); }}><form onSubmit={login}>
       <label>Account type<select value={provider} onChange={event => setProvider(event.target.value)}><option value="local">Local HMI account</option>{session?.windows_enabled && session?.windows_available && <option value="windows">Windows account</option>}</select></label>

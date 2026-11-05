@@ -11,7 +11,7 @@ export const uiText = {
   simulation: 'SIMULATION', localStation: 'LOCAL STATION', dataConnected: 'Data connected', commLoss: 'COMM LOSS',
   badData: 'BAD DATA', badRange: 'BAD RANGE', on: 'ON', off: 'OFF', state: 'STATE', textShape: 'Text + shape',
   inactive: 'INACTIVE', active: 'ACTIVE', normal: 'Normal', outOfScale: 'OUT OF SCALE', outsideBand: 'OUTSIDE NORMAL BAND',
-  overview: 'OVERVIEW', localSimulator: 'LOCAL SIMULATOR', preview: 'PREVIEW', editScreen: 'EDIT SCREEN',
+  overview: 'OVERVIEW', localSimulator: 'LOCAL SIMULATOR', localPlcRuntime: 'LOCAL PLC RUNTIME', preview: 'PREVIEW', editScreen: 'EDIT SCREEN',
   alarmUnavailable: 'ALARM MONITOR UNAVAILABLE', noAlarms: 'No alarms configured', noActiveAlarms: 'No active or unacknowledged alarms',
   activeAlarms: '{active} active / {unack} unacknowledged', alarms: 'ALARMS', acknowledge: 'Acknowledge', acknowledgeAll: 'Acknowledge all',
   returned: 'Returned', retired: 'Retired', unacknowledged: 'Unacknowledged', acknowledged: 'Acknowledged',

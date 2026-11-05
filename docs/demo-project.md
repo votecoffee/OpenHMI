@@ -32,10 +32,14 @@ the generator's optional `--read-only-route`, `--udt-type`, and repeated
 Boolean member names. The generator stores the route in the output database and
 backup. Keep those files local.
 
-The optional **PLC preview (read-only)** screen binds to `_Demo_DINT`,
+The PLC demo opens on a live overview with read-only bindings to `_Demo_DINT`,
 `_Demo_REAL`, `_Demo_STRING`, `_Demo_BOOL` and selected Boolean members of
-`_Demo_UDT`. The connection starts held. Keep the accompanying `.hold` file
-beside the database if opening the SQLite file directly. Review the connection
-and tag settings before using **Apply live** to release acquisition. The PLC
-screen uses a 2-second update interval and the screen's tag subscription. The
-Simulator's inputs and buttons target its own local tags.
+`_Demo_UDT`. **Trends** plots the two numeric tags and shows the Boolean tags
+in separate lanes. The SQL historian starts collecting those tags when
+acquisition starts, at a two-second interval. Use **Run trend** and **Stop trend**
+to record a separate capture, then **Export entire capture CSV** to save it.
+The PLC project starts with an empty history.
+
+Newly generated or imported PLC projects start with acquisition held. Keep the
+accompanying `.hold` file beside the database when opening it directly. Review
+the connection and tag settings, then use **Apply live** to release acquisition.

@@ -258,10 +258,13 @@ function App({ initial, catalog }) {
     tick();
     return () => { stopped = true; clearTimeout(timer); };
   }, [runtime]);
+  const plcConfigured = active.project.connections?.some(connection => connection.enabled);
+  const plcConnected = live.connected && live.connections?.some(connection => connection.connected);
+  const plcStatus = live.plcHold ? 'PLC acquisition held' : plcConnected ? 'PLC data available' : 'PLC disconnected';
   return <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
-      <span className={`connection ${live.connected ? 'connected' : ''}`}>{live.connected ? live.driver === 'logix' ? live.connections.some(connection => connection.connected) ? 'PLC data available' : 'PLC disconnected' : 'Simulator connected' : 'Simulator disconnected'}</span></header>
-    <SecurityBar session={session} refresh={refreshSession} />
+      <span className={`connection ${(plcConfigured ? plcConnected : live.connected) ? 'connected' : ''}`}>{plcConfigured ? plcStatus : live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
+    <SecurityBar session={session} refresh={refreshSession} plcConfigured={plcConfigured} />
     {!identityAvailable && <p role="status" className="save-status">HMI identity status unavailable. Showing the last confirmed sign-in; the server checks permission on every operation.</p>}
     {projectChanged && <p role="alert" className="save-status">A different project was opened. Saves from this editor are blocked; copy any unsaved work before reloading. <button onClick={() => location.reload()}>Reload opened project</button></p>}
     {live.plcHold && <p role="status" className="save-status">Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.</p>}

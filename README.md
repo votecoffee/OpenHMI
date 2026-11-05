@@ -122,7 +122,7 @@ contributor installation steps.
 
 The generator also creates a complete backup ZIP. See the
 [demo walkthrough](docs/demo-project.md) for the featured screens and the
-optional read-only PLC preview.
+optional live-only, read-only PLC demo with tag history and trend capture.
 
 Start the local simulation builder:
 

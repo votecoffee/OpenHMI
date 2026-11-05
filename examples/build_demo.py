@@ -108,29 +108,43 @@ def simulation():
     }
 
 
-def add_plc_preview(project, route, udt_type, bits):
-    project['connections'] = [{'id': 'read_only_demo', 'name': 'Read-only PLC demo',
-                               'path': route, 'enabled': True, 'program_tags': False}]
+def plc_demo(route, udt_type, bits):
     scalar = {'DINT': 'integer', 'REAL': 'number', 'STRING': 'string', 'BOOL': 'boolean'}
-    project['tags'].extend({'name': 'PLCDemo' + suffix, 'type': kind, 'connection': 'read_only_demo',
-                            'address': '_Demo_' + suffix, 'writable': False} for suffix, kind in scalar.items())
-    project['tags'].append({'name': 'PLCDemoUDT', 'type': 'struct', 'connection': 'read_only_demo',
-                            'address': '_Demo_UDT', 'writable': False, 'udt_type': udt_type,
-                            'members': dict.fromkeys(bits, 'boolean')})
-    project['faceplates'].append({
-        'id': 'plcflags', 'name': 'Demo UDT flags', 'udt_type': udt_type,
-        'members': dict.fromkeys(bits, 'boolean'),
-        'controls': [control('indicator', f'flag{index}', bit, tag='$.' + bit) for index, bit in enumerate(bits)],
-    })
-    project['screens'].append({
-        'id': 'plcpreview', 'title': 'PLC preview (read-only)', 'columns': 2, 'update_ms': 2000, 'controls': [
-            control('numeric', 'dint', 'Demo integer', tag='PLCDemoDINT'),
+    tags = [{'name': 'PLCDemo' + suffix, 'type': kind, 'connection': 'read_only_demo',
+             'address': '_Demo_' + suffix, 'writable': False} for suffix, kind in scalar.items()]
+    tags.append({'name': 'PLCDemoUDT', 'type': 'struct', 'connection': 'read_only_demo',
+                 'address': '_Demo_UDT', 'writable': False, 'udt_type': udt_type,
+                 'members': dict.fromkeys(bits, 'boolean')})
+    plot_tags = ['PLCDemoDINT', 'PLCDemoREAL', 'PLCDemoBOOL', *('PLCDemoUDT.' + bit for bit in bits)]
+    trend_controls = [
+        control('trend', f'capture{offset // 12}', 'PLC trends' if offset == 0 else 'Additional UDT flags',
+                tags=plot_tags[offset:offset + 12], seconds=60,
+                series={'PLCDemoDINT': {'decimals': 0}, 'PLCDemoREAL': {'decimals': 2}} if offset == 0 else {},
+                recording={'sample_ms': 2000, 'max_samples': 4000})
+        for offset in range(0, len(plot_tags), 12)
+    ]
+    return {
+        'title': 'Read-only PLC demo', 'columns': 2, 'update_ms': 2000,
+        'connections': [{'id': 'read_only_demo', 'name': 'Read-only PLC demo',
+                         'path': route, 'enabled': True, 'program_tags': False}],
+        'tags': tags,
+        'historian': {'tags': [{'tag': tag, 'sample_ms': 2000} for tag in plot_tags],
+                      'retention_days': 7, 'max_rows': 100000},
+        'faceplates': [{
+            'id': 'plcflags', 'name': 'Demo UDT flags', 'udt_type': udt_type,
+            'members': dict.fromkeys(bits, 'boolean'),
+            'controls': [control('indicator', f'flag{index}', bit, tag='$.' + bit) for index, bit in enumerate(bits)],
+        }],
+        'controls': [
+            control('numeric', 'dint', 'Demo integer', tag='PLCDemoDINT', decimals=0),
             control('numeric', 'real', 'Demo real', tag='PLCDemoREAL', decimals=2),
             control('text', 'string', 'Demo string', tag='PLCDemoSTRING'),
             control('indicator', 'bool', 'Demo Boolean', tag='PLCDemoBOOL'),
             control('faceplate', 'udt', 'Demo UDT flags', template='plcflags', root_tag='PLCDemoUDT'),
+            button('trends', 'Open live trends', mode='navigate', screen='trends'),
         ],
-    })
+        'screens': [{'id': 'trends', 'title': 'Trends', 'columns': 1, 'update_ms': 2000, 'controls': trend_controls}],
+    }
 
 
 def seed_recipes(app):
@@ -159,13 +173,12 @@ def seed_recipes(app):
                                        expected_revision_version=recipe['version'], reason='Load the demo profile'), actor)
 
 
-def seed_history(app, recording):
+def seed_history(app):
     driver = app.state.driver
     historian = app.state.historian
     trends = app.state.trends
-    if recording:
-        with trends.lock:
-            capture = trends._start('trends__profile', time.time() - 60)
+    with trends.lock:
+        capture = trends._start('trends__profile', time.time() - 60)
     wall = time.time() - 60
     for index in range(121):
         level = 40.0 + (index % 48 if index % 96 < 48 else 48 - index % 48) * 0.8
@@ -174,19 +187,15 @@ def seed_history(app, recording):
         driver.write('DemoRunning', [index % 32 < 24])
         driver.write('DemoFault', [55 <= index < 62])
         historian.sample(1000 + index / 2, wall + index / 2)
-        if recording:
-            trends.sample(1000 + index / 2, wall + index / 2)
-    if recording:
-        trends.stop('trends__profile', capture)
+        trends.sample(1000 + index / 2, wall + index / 2)
+    trends.stop('trends__profile', capture)
     for tag, value in [('DemoLevel', 62.0), ('DemoFlow', 35.0), ('DemoRunning', True), ('DemoFault', False)]:
         driver.write(tag, [value])
     app.state.alarms.sample()
 
 
 def build(output, route=None, udt_type=None, bits=()):
-    project = simulation()
-    if route:
-        add_plc_preview(project, route, udt_type, bits)
+    project = plc_demo(route, udt_type, bits) if route else simulation()
     model = Project.model_validate(project)
     output.mkdir(parents=True, exist_ok=False)
     database = output / 'OpenHMI-Demo.openhmi.sqlite3'
@@ -195,8 +204,9 @@ def build(output, route=None, udt_type=None, bits=()):
     ProjectStore(database, initial_project=model).close()
     workspace = ProjectWorkspace(database)
     try:
-        seed_recipes(workspace.current)
-        seed_history(workspace.current, recording=not route)
+        if not route:
+            seed_recipes(workspace.current)
+            seed_history(workspace.current)
         (output / 'OpenHMI-Demo-backup.zip').write_bytes(workspace.export())
     finally:
         workspace.current.state.store.close()
