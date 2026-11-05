@@ -6,6 +6,7 @@ import { useLocalization, LanguageSelector, alarmMessage } from './localization.
 import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
+import { WebBrowser } from './web-browser.jsx';
 import { EditControl } from './edit-control.jsx';
 import { Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
@@ -234,6 +235,9 @@ export function createConfig(catalog) {
     <small>No groups selected: use the user's operation permission.</small></fieldset> };
   const tagField = type => ({ type: 'select', label: 'Tag', options: catalog.tags
     .filter(tag => tag.type === type).map(tag => ({ label: tag.name, value: tag.name })) });
+  const browserTag = (label, unbound, predicate) => ({ type: 'select', label, options: [
+    { label: unbound, value: '' }, ...catalog.tags.filter(predicate).map(tag => ({ label: tag.name, value: tag.name })),
+  ] });
   const limitTag = label => ({ type: 'select', label, options: [{ label: 'Fixed HMI value', value: '' }, ...catalog.tags.filter(tag => tag.type === 'number').map(tag => ({ label: tag.name, value: tag.name }))] });
   const labelField = { type: 'text', label: 'Label' };
   const numericFields = { label: labelField, tag: tagField('number'), unit: { type: 'text', label: 'Units' },
@@ -266,6 +270,16 @@ export function createConfig(catalog) {
         recording: { type: 'custom', render: ({ value, onChange }) => <TrendRecordingFields value={value} onChange={onChange} catalog={catalog} /> },
       }, defaultProps: { label: 'Process trend', pens: { tags: ['TankLevel'], series: {} }, seconds: 300 },
       render: props => <LiveTrend {...props} catalog={catalog} /> },
+      WebBrowser: { label: 'Web Browser / Camera View', fields: {
+        label: labelField,
+        scheme: { type: 'select', label: 'Scheme', options: [{ label: 'HTTPS', value: 'https' }, { label: 'HTTP', value: 'http' }] },
+        hosts: { type: 'text', label: 'Approved hosts (comma-separated)' },
+        port: { type: 'number', label: 'Port (blank uses scheme default)', min: 1, max: 65535 },
+        path: { type: 'text', label: 'Approved path' },
+        address_tag: browserTag('Address from tag', 'Fixed address (first approved host)', tag => tag.type === 'string'),
+        refresh_tag: browserTag('Refresh from tag', 'Manual refresh only', tag => tag.type === 'boolean' || tag.integer),
+      }, defaultProps: { label: 'Camera view', scheme: 'https', hosts: '', port: null, path: '/', address_tag: '', refresh_tag: '' },
+      render: WebBrowser },
       Faceplate: { label: 'UDT faceplate', fields: { label: labelField, template: { type: 'select', label: 'Definition', options: (catalog.faceplates || []).map(item => ({ label: item.name, value: item.id })) }, root_tag: tagField('struct') },
         defaultProps: { label: 'Equipment', template: catalog.faceplates?.[0]?.id || '', root_tag: catalog.tags.find(tag => tag.type === 'struct')?.name || '' },
         render: props => <FaceplateInstance {...props} config={config} /> },
@@ -325,7 +339,7 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config }) {
   if (!definition) return <article className="hmi-control" data-control="faceplate"><strong>{label}</strong><p>Faceplate definition unavailable</p></article>;
   return <article className="hmi-faceplate" data-control="faceplate"><strong>{text(`control.${id}.label`, label)}</strong><div className="faceplate-grid">{definition.controls.map(control => {
     const resolved = { ...control, id: `${id}__${control.id}`, puck };
-    for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag']) if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
+    for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'address_tag', 'refresh_tag']) if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
     if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
     if (Array.isArray(resolved.series)) resolved.series = resolved.series.map(item =>
       item.tag.startsWith('$.') ? { ...item, tag: root_tag + item.tag.slice(1) } : item);

@@ -2,6 +2,8 @@
 
 import json
 import math
+import re
+from ipaddress import IPv4Address
 import sqlite3
 import uuid
 from copy import deepcopy
@@ -244,7 +246,37 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
+class WebBrowserControl(ControlBase):
+    kind: Literal['web_browser']
+    scheme: Literal['http', 'https'] = 'https'
+    hosts: str = Field(default='', max_length=1024)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    path: str = Field(default='/', max_length=512)
+    address_tag: str = Field(default='', max_length=200)
+    refresh_tag: str = Field(default='', max_length=200)
+
+    @model_validator(mode='after')
+    def valid_destination(self):
+        if not re.fullmatch(r'/[A-Za-z0-9._~/-]*', self.path) or '//' in self.path or any(
+            segment in ('.', '..') for segment in self.path.split('/')
+        ):
+            raise ValueError('Browser path must be an absolute plain path without traversal, query or fragment')
+        hosts = [host.strip().lower() for host in self.hosts.split(',')] if self.hosts.strip() else []
+        if len(hosts) > 16 or len(set(hosts)) != len(hosts):
+            raise ValueError('Browser hosts must be unique and limited to 16')
+        for host in hosts:
+            try:
+                IPv4Address(host)
+            except ValueError:
+                labels = host.split('.')
+                if len(host) > 253 or not re.match(r'[a-z]', labels[-1]) or any(
+                    not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in labels
+                ):
+                    raise ValueError('Browser hosts must be exact DNS names or IPv4 addresses') from None
+        return self
+
+
+Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

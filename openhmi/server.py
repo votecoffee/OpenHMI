@@ -266,6 +266,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 raise HTTPException(422, 'Control references an unknown HMI security group')
             if control['kind'] in ('recipe', 'current_user'):
                 continue
+            if control['kind'] == 'web_browser':
+                if control['address_tag'] and kinds.get(control['address_tag']) != 'string':
+                    raise HTTPException(422, 'Web Browser address requires a STRING tag')
+                if control['refresh_tag'] and kinds.get(control['refresh_tag']) not in ('boolean', 'integer'):
+                    raise HTTPException(422, 'Web Browser refresh requires a BOOL or integer tag')
+                continue
             if control['kind'] in ('bar', 'radar'):
                 if any(kinds.get(series['tag']) not in ('number', 'integer') for series in control['series']):
                     raise HTTPException(422, 'Bar and radar charts require numeric tags')

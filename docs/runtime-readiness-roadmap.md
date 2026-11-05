@@ -71,8 +71,8 @@ sample must never appear as an alarm returning to normal. Verify partial outages
 and fresh recovery on the target display in dense screens and popups.
 [Operator quality #13](https://github.com/votecoffee/OpenHMI/issues/13)
 
-**Web Browser and Camera View.** Add a drag-and-drop control configured in the
-property editor. Accept a fixed address or bind a PLC STRING containing a host
+**Web Browser and Camera View.** The [drag-and-drop control](web-browser-camera.md)
+is available in the designer. Accept a fixed address or bind a PLC STRING containing a host
 or approved HTTP(S) URL. Configure the scheme, host allowlist, port and path
 in the project. Validate the address before navigation and show unavailable
 when its quality is bad or stale. Support manual reload and an optional
@@ -80,7 +80,7 @@ read-only PLC BOOL rising edge or sequence change. The first good value
 establishes the trigger baseline. Coalesce requests, rate-limit reloads and
 resume on fresh trigger data. No PLC writes are needed for the first version.
 
-Start with a restricted iframe and an operator-visible unavailable state. Test
+The initial control uses a restricted iframe and an operator-visible unavailable state. Test
 blocked framing, mixed content, local-network access, vendor authentication,
 unreachable cameras and stale PLC address/refresh tags. An iframe load event
 alone cannot establish that video is healthy. Offer an explicitly configured

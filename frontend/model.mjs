@@ -4,7 +4,7 @@ export const controlTypes = {
   recipe: 'SelectedRecipe',
   input: 'NumericInput',
   text_input: 'TextInput', current_user: 'CurrentUser',
-  faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay',
+  faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', web_browser: 'WebBrowser',
 };
 const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type]) => [type, kind]));
 
@@ -30,6 +30,9 @@ export function toProject(data, settings = {}) {
       if (type === 'Faceplate') return { ...base, template: props.template, root_tag: props.root_tag };
       if (type === 'Trend') return { ...base, tags: props.pens?.tags ?? props.tags ?? ['TankLevel'],
         series: props.pens?.series ?? props.series ?? {}, seconds: Number(props.seconds ?? 300), recording: props.recording ?? null };
+      if (type === 'WebBrowser') return { ...base, scheme: props.scheme || 'https', hosts: props.hosts || '',
+        port: props.port === '' || props.port == null ? null : Number(props.port), path: props.path ?? '/',
+        address_tag: props.address_tag || '', refresh_tag: props.refresh_tag || '' };
       if (type === 'RadarChart') return { ...base, series: props.series };
       if (type === 'BarGraph') return { ...base, series: props.series, unit: props.unit,
         minimum: Number(props.minimum), maximum: Number(props.maximum) };

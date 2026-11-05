@@ -16,10 +16,10 @@ function structureInitial(members, values) {
 export function engineeringCatalog(catalog, settings, template = null) {
   const tags = [...catalog.tags.filter(tag => !settings.tags?.some(item => item.name === tag.name || tag.name.startsWith(item.name + '.')))];
   for (const tag of settings.tags || []) {
-    tags.push({ name: tag.name, type: tag.type === 'integer' ? 'number' : tag.type });
-    for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type });
+    tags.push({ name: tag.name, type: tag.type === 'integer' ? 'number' : tag.type, integer: tag.type === 'integer' });
+    for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer' });
   }
-  if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type });
+  if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer' });
   return { ...catalog, tags, commands: settings.commands || [], faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
 }
 
