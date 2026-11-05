@@ -8,6 +8,7 @@ import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.
 import { EditControl } from './edit-control.jsx';
 import { Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
+import { ChartFields, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -67,7 +68,7 @@ function Indicator({ id, label, tag, on_text = 'ON', off_text = 'OFF', puck }) {
   </article>;
 }
 
-function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_low, normal_high, puck }) {
+function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_low, normal_high, puck, tank = false }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, ui, language } = useLocalization();
   label = text(`control.${id}.label`, label);
@@ -76,19 +77,21 @@ function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_
   try { formatted = valid ? new Intl.NumberFormat(language.code, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }).format(value) : ''; }
   catch { formatted = valid ? value.toFixed(decimals) : ''; }
   const configured = [minimum, maximum, normal_low, normal_high].every(Number.isFinite)
-    && minimum <= normal_low && normal_low < normal_high && normal_high <= maximum;
+    && Number.isFinite(maximum - minimum) && minimum <= normal_low && normal_low < normal_high && normal_high <= maximum;
   const position = number => Math.max(0, Math.min(100, (number - minimum) / (maximum - minimum) * 100));
   const outside = valid && (value < minimum || value > maximum);
-  return <article className="hmi-control hmi-analog" data-control="analog">
+  const graphicLabel = valid ? `${label}: ${value} ${unit}, scale ${minimum} to ${maximum}, normal ${normal_low} to ${normal_high}${outside ? ', out of scale' : ''}` : `${label}: ${problem}`;
+  return <article className="hmi-control hmi-analog" data-control={tank ? 'tank' : 'analog'}>
     <div className="analog-heading"><span className="hmi-label">{label}</span>
       {valid ? <strong className="hmi-value">{formatted} <small>{unit}</small></strong> : <Quality text={problem} />}</div>
     {!configured ? <Quality text="BAD RANGE" /> : <>
-      <div className={`analog-track ${!valid ? 'invalid' : ''}`} role="img"
-        aria-label={valid ? `${label}: ${value} ${unit}, scale ${minimum} to ${maximum}, normal ${normal_low} to ${normal_high}${outside ? ', out of scale' : ''}` : `${label}: ${problem}`}>
+      {tank ? <TankGraphic label={graphicLabel} position={valid ? position(value) : 0} valid={valid} minimum={minimum} maximum={maximum}
+        normalLow={position(normal_low)} normalHigh={position(normal_high)} />
+        : <div className={`analog-track ${!valid ? 'invalid' : ''}`} role="img" aria-label={graphicLabel}>
         <span className="normal-band" style={{ left: `${position(normal_low)}%`, width: `${position(normal_high) - position(normal_low)}%` }} />
         {valid && <span className="analog-pointer" style={{ left: `${position(value)}%` }} aria-hidden="true">▼</span>}
-      </div>
-      <div className="analog-scale"><span>{minimum}</span><span>{ui('normal')} {normal_low}–{normal_high} {unit}</span><span>{maximum}</span></div>
+      </div>}
+      <div className="analog-scale">{!tank && <span>{minimum}</span>}<span>{ui('normal')} {normal_low}–{normal_high} {unit}</span>{!tank && <span>{maximum}</span>}</div>
       {valid && (outside || value < normal_low || value > normal_high) && <strong className="range-deviation">{outside ? ui('outOfScale') : ui('outsideBand')}</strong>}
     </>}
     <TagReference tag={tag} puck={puck} />
@@ -197,6 +200,11 @@ function LiveTrend(props) {
   return <Trend {...props} live={live} />;
 }
 
+function LiveChart(props) {
+  const live = useContext(Live);
+  return <ProcessChart {...props} live={live} Quality={Quality} />;
+}
+
 export function createConfig(catalog) {
   const groupsField = { type: 'custom', render: ({ value = [], onChange }) => <fieldset className="security-group-choice"><legend>Allowed HMI groups (any selected)</legend>
     {catalog.security_groups.map(group => <label key={group}><input type="checkbox" checked={value.includes(group)} onChange={event => onChange(event.target.checked ? [...value, group] : value.filter(item => item !== group))} />{group}</label>)}
@@ -208,6 +216,12 @@ export function createConfig(catalog) {
   const numericFields = { label: labelField, tag: tagField('number'), unit: { type: 'text', label: 'Units' },
     decimals: { type: 'select', label: 'Decimal places', options: [0, 1, 2, 3, 4].map(value => ({ label: String(value), value })) } };
   const numericDefaults = { label: 'Tank level', tag: 'TankLevel', unit: '%', decimals: 1 };
+  const scaleFields = { minimum: { type: 'number', label: 'Scale minimum' }, maximum: { type: 'number', label: 'Scale maximum' } };
+  const analogFields = { ...numericFields, ...scaleFields,
+    normal_low: { type: 'number', label: 'Normal low' }, normal_high: { type: 'number', label: 'Normal high' } };
+  const analogDefaults = { ...numericDefaults, minimum: 0, maximum: 100, normal_low: 20, normal_high: 80 };
+  const chartField = radar => ({ type: 'custom', render: ({ value, onChange }) =>
+    <ChartFields value={value} onChange={onChange} catalog={catalog} radar={radar} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const config = {
@@ -237,11 +251,16 @@ export function createConfig(catalog) {
         label: 'Indicator', fields: { label: labelField, tag: tagField('boolean'), on_text: { type: 'text', label: 'ON text' }, off_text: { type: 'text', label: 'OFF text' } },
         defaultProps: { label: 'Motor', tag: 'MotorRunning', on_text: 'ON', off_text: 'OFF' }, render: Indicator,
       },
-      AnalogRange: {
-        label: 'Analog range', fields: { ...numericFields, minimum: { type: 'number', label: 'Scale minimum' }, maximum: { type: 'number', label: 'Scale maximum' },
-          normal_low: { type: 'number', label: 'Normal low' }, normal_high: { type: 'number', label: 'Normal high' } },
-        defaultProps: { ...numericDefaults, label: 'Tank operating range', minimum: 0, maximum: 100, normal_low: 20, normal_high: 80 }, render: AnalogRange,
-      },
+      AnalogRange: { label: 'Analog range', fields: analogFields,
+        defaultProps: { ...analogDefaults, label: 'Tank operating range' }, render: AnalogRange },
+      TankLevel: { label: 'Tank level indicator', fields: analogFields,
+        defaultProps: analogDefaults, render: props => <AnalogRange {...props} tank /> },
+      BarGraph: { label: 'Bar graph', fields: { label: labelField, ...scaleFields, unit: numericFields.unit, series: chartField(false) },
+        defaultProps: { label: 'Process comparison', minimum: 0, maximum: 100, unit: '', series: [chartSeries('TankLevel', false)] },
+        render: LiveChart },
+      RadarChart: { label: 'Radar chart', fields: { label: labelField, series: chartField(true) },
+        defaultProps: { label: 'Process profile', series: catalog.tags.filter(tag => tag.type === 'number').slice(0, 3).map(tag => chartSeries(tag.name, true)) },
+        render: props => <LiveChart {...props} radar /> },
       AlarmIndicator: {
         label: 'Alarm indicator', fields: { label: labelField, tag: tagField('boolean'), priority: { type: 'select', label: 'Alarm priority',
           options: [1, 2, 3, 4].map(value => ({ label: `Priority ${value}`, value })) } },
@@ -278,6 +297,8 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config }) {
     const resolved = { ...control, id: `${id}__${control.id}`, puck };
     for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag']) if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
     if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
+    if (Array.isArray(resolved.series)) resolved.series = resolved.series.map(item =>
+      item.tag.startsWith('$.') ? { ...item, tag: root_tag + item.tag.slice(1) } : item);
     return <React.Fragment key={control.id}>{config.components[controlTypes[control.kind]].render(resolved)}</React.Fragment>;
   })}</div></article>;
 }

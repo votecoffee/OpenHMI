@@ -1,0 +1,27 @@
+.hmi-chart { width: 100%; }
+.chart-series { display: grid; gap: 6px; width: 100%; list-style: none; padding: 0; margin: 0; }
+.chart-series > li { display: grid; gap: 4px; border-bottom: 1px solid #b7b7b7; padding-block: 3px; }
+.chart-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; overflow-wrap: anywhere; }
+.chart-value { color: var(--hmi-live); font-variant-numeric: tabular-nums; }
+.chart-series .range-deviation, .chart-series .hmi-quality { justify-self: start; }
+.bar-track { position: relative; height: 15px; border: 1px solid #888; background: #eee; }
+.bar-track.chart-invalid { border-style: dashed; }
+.bar-fill, .bar-zero { position: absolute; height: 100%; background: var(--hmi-live); }
+.bar-zero { width: 1px; background: #555; }
+.radar-content { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; width: 100%; }
+.radar-content .chart-series { flex: 1 1 180px; min-width: 0; }
+.radar-plot { display: block; width: min(100%, 240px); margin-inline: auto; }
+.radar-plot text { font: 13px sans-serif; fill: #333; }
+.radar-grid { fill: none; stroke: #888; }
+.radar-profile { fill: var(--hmi-live); fill-opacity: .13; stroke: var(--hmi-live); stroke-width: 2; }
+.radar-dot { fill: var(--hmi-live); }
+.tank-graphic { display: flex; gap: 8px; align-items: stretch; align-self: center; }
+.tank-vessel { position: relative; width: 82px; height: 138px; overflow: hidden; border: 2px solid #666; border-radius: 12px; background: #eee; }
+.tank-vessel.tank-invalid { border-style: dashed; }
+.tank-fill { position: absolute; inset: auto 0 0; background: var(--hmi-live); opacity: .68; }
+.tank-band { position: absolute; right: 0; width: 20%; background: #aaa; border-block: 1px solid #555; }
+.tank-ticks { display: flex; flex-direction: column; justify-content: space-between; font-size: 10px; color: #555; }
+.chart-fields, .chart-fields fieldset { min-width: 0; }
+.chart-fields fieldset { margin-block: 8px; }
+.chart-fields label { display: flex; flex-direction: column; margin-block: 5px; }
+.chart-fields :is(input, select) { width: 100%; }

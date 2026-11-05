@@ -136,6 +136,28 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'bad')
         driver.close()
 
+    def test_chart_faceplate_tags_join_screen_subscription(self):
+        project = logix_project()
+        project['faceplates'] = [{'id': 'charts', 'name': 'Equipment charts', 'udt_type': 'MotorUDT',
+                                  'members': {'Speed': 'number'}, 'controls': [
+            {'id': 'tank', 'kind': 'tank', 'label': 'Level', 'tag': '$.Speed'},
+            {'id': 'bar', 'kind': 'bar', 'label': 'Comparison', 'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}]},
+            {'id': 'radar', 'kind': 'radar', 'label': 'Profile',
+             'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}, {'tag': 'TankLevel'}]},
+        ]}]
+        project['screens'].append({'id': 'charts', 'title': 'Charts', 'update_ms': 200, 'controls': [
+            {'id': 'chartpanel', 'kind': 'faceplate', 'label': 'Charts', 'template': 'charts', 'root_tag': 'MotorA'},
+        ]})
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.lease('charts-station', ['charts'], 1)
+        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'LevelA', 'TankLevel')},
+                         {'MotorA.Speed': 200, 'LevelA': 200, 'TankLevel': 200})
+        driver.poll(1)
+        self.assertEqual(driver.connections['plc'].client.reads, [('Motor', 'Level')])
+        self.assertNotIn('LevelA', driver.demands(16))
+
     def test_background_history_deadband_quality_and_query(self):
         store = ProjectStore()
         driver = RuntimeDriver(FakePLC)

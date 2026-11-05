@@ -247,6 +247,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 raise HTTPException(422, 'Control references an unknown HMI security group')
             if control['kind'] in ('recipe', 'current_user'):
                 continue
+            if control['kind'] in ('bar', 'radar'):
+                if any(kinds.get(series['tag']) not in ('number', 'integer') for series in control['series']):
+                    raise HTTPException(422, 'Bar and radar charts require numeric tags')
+                continue
             if control['kind'] == 'trend':
                 if any(kinds.get(tag) not in ('number', 'integer', 'boolean') for tag in control['tags']):
                     raise HTTPException(422, 'Trend requires numeric or Boolean tags')
@@ -273,7 +277,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if kind not in ('number', 'integer', 'boolean', 'string') or (mode == 'toggle' and kind != 'boolean'):
                         raise HTTPException(422, 'Action target type is incompatible')
             else:
-                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'input') else ('string',) if control['kind'] == 'text_input' else ('boolean',)
+                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'input') else ('string',) if control['kind'] == 'text_input' else ('boolean',)
                 if kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 

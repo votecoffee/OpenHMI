@@ -173,6 +173,10 @@ keeps its running copy; test recipes carry production status false. See the
    across the plot to read every tag at the same time. Enable **Saved trend
    recording** for manual Run/Stop or optional Boolean triggers, independent
    rolling sample retention, saved capture review and full capture CSV export.
+7. Drop in a **Tank level indicator** for a live fill and normal band, a **Bar
+   graph** to compare numeric tags on one scale, or a **Radar chart** for a
+   live profile with independently scaled axes. Set tags, labels, units and
+   precision in the designer. See the [control catalog](docs/hmi-style-guide.md#initial-catalog).
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

@@ -59,6 +59,47 @@ class AnalogControl(NumericControl):
         return self
 
 
+class TankControl(AnalogControl):
+    kind: Literal['tank']
+
+
+class ChartSeries(StrictModel):
+    tag: str = Field(min_length=1, max_length=200)
+    label: str = Field(default='', max_length=100)
+    decimals: int = Field(default=1, ge=0, le=4)
+
+
+class RadarAxis(ChartSeries):
+    unit: str = Field(default='', max_length=30)
+    minimum: float = Field(default=0, allow_inf_nan=False)
+    maximum: float = Field(default=100, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def ordered_range(self):
+        if not 0 < self.maximum - self.minimum < math.inf:
+            raise ValueError('Radar axis minimum must be less than maximum with a finite span')
+        return self
+
+
+class RadarControl(ControlBase):
+    kind: Literal['radar']
+    series: list[RadarAxis] = Field(min_length=3, max_length=8)
+
+
+class BarGraphControl(ControlBase):
+    kind: Literal['bar']
+    series: list[ChartSeries] = Field(min_length=1, max_length=12)
+    unit: str = Field(default='', max_length=30)
+    minimum: float = Field(default=0, allow_inf_nan=False)
+    maximum: float = Field(default=100, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def ordered_range(self):
+        if not 0 < self.maximum - self.minimum < math.inf:
+            raise ValueError('Bar graph minimum must be less than maximum with a finite span')
+        return self
+
+
 class AlarmControl(ControlBase):
     kind: Literal["alarm"]
     tag: str = Field(min_length=1, max_length=200)
@@ -197,7 +238,7 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

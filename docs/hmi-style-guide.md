@@ -46,8 +46,18 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Numeric display | Label, live value, engineering units and selected precision; no input-like frame |
 | Binary indicator | Stable label, grayscale filled/empty square and configurable ON/OFF text |
 | Analog range | Value and units, scale endpoints, normal band and pointer; out-of-scale indication without falsifying the numeric value |
+| Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
+| Bar graph | Compare up to 12 numeric tags with a shared engineering scale and units. Bars extend from zero when zero is in range, or from the endpoint nearest zero |
+| Radar chart | Plot 3 to 8 numeric tags around a shared profile, with engineering units and scaling set independently per axis |
 | Alarm indicator | Explicit Boolean alarm binding, active/inactive text and numbered priority shape; no implicit alarm from a running/stopped bit |
 | Action button | Named Python action, visible disabled state and explicit execution feedback |
+
+These live charts use the screen's normal tag update rate. If a value exceeds
+its configured scale, the chart clips the geometry and shows the measured value
+and an out-of-scale label. Bad-quality values suppress tank fills and bars. The
+radar chart suppresses the polygon when an axis is unavailable and keeps the
+individual valid points visible. Radar numbers match the axis labels and engineering ranges below
+the chart. Bars compare values in the same units. A Trend shows change over time.
 
 An analog normal band is operator context, not an alarm engine. An excursion
 outside the band is labeled as such and does not consume alarm colors. Alarm

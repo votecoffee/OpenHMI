@@ -26,13 +26,21 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
     onChange({ ...settings, languages: [...settings.languages, { code, name: name.trim(), flag, direction: 'ltr', translations: {} }] });
     setSelected(code); setCode(''); setName(''); setError('');
   }
-  const entries = [['screen.title', title], ...controls.flatMap(control => [
-    [`control.${control.id}.label`, control.label],
-    ...('unit' in control ? [[`control.${control.id}.unit`, control.unit]] : []),
-    ...(control.kind === 'indicator' ? [[`control.${control.id}.on_text`, control.on_text || 'ON'], [`control.${control.id}.off_text`, control.off_text || 'OFF']] : []),
-  ]), ...(settings.screens || []).flatMap(screen => [[`screen.${screen.id}.title`, screen.title], ...screen.controls.flatMap(control => [
-    [`control.${screen.id}__${control.id}.label`, control.label], ...('unit' in control ? [[`control.${screen.id}__${control.id}.unit`, control.unit]] : []),
-    ...(control.kind === 'indicator' ? [[`control.${screen.id}__${control.id}.on_text`, control.on_text || 'ON'], [`control.${screen.id}__${control.id}.off_text`, control.off_text || 'OFF']] : [])])]),
+  function controlEntries(control, id) {
+    const key = `control.${id}`;
+    return [
+      [key + '.label', control.label],
+      ...('unit' in control ? [[key + '.unit', control.unit]] : []),
+      ...(control.kind === 'indicator' ? [[key + '.on_text', control.on_text || 'ON'], [key + '.off_text', control.off_text || 'OFF']] : []),
+      ...(Array.isArray(control.series) ? control.series.flatMap((series, index) => [
+        [`${key}.series.${index}.label`, series.label || series.tag],
+        ...('unit' in series ? [[`${key}.series.${index}.unit`, series.unit]] : []),
+      ]) : []),
+    ];
+  }
+  const entries = [['screen.title', title], ...controls.flatMap(control => controlEntries(control, control.id)),
+    ...(settings.screens || []).flatMap(screen => [[`screen.${screen.id}.title`, screen.title],
+      ...screen.controls.flatMap(control => controlEntries(control, `${screen.id}__${control.id}`))]),
     ...settings.alarms.flatMap(alarm => [['message', alarm.message], ['cause', alarm.cause || ''], ['response', alarm.response || '']].map(([field, value]) => [`alarm.${alarm.id}.${field}`, value])), ...Object.entries(uiText).map(([key, value]) => [`ui.${key}`, value])];
   function updateAlarm(index, change) { onChange({ ...settings, alarms: settings.alarms.map((alarm, i) => i === index ? { ...alarm, ...change } : alarm) }); }
   if (tab === 'languages') return <section className="project-settings" aria-label="Language settings">
