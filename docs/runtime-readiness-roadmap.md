@@ -113,6 +113,8 @@ healthy routes and unrelated features continue, and operator quality reflects
 the fault. A proposed starting gate is a 24-hour offline load and fault soak
 with zero unexpected exits and zero command replay or duplication. Agree
 resource, latency and recovery bounds for the test profile before running it.
+The [offline soak runner](runtime-soak.md) provides a repeatable ASGI rehearsal
+with simulated PLC faults, read-only storage and a durable command reopen check.
 Confirm the relevant cases on the designated Windows station with the
 [pilot matrix](pilot-acceptance.md).
 [Runtime resilience #15](https://github.com/votecoffee/OpenHMI/issues/15)

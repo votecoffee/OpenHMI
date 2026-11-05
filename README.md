@@ -431,7 +431,9 @@ PLC data quality, and Windows runtime resilience. The no-code
 [Web Browser / Camera View](docs/web-browser-camera.md) supports a fixed address
 or PLC STRING selection and an optional PLC refresh trigger. See the
 [runtime readiness roadmap](docs/runtime-readiness-roadmap.md) for the driver
-assessment, product references, and acceptance gates.
+assessment, product references, and acceptance gates. The
+[offline fault rehearsal](docs/runtime-soak.md) exercises recovery and checks
+that pending commands reconcile without replay.
 
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
