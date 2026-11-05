@@ -6,6 +6,7 @@ import json
 import re
 from threading import RLock
 import time
+from uuid import uuid4
 
 from .drivers import SimulatorDriver
 from .screens import screen_map, expanded_controls, referenced_tags
@@ -34,6 +35,7 @@ def type_ok(value, kind):
 class LogixConnection:
     def __init__(self, config, factory=None):
         self.config, self.factory = config, factory
+        self.instance = uuid4().hex
         self.lock = RLock()
         self.client = None
         self.connected = False
@@ -437,6 +439,7 @@ class RuntimeDriver(SimulatorDriver):
     def status(self):
         with self.lock:
             return [{'id': identifier, 'connected': connection.connected, 'error': connection.error,
+                     'connection_instance': connection.instance,
                      'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
                      'groups': [{'rate_ms': rate, 'addresses': sorted(address for (conn, address), interval in self.last_rates.items() if conn == identifier and interval == rate)}
                                 for rate in sorted({interval for (conn, _), interval in self.last_rates.items() if conn == identifier})]}

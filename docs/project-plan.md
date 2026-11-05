@@ -78,6 +78,8 @@ controller/firmware, pycomm3/runtime versions, representative tag/UDT/indexed-ar
 coverage and requested-versus-observed acquisition behavior. Check communication
 loss/recovery and measured controller load before controlled writes. M1 provides
 traceability for write tests. Do not choose a live machine or test tags implicitly.
+Use the [read-only bench procedure and diagnostics comparison](plc-bench-acceptance.md)
+to prepare and record the M2 evidence.
 
 M3 [command software contracts](command-transactions.md) are implemented against
 a deterministic simulator while bench access is pending. Designer contracts,

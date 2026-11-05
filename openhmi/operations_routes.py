@@ -1,6 +1,7 @@
 """Protected operator activity and read-only runtime diagnostics."""
 
 import csv
+from datetime import datetime, timezone
 from io import StringIO
 import json
 import time
@@ -71,6 +72,7 @@ def add_operations_routes(app, journal, security, driver):
             status = live.get(config['id'], {})
             state = 'held' if driver.plc_hold and config['enabled'] else 'disabled' if not config['enabled'] else 'connected' if status.get('connected') else 'disconnected'
             connections.append({'id': config['id'], 'name': config['name'], 'path': config['path'], 'state': state,
+                                'connection_instance': status.get('connection_instance'),
                                 'error': status.get('error'), 'read_calls': status.get('read_calls', 0), 'tags_read': status.get('tags_read', 0), 'groups': status.get('groups', [])})
         return {'connections': connections, 'tags': tags, 'total_tags': len(names), 'offset': offset,
                 'next_offset': offset + limit if offset + limit < len(names) else None, 'truncated': offset + limit < len(names),
@@ -82,6 +84,9 @@ def add_operations_routes(app, journal, security, driver):
 
     @app.get('/api/diagnostics.json')
     def export_diagnostics(request: Request, search: str = Query(default='', max_length=100)):
+        capture = {'project_instance': app.state.project_instance, 'monotonic_seconds': time.monotonic(),
+                   'utc': datetime.now(timezone.utc).isoformat()}
         data = diagnostic_data(request, search, 0, 5000)
+        data['capture'] = capture
         return Response(json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False), media_type='application/json',
                         headers={'Content-Disposition': 'attachment; filename="runtime-diagnostics.json"'})

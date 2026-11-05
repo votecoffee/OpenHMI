@@ -202,6 +202,8 @@ class ActivityTests(unittest.TestCase):
             self.assertEqual(result['tags'][0]['error'], 'PLC acquisition is held')
             exported = self.client.get('/api/diagnostics.json').json()
             self.assertNotIn('values', exported)
+            self.assertEqual(exported['capture']['project_instance'], self.app.state.project_instance)
+            self.assertGreater(exported['capture']['monotonic_seconds'], 0)
             self.assertFalse(driver.connections)
         project = logix_project()
         project['connections'][0]['enabled'] = False
@@ -210,6 +212,8 @@ class ActivityTests(unittest.TestCase):
         driver.plc_hold = False
         driver.factory = FakePLC
         driver.configure(logix_project())
+        connection = self.client.get('/api/diagnostics.json').json()['connections'][0]
+        self.assertEqual(connection['connection_instance'], driver.connections['plc'].instance)
         self.assertEqual(self.client.get('/api/diagnostics?search=LevelA').json()['tags'][0]['quality'], 'pending')
         with driver.lock:
             driver.samples['LevelA'] = {'value': 1.0, 'quality': 'good', 'timestamp': '2026-11-04T00:00:00+00:00', 'monotonic': time.monotonic() - 10, 'rate_ms': 100, 'error': None}

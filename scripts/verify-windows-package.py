@@ -116,6 +116,10 @@ def main():
             for path in ('/', '/runtime', '/static/vendor/app.js', '/static/vendor/app.css', '/static/assets/fonts/NotoSansSC.ttf', '/static/assets/flags/us.svg'):
                 assert request(path), f'Missing HTTP asset: {path}'
             state = json.loads(request('/api/project'))
+            diagnostics = json.loads(request('/api/diagnostics.json'))
+            assert diagnostics['capture']['project_instance'] == state['project_instance']
+            assert diagnostics['capture']['monotonic_seconds'] > 0
+            report['bench_diagnostic_capture_metadata'] = True
             state['draft']['title'] = 'Packaged restart fixture'
             state['draft']['tags'] += [{'name': 'PackageMaximum', 'type': 'number', 'initial': 50.0}, {'name': 'PackageUser', 'type': 'string', 'initial': '', 'writable': True}, {'name': 'PackagePrivileges', 'type': 'integer', 'initial': 0, 'writable': True}]
             state['draft']['historian']['tags'] = [

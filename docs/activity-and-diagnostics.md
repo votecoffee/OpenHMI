@@ -81,6 +81,10 @@ Filtering/pagination bounds the display; JSON export includes at most 5,000 matc
 tag rows and indicates truncation. Diagnostic exports omit tag values and HMI
 authentication credentials.
 
+JSON exports include the runtime session, capture time and connection instance.
+The [M2 bench procedure](plc-bench-acceptance.md) uses two exports to compute
+read-call and requested-address deltas during a steady measurement interval.
+
 The view reads cached state and does not introduce screen-tag scan demand or PLC
 writes. Other viewers, expiring prior leases, alarms and historian demand may keep
 acquisition active. Normal polling/reconnect remains owned by the runtime service.
