@@ -118,6 +118,10 @@ def main():
             state = json.loads(request('/api/project'))
             state['draft']['title'] = 'Packaged restart fixture'
             state['draft']['tags'] += [{'name': 'PackageMaximum', 'type': 'number', 'initial': 50.0}, {'name': 'PackageUser', 'type': 'string', 'initial': '', 'writable': True}, {'name': 'PackagePrivileges', 'type': 'integer', 'initial': 0, 'writable': True}]
+            state['draft']['historian']['tags'] = [
+                {'tag': 'TankLevel', 'sample_ms': 100},
+                {'tag': 'PackageMaximum', 'sample_ms': 100, 'mode': 'change'},
+            ]
             state['draft']['controls'] += [{'id': 'package_number', 'kind': 'input', 'label': 'Packaged number', 'tag': 'TankLevel', 'minimum': 10.0, 'maximum_tag': 'PackageMaximum'}, {'id': 'package_text', 'kind': 'text_input', 'label': 'Packaged text', 'tag': 'OperatorText', 'max_length': 4}]
             state['draft']['controls'].append({
                 'id': 'package_trend', 'kind': 'trend', 'label': 'Packaged trend',
@@ -150,6 +154,15 @@ def main():
             except urllib.error.HTTPError as error:
                 assert error.code == 422
             report['bounded_numeric_and_text_edits'] = True
+            for _ in range(50):
+                history = json.loads(request('/api/history?tags=TankLevel,PackageMaximum&seconds=60'))['samples']
+                if sum(row['tag'] == 'TankLevel' for row in history) >= 3:
+                    break
+                time.sleep(.1)
+            else:
+                raise AssertionError('Packaged historian did not sample the periodic tag')
+            assert [row['value'] for row in history if row['tag'] == 'PackageMaximum'] == [50.0]
+            report['on_change_history_skips_steady_samples'] = True
             capture = json.loads(request('/api/trends/package_trend', {'action': 'start'}, 'POST'))
             capture_path = f'/api/trend-captures/{capture["id"]}'
             for _ in range(50):
@@ -174,9 +187,12 @@ def main():
             assert report['timed_shelving_does_not_clear_alarm']
             backup = request('/api/workspace/backup')
             (work / 'fixture-backup.zip').write_bytes(backup)
-            denied = subprocess.run([str(executable), '--project', str(project), '--port', str(port + 1 if port < 65535 else port - 1)],
+            with socket.socket() as reservation:
+                reservation.bind(('127.0.0.1', 0))
+                other_port = reservation.getsockname()[1]
+            denied = subprocess.run([str(executable), '--project', str(project), '--port', str(other_port)],
                                     cwd=work, env=env, capture_output=True, text=True, timeout=15, creationflags=hidden)
-            assert denied.returncode != 0 and 'Another OpenHMI runtime owns' in denied.stderr
+            assert denied.returncode != 0 and 'Another OpenHMI runtime owns' in denied.stderr, denied.stderr
             report['second_runtime_rejected'] = True
         finally:
             # Forced-stop drill of this exact owned process. No PID enumeration or shared process cleanup.
