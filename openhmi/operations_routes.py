@@ -22,7 +22,7 @@ def csv_text(value):
     return "'" + text if text.lstrip().startswith(('=', '+', '-', '@')) or text.startswith(('\t', '\r')) else text
 
 
-def add_operations_routes(app, journal, security, driver):
+def add_operations_routes(app, journal, security, driver, workers):
     def activity_result(request, limit, before_id, actor, status, search, start, end):
         can_view(security, request, 'activity.view')
         if status and status not in STATUSES:
@@ -75,7 +75,7 @@ def add_operations_routes(app, journal, security, driver):
                                 'connection_instance': status.get('connection_instance'),
                                 'error': status.get('error'), 'read_calls': status.get('read_calls', 0), 'tags_read': status.get('tags_read', 0), 'groups': status.get('groups', []),
                                 'timings': status.get('timings', {}), 'route_failures': status.get('route_failures', 0)})
-        return {'connections': connections, 'tags': tags, 'total_tags': len(names), 'offset': offset,
+        return {'workers': workers.snapshot(), 'connections': connections, 'tags': tags, 'total_tags': len(names), 'offset': offset,
                 'next_offset': offset + limit if offset + limit < len(names) else None, 'truncated': offset + limit < len(names),
                 'plc_hold': driver.plc_hold, 'counter_scope': 'pycomm3 read calls and requested addresses; not wire-packet measurements', 'scan_timing': 'best effort'}
 

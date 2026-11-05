@@ -147,6 +147,28 @@ function ConnectionTimings({ connection }) {
   </details>;
 }
 
+const workerLabels = {
+  acquisition: 'PLC acquisition', commands: 'Commands', alarms: 'Alarms',
+  trends: 'Trend recording', historian: 'Historian', activity: 'Activity maintenance', identity: 'PLC identity',
+};
+
+function WorkerHealth({ workers }) {
+  return <>
+    <h2>Runtime workers</h2>
+    <table aria-label="Runtime workers"><thead><tr><th>Worker</th><th>State</th><th>Last successful tick</th><th>Failures</th></tr></thead>
+      <tbody>{workers.map(worker => <tr key={worker.id}>
+        <th scope="row">{workerLabels[worker.id] || worker.id}</th>
+        <td><strong>{worker.state}</strong>
+          {worker.state === 'overdue' && <><br />Running for {worker.running_seconds.toFixed(1)} s</>}
+          {worker.retry_in_seconds != null && <><br />Retry in {worker.retry_in_seconds.toFixed(1)} s</>}
+        </td>
+        <td>{worker.last_success_at ? new Date(worker.last_success_at).toLocaleString() : '—'}</td>
+        <td>{worker.failures}{worker.last_error_type && <><br />Last error: {worker.last_error_type}</>}</td>
+      </tr>)}</tbody>
+    </table>
+  </>;
+}
+
 export function DiagnosticsConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'diagnostics.view');
@@ -167,6 +189,7 @@ export function DiagnosticsConsole() {
     <h2>Connections and scans</h2><table><thead><tr><th>Connection / route</th><th>State</th><th>Read calls / addresses</th><th>Effective groups</th><th>Timing</th><th>Error</th></tr></thead><tbody>{data?.connections.map(connection => <tr key={connection.id}><td>{connection.name}<br />{connection.path}</td><td>{connection.state}</td><td>{connection.read_calls} / {connection.tags_read}</td><td>{connection.groups.map(group => <details key={group.rate_ms}><summary>{group.rate_ms} ms · {group.addresses.length} addresses</summary>{group.addresses.join(', ')}</details>)}</td><td><ConnectionTimings connection={connection} /></td><td>{connection.error || '—'}</td></tr>)}</tbody></table>
     {data && !data.connections.length && <p>No PLC connections are configured.</p>}
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>
+    {!!data?.workers?.length && <WorkerHealth workers={data.workers} />}
     <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setSearch(filter); setOffset(0); }}><label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label><button>Filter diagnostic tags</button></form>
     <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?search=${encodeURIComponent(search)}`}>Export diagnostics JSON</a></div>
     <p>{data?.total_tags || 0} matching logical tags. Values are omitted from this diagnostic export.</p>

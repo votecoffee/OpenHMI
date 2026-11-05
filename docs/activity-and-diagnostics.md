@@ -84,6 +84,15 @@ Expand **Timing (ms)** for the latest measurement and p50, p95 and p99 by
 route. Each metric uses up to 256 recent observations in memory and is also
 in the JSON export. A new connection instance starts a fresh window.
 
+**Runtime workers** shows the state, last successful tick, failure count and
+latest exception type for acquisition, commands, alarms, trend recording,
+historian, activity maintenance and PLC identity. The JSON export also
+includes start and failure timestamps, running time and retry delay. A worker
+reports **overdue** after five seconds in one invocation. An exception starts
+a retry delay of 250 ms, increasing to at most five seconds on repeated
+failures. Successful ticks reset that delay. PLC route and feature-specific
+status still describe their underlying data and transaction state.
+
 Tag rows show logical source/type, quality, observation timestamp, age and error.
 A tag-level read error records the failed observation time. Route failure
 invalidates the cached samples and preserves their previous timestamps and ages.

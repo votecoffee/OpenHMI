@@ -90,6 +90,8 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await page.getByRole('link', { name: 'Diagnostics', exact: true }).click();
   await noScan;
   await expect(page.getByRole('region', { name: 'Runtime diagnostics', exact: true })).toBeVisible();
+  const workers = page.getByRole('table', { name: 'Runtime workers', exact: true });
+  await expect(workers.getByRole('row').filter({ hasText: 'Historian' })).toContainText('healthy');
   await page.getByLabel('Tag filter', { exact: true }).fill('TankLevel');
   await page.getByRole('button', { name: 'Filter diagnostic tags', exact: true }).click();
   await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(1);

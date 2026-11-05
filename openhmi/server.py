@@ -18,6 +18,7 @@ from .commands import CommandService, add_command_routes, validate_commands
 from .recipe_transfers import validate_transfers
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
+from .runtime_workers import RuntimeWorkers
 from .historian import Historian
 from .history_export import CSV_COLUMNS, complete_history_csv, csv_row
 from .trend_recording import TrendRecorder, add_trend_routes
@@ -93,62 +94,31 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     monitor = AlarmMonitor(store, sample_values)
 
-    def sample_alarms():
-        try:
-            monitor.sample()
-        except Exception:
-            logging.exception("Alarm monitor sampling failed")
-            monitor.error = "Alarm sampling unavailable"
-
-    async def alarm_loop():
-        while True:
-            await asyncio.sleep(0.25)
-            sample_alarms()
-
-    async def acquisition_loop():
-        while not stopping.is_set():
+    def sample_alarms(*, propagate=False):
+        with monitor.lock:
             try:
-                await asyncio.to_thread(application.driver.poll, wait=False)
+                monitor.sample()
             except Exception:
-                logging.exception('PLC acquisition scheduling failed')
-            await asyncio.sleep(0.05)
-
-    async def driver_loop():
-        while not stopping.is_set():
-            try:
-                await asyncio.to_thread(commands.poll)
-                await asyncio.to_thread(trends.sample)
-                await asyncio.to_thread(historian.sample)
-                await asyncio.to_thread(activity.maintenance)
-                await asyncio.to_thread(publisher.poll)
-            except Exception:
-                logging.exception('Driver/history cycle failed')
-            await asyncio.sleep(0.05)
-
-    stopping = asyncio.Event()
+                monitor.error = "Alarm sampling unavailable"
+                if propagate:
+                    raise
+                logging.exception("Alarm monitor sampling failed")
 
     @asynccontextmanager
     async def lifespan(app):
-        stopping.clear()
-        sample_alarms()
-        task = asyncio.create_task(alarm_loop())
-        acquisition = asyncio.create_task(acquisition_loop())
-        polling = asyncio.create_task(driver_loop())
+        await asyncio.to_thread(sample_alarms)
         try:
-            yield
+            async with workers.running():
+                yield
         finally:
-            task.cancel()
-            stopping.set()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-            await acquisition
-            await polling
-            await asyncio.to_thread(trends.shutdown)
-            await asyncio.to_thread(publisher.shutdown)
-            await asyncio.to_thread(application.driver.close)
-            store.close()
+            for name, cleanup in (
+                ('trends', trends.shutdown), ('identity', publisher.shutdown),
+                ('acquisition', application.driver.close), ('project store', store.close),
+            ):
+                try:
+                    await asyncio.to_thread(cleanup)
+                except Exception:
+                    logging.exception('Runtime cleanup failed for %s', name)
 
     app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifespan)
     instance = app.state.project_instance = uuid.uuid4().hex
@@ -176,7 +146,17 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     activity = app.state.activity = ActivityJournal(store, security)
     commands = app.state.commands = CommandService(store, application.driver)
     add_command_routes(app, commands, security)
-    add_operations_routes(app, activity, security, application.driver)
+    workers = RuntimeWorkers({
+        'acquisition': (0.05, lambda: application.driver.poll(wait=False)),
+        'commands': (0.05, lambda: commands.poll()),
+        'alarms': (0.25, lambda: sample_alarms(propagate=True)),
+        'trends': (0.05, lambda: trends.sample()),
+        'historian': (0.05, lambda: historian.sample()),
+        'activity': (60, lambda: activity.maintenance(force=True)),
+        'identity': (0.05, lambda: publisher.poll()),
+    })
+    app.state.runtime_workers = workers
+    add_operations_routes(app, activity, security, application.driver, workers)
     add_security_routes(app, security)
     canvas_images = CanvasImages(store)
     add_canvas_routes(app, canvas_images, security)

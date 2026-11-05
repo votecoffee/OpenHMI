@@ -42,12 +42,12 @@ class Historian:
         wall = time.time() if wall is None else wall
         samples = self.driver.sample_snapshot(now)
         inserts = []
-        recorded = {}
+        recorded, deadlines = {}, {}
         for config in self.settings['tags']:
             tag = config['tag']
             if now < self.deadlines.get(tag, 0):
                 continue
-            self.deadlines[tag] = now + config['sample_ms'] / 1000
+            deadlines[tag] = now + config['sample_ms'] / 1000
             sample = samples.get(tag, {'value': None, 'quality': 'bad', 'timestamp': None})
             value = sample['value'] if sample['quality'] == 'good' else None
             quality = sample['quality']
@@ -72,6 +72,7 @@ class Historian:
             self.previous.update(recorded)
             if prune:
                 self.last_prune = now
+        self.deadlines.update(deadlines)
 
     def query(self, tags, start, end, limit=2000, trend_context=False):
         result = []
