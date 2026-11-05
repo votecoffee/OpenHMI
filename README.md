@@ -257,6 +257,9 @@ OpenHMI installation are separate. See [backup details](docs/runtime-and-project
 
 ### Activity and diagnostics
 
+When a PLC route fails, its cached values become unavailable to live controls
+and permits until fresh reads succeed.
+
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;
 its operation IDs also appear in API response headers. **Diagnostics** shows

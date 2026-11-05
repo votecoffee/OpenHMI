@@ -294,7 +294,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get("/api/tags")
     def tags() -> dict:
         with application.lock:
-            return {'driver': 'logix' if application.driver.connections else 'simulator', 'values': application.driver.snapshot(), 'samples': application.driver.sample_snapshot(), 'connections': application.driver.status(), 'plc_hold': application.driver.plc_hold}
+            samples = application.driver.sample_snapshot()
+            values = {name: sample['value'] for name, sample in samples.items() if sample['quality'] == 'good'}
+            return {'driver': 'logix' if application.driver.connections else 'simulator', 'values': values, 'samples': samples, 'connections': application.driver.status(), 'plc_hold': application.driver.plc_hold}
 
     @app.get("/api/catalog")
     def catalog() -> dict:

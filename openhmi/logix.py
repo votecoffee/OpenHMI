@@ -41,6 +41,7 @@ class LogixConnection:
         self.connected = False
         self.error = None
         self.retry_at, self.failures = 0, 0
+        self.failure_generation = 0
         self.metadata = {}
         self.read_calls = self.tags_read = 0
 
@@ -117,6 +118,7 @@ class LogixConnection:
 
     def failed(self, error, now):
         self.error = str(error)
+        self.failure_generation += 1
         self.failures += 1
         self.retry_at = now + min(30, 2 ** min(self.failures - 1, 5))
         self.close()
@@ -266,8 +268,15 @@ class RuntimeDriver(SimulatorDriver):
                         self.deadlines[key] = now
                 self.last_rates = grouped
             for identifier, connection in list(self.connections.items()):
-                due = [address for (conn, address), rate in grouped.items() if conn == identifier and now >= self.deadlines.get((conn, address), 0)]
-                if not due and not connection.client and now >= connection.retry_at:
+                if not connection.connected:
+                    if now < connection.retry_at:
+                        continue
+                    # Refresh current demand on reconnect, even if its old deadline is later.
+                    for key in list(self.deadlines):
+                        if key[0] == identifier:
+                            del self.deadlines[key]
+                due = [address for conn, address in grouped if conn == identifier and now >= self.deadlines.get((conn, address), 0)]
+                if not due and not connection.connected:
                     # Metadata browsing is available even before a screen leases tags.
                     try:
                         with connection.lock:
@@ -279,7 +288,8 @@ class RuntimeDriver(SimulatorDriver):
                 try:
                     results = connection.read(due, now)
                 except Exception:
-                    results = [None] * len(due)
+                    # A route failure invalidates its entire cache in sample_snapshot.
+                    continue
                 acquired = time.monotonic() if real_clock else now
                 with self.lock:
                     for address, result in zip(due, results):
@@ -291,10 +301,9 @@ class RuntimeDriver(SimulatorDriver):
                             for alias, (source, member) in self.sources.items():
                                 if source != root:
                                     continue
-                                error = connection.error if result is None else result.error
                                 try:
-                                    if error or result is None:
-                                        raise ValueError(error or 'PLC read failed')
+                                    if result is None or result.error:
+                                        raise ValueError(result.error if result is not None else 'PLC read failed')
                                     value = member_value(result.value, member) if member else result.value
                                     kind = tag['members'][member] if member else tag['type']
                                     if not type_ok(value, kind):
@@ -306,9 +315,13 @@ class RuntimeDriver(SimulatorDriver):
                                             value = float(value)
                                         if not math.isfinite(value):
                                             raise ValueError('Scaled PLC value is not finite')
-                                    self.samples[alias] = {'value': value, 'quality': 'good', 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate, 'error': None}
+                                    sample = {'value': value, 'quality': 'good', 'error': None}
                                 except (ValueError, KeyError, TypeError, IndexError) as failure:
-                                    self.samples[alias] = {'value': None, 'quality': 'bad', 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate, 'error': str(failure)}
+                                    sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
+                                self.samples[alias] = {
+                                    **sample, 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate,
+                                    'failure_generation': connection.failure_generation,
+                                }
 
     def sample_snapshot(self, now=None):
         now = time.monotonic() if now is None else now
@@ -326,10 +339,16 @@ class RuntimeDriver(SimulatorDriver):
                 if not tag['connection']:
                     continue
                 sample = deepcopy(self.samples.get(alias, {'value': None, 'quality': 'pending', 'timestamp': None, 'error': 'Waiting for PLC sample'}))
-                if sample.get('quality') == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
+                connection = self.connections.get(tag['connection'])
+                generation = sample.pop('failure_generation', 0)
+                if connection is None:
+                    sample.update(value=None, quality='bad', error='PLC acquisition is held' if self.plc_hold else 'Connection is disabled')
+                elif not connection.connected and connection.error:
+                    sample.update(value=None, quality='bad', error=connection.error)
+                elif alias in self.samples and generation != connection.failure_generation:
+                    sample.update(value=None, quality='bad', error='Waiting for a fresh PLC sample after connection loss')
+                elif sample['quality'] == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
                     sample.update(quality='stale', error='PLC sample is stale')
-                if tag['connection'] not in self.connections:
-                    sample.update(quality='bad', error='PLC acquisition is held' if self.plc_hold else 'Connection is disabled')
                 sample.pop('monotonic', None)
                 if alias in self.samples:
                     sample['age_seconds'] = max(0, now - self.samples[alias]['monotonic'])

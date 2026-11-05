@@ -26,9 +26,9 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
 
 1. **Isolate routes.** Poll each controller with independent bounded work and
    serialize reads, writes and readbacks within that route. A slow route currently
-   holds the shared driver I/O lock and can delay healthy routes. Publish known
-   route loss promptly to all its aliases, including aliases that were outside
-   the failed batch. Recover each alias only after its own fresh read succeeds.
+   holds the shared driver I/O lock and can delay healthy routes. Route loss
+   now invalidates all its aliases, including those outside the failed batch.
+   Each alias needs a fresh read before its value becomes available again.
    Keep tag-level errors distinct from connection failures.
 2. **Measure before tuning.** The current schedule includes scan duration and
    the polling loop delay. Record requested interval, p50/p95/p99 scan lateness

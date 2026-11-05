@@ -140,6 +140,48 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'bad')
         driver.close()
 
+    def test_route_loss_invalidates_cached_aliases_until_fresh_reads(self):
+        project = logix_project()
+        project['connections'].append({**project['connections'][0], 'id': 'other', 'path': 'other-offline/0'})
+        project['tags'].append({**project['tags'][1], 'name': 'OtherLevel', 'connection': 'other'})
+        project['screens'][1]['update_ms'] = 5000
+        project['screens'][1]['controls'].append({'id': 'other-level', 'kind': 'numeric', 'label': 'Other level', 'tag': 'OtherLevel'})
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.lease('slow-viewer', ['slow'], 1)
+        driver.lease('fast-viewer', ['fast'], 1)
+        driver.poll(1)
+        before = driver.sample_snapshot(1)
+        self.assertEqual(before['LevelA']['quality'], 'good')
+        connection = driver.connections['plc']
+        plc = connection.client
+        plc.fail = True
+
+        driver.poll(1.2)
+        self.assertEqual(plc.reads[-1], ('Motor',))
+        samples = driver.sample_snapshot(1.2)
+        for name in ('MotorA', 'MotorA.Running', 'MotorA.Speed', 'LevelA'):
+            self.assertEqual(samples[name]['quality'], 'bad')
+            self.assertIsNone(samples[name]['value'])
+        self.assertEqual(samples['LevelA']['timestamp'], before['LevelA']['timestamp'])
+        self.assertEqual(samples['OtherLevel']['quality'], 'good')
+
+        # Reopening for metadata after the views close cannot revive old samples.
+        driver.lease('slow-viewer', [], 1.3)
+        driver.lease('fast-viewer', [], 1.3)
+        driver.poll(2.3)
+        self.assertTrue(connection.connected)
+        self.assertEqual(connection.client.reads, [])
+        self.assertEqual(driver.sample_snapshot(2.3)['LevelA']['quality'], 'bad')
+
+        driver.lease('slow-viewer', ['slow'], 2.4)
+        connection.client.values['Level'] = 40.0
+        driver.poll(2.4)
+        self.assertIn('Level', connection.client.reads[-1])
+        self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['value'], 85.0)
+        self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['quality'], 'good')
+
     def test_chart_faceplate_tags_join_screen_subscription(self):
         project = logix_project()
         project['faceplates'] = [{'id': 'charts', 'name': 'Equipment charts', 'udt_type': 'MotorUDT',
