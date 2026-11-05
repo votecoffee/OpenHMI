@@ -239,14 +239,22 @@ function App({ initial, catalog }) {
   const screenNavigation = useRef(null);
   const clientId = useRef(crypto.randomUUID());
   const screens = useMemo(() => projectScreens(active.project), [active.project]);
-  const currentScreen = scopedScreen(active.project, screenId);
-  const invalidPopup = popups.findIndex(({ id }) => !screens.some(screen => screen.id === id && screen.popup));
+  const invalidScreen = location.pathname === '/runtime' && !screens.some(screen => screen.id === screenId && !screen.popup);
+  const currentScreen = scopedScreen(active.project, invalidScreen ? 'overview' : screenId);
+  const invalidPopup = invalidScreen && popups.length ? 0
+    : popups.findIndex(({ id }) => !screens.some(screen => screen.id === id && screen.popup));
   const visiblePopups = invalidPopup < 0 ? popups : popups.slice(0, invalidPopup);
   useLayoutEffect(() => {
-    if (invalidPopup < 0) return;
-    setPopups(visiblePopups);
+    if (!invalidScreen && invalidPopup < 0) return;
+    if (invalidScreen) {
+      setScreenId('overview');
+      const url = new URL(location.href);
+      url.searchParams.delete('screen');
+      history.replaceState(history.state, '', url);
+    }
+    if (invalidPopup >= 0) setPopups(visiblePopups);
     if (document.activeElement === document.body) {
-      const opener = popups[invalidPopup].opener;
+      const opener = invalidScreen ? null : popups[invalidPopup].opener;
       if (opener?.isConnected) opener.focus({ preventScroll: true });
       if (document.activeElement === document.body) {
         const modal = Array.from(document.querySelectorAll('dialog.hmi-popup:modal')).at(-1);
@@ -255,7 +263,7 @@ function App({ initial, catalog }) {
         fallback?.focus({ preventScroll: true });
       }
     }
-  }, [invalidPopup, popups, visiblePopups]);
+  }, [invalidScreen, invalidPopup, popups, visiblePopups]);
   const runtimeCatalog = useMemo(() => engineeringCatalog(catalog, getSettings(active.project)), [catalog, active.project]);
   const config = useMemo(() => createConfig(runtimeCatalog), [runtimeCatalog]);
   const updateRate = useRef(500);

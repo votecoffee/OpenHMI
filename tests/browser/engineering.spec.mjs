@@ -217,6 +217,23 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await expect(viewer.getByRole('button', { name: 'Equipment', exact: true })).toBeFocused();
     await viewer.reload();
     await expect(viewer.locator('[data-control="faceplate"]')).toContainText('Unit speed');
+    await saveProject(latest);
+    await expect(open).toBeVisible();
+    await Promise.all([subscribed('equipment,details'), open.press('Enter')]);
+    const withoutEquipment = structuredClone(latest);
+    withoutEquipment.screens = withoutEquipment.screens.filter(screen => screen.id !== 'equipment');
+    await Promise.all([subscribed('overview'), saveProject(withoutEquipment)]);
+    const overview = viewer.getByRole('button', { name: latest.title, exact: true });
+    await expect(viewer.getByRole('dialog')).toHaveCount(0);
+    await expect(overview).toBeFocused();
+    await expect(overview).toHaveAttribute('aria-pressed', 'true');
+    await expect(viewer).toHaveURL(/\/runtime$/);
+    await saveProject(latest);
+    await expect(viewer.getByRole('button', { name: 'Equipment', exact: true })).toBeVisible();
+    await expect(overview).toHaveAttribute('aria-pressed', 'true');
+    await viewer.goto('/runtime?screen=details&station=review#view');
+    await expect(viewer).toHaveURL(/\/runtime\?station=review#view$/);
+    await expect(overview).toHaveAttribute('aria-pressed', 'true');
     expect(errors).toEqual([]);
   } finally {
     await saveProject(original.active);
