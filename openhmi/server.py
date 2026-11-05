@@ -334,7 +334,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     def apply(request: ApplyRequest, http: Request) -> dict:
         principal = security.require(http, 'project.edit')
         identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
-        with commands.lock, monitor.lock, trends.lock:
+        with commands.lock, monitor.lock, trends.lock, historian.lock:
             def validate_apply(project):
                 old_publication = (application.driver.project or {}).get('identity_publication', {})
                 if old_publication.get('enabled') or publisher.last_config:

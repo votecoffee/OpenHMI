@@ -2,12 +2,14 @@
 
 from datetime import datetime, timezone
 import json
+from threading import RLock
 import time
 
 
 class Historian:
     def __init__(self, store, driver):
         self.store, self.driver = store, driver
+        self.lock = RLock()
         self.deadlines, self.previous = {}, {}
         self.settings = {'tags': [], 'retention_days': 30, 'max_rows': 1000000}
         self.last_prune = 0
@@ -19,15 +21,21 @@ class Historian:
             ''')
 
     def configure(self, settings):
-        self.settings = settings
-        self.deadlines.clear()
-        self.previous.clear()
+        with self.lock:
+            self.settings = settings
+            self.deadlines.clear()
+            self.previous.clear()
 
     def sample(self, now=None, wall=None):
+        with self.lock:
+            self._sample(now, wall)
+
+    def _sample(self, now, wall):
         now = time.monotonic() if now is None else now
         wall = time.time() if wall is None else wall
         samples = self.driver.sample_snapshot(now)
         inserts = []
+        recorded = {}
         for config in self.settings['tags']:
             tag = config['tag']
             if now < self.deadlines.get(tag, 0):
@@ -37,19 +45,26 @@ class Historian:
             value = sample['value'] if sample['quality'] == 'good' else None
             quality = sample['quality']
             previous = self.previous.get(tag)
-            if previous and previous[1] == quality and type(value) in (float, int) and type(previous[0]) in (float, int) and config['deadband'] > 0 and abs(value - previous[0]) < config['deadband'] and wall - previous[2] < 60:
-                continue
-            if previous and previous[1] == quality and quality != 'good' and wall - previous[2] < 60:
-                continue
+            if previous and previous[1] == quality and now - previous[2] < 60:
+                if quality != 'good':
+                    continue
+                if config['deadband'] > 0 and type(value) in (float, int) and type(previous[0]) in (float, int):
+                    if abs(value - previous[0]) < config['deadband']:
+                        continue
+                elif config.get('mode') == 'change' and value == previous[0]:
+                    continue
             inserts.append((tag, wall, json.dumps(value, allow_nan=False) if value is not None else None, quality, sample.get('timestamp')))
-            self.previous[tag] = (value, quality, wall)
-        if inserts or now - self.last_prune >= 60:
+            recorded[tag] = (value, quality, now)
+        prune = now - self.last_prune >= 60
+        if inserts or prune:
             with self.store.transaction() as db:
                 db.executemany('INSERT INTO tag_history(tag,timestamp,value,quality,source_timestamp) VALUES(?,?,?,?,?)', inserts)
                 db.execute('DELETE FROM tag_history WHERE id <= (SELECT COALESCE(MAX(id),0)-? FROM tag_history)', (self.settings['max_rows'],))
-                if now - self.last_prune >= 60:
+                if prune:
                     db.execute('DELETE FROM tag_history WHERE timestamp < ?', (wall - self.settings['retention_days'] * 86400,))
-                    self.last_prune = now
+            self.previous.update(recorded)
+            if prune:
+                self.last_prune = now
 
     def query(self, tags, start, end, limit=2000):
         result = []

@@ -72,8 +72,12 @@ handshake, pulse lifecycle or machine interlock; those remain PLC/application wo
 
 History records logical tag values, quality, acquisition time and record time in
 the project SQLite database. Configure sampling, numeric deadband, retention days
-and a maximum row count. Quality changes are always retained; unchanged deadband
-values receive at least a one-minute heartbeat. The query API bounds result size
+and a maximum row count. **Periodic** is the default logging mode. **On change**
+records the first sample, changes in value or quality, and a heartbeat on the
+first due sample after 60 seconds without a record. Numeric deadband is measured
+from the last recorded value. Both modes use the configured sample interval, so
+changes between samples can be missed. Use **Periodic** with zero deadband for
+regular points in short trend windows. The query API bounds result size
 and reports truncation. In **History**, select up to 12 configured tags under
 **Export recorded data**, choose the range and optionally set a local end time.
 The CSV includes recorded values, quality and UTC timestamps. The History panel

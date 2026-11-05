@@ -164,7 +164,13 @@ export function EngineeringSettings({ tab, settings, onChange, editScope, catalo
   if (tab === 'history') return <section className="engineering" aria-label="Historian settings"><h2>SQL tag history</h2>
     <label>Retention days<input type="number" min="1" max="3650" value={settings.historian.retention_days} onChange={event => onChange({ ...settings, historian: { ...settings.historian, retention_days: Number(event.target.value) } })} /></label>
     <label>Maximum history rows<input type="number" min="1000" max="10000000" value={settings.historian.max_rows} onChange={event => onChange({ ...settings, historian: { ...settings.historian, max_rows: Number(event.target.value) } })} /></label>
-    <table><thead><tr><th>Tag</th><th>Sample ms</th><th>Deadband</th><th /></tr></thead><tbody>{settings.historian.tags.map((item, i) => <tr key={item.tag}><td>{item.tag}</td><td>{item.sample_ms}</td><td>{item.deadband}</td><td><button onClick={() => onChange({ ...settings, historian: { ...settings.historian, tags: settings.historian.tags.filter((_, index) => index !== i) } })}>Remove {item.tag}</button></td></tr>)}</tbody></table>
+    <p>On change skips repeated values and records a heartbeat at the first sample due after 60 seconds.</p>
+    <table><thead><tr><th>Tag</th><th>Sample ms</th><th>Deadband</th><th>Logging mode</th><th /></tr></thead><tbody>{settings.historian.tags.map((item, i) => <tr key={item.tag}><td>{item.tag}</td><td>{item.sample_ms}</td><td>{item.deadband}</td>
+      <td><select aria-label={item.tag + ' logging mode'} value={item.mode ?? 'periodic'} onChange={event => onChange({
+        ...settings, historian: { ...settings.historian, tags: settings.historian.tags.map((tag, index) =>
+          index === i ? { ...tag, mode: event.target.value } : tag) },
+      })}><option value="periodic">Periodic</option><option value="change">On change</option></select></td>
+      <td><button onClick={() => onChange({ ...settings, historian: { ...settings.historian, tags: settings.historian.tags.filter((_, index) => index !== i) } })}>Remove {item.tag}</button></td></tr>)}</tbody></table>
     <label>History tag<input value={historyTag} onChange={event => setHistoryTag(event.target.value)} /></label><label>Sample interval (ms)<input type="number" min="100" value={sample} onChange={event => setSample(Number(event.target.value))} /></label><label>Deadband<input type="number" min="0" step="any" value={deadband} onChange={event => setDeadband(Number(event.target.value))} /></label>
     <button onClick={() => { if (historyTag && !settings.historian.tags.some(item => item.tag === historyTag)) onChange({ ...settings, historian: { ...settings.historian, tags: [...settings.historian.tags, { tag: historyTag, sample_ms: sample, deadband }] } }); }}>Add history tag</button>
     <HistoryExport tags={settings.historian.tags} projectInstance={projectInstance} />

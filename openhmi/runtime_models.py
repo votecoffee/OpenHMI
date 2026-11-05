@@ -69,6 +69,7 @@ class HistoryTag(Model):
     tag: str = Field(min_length=1, max_length=200)
     sample_ms: int = Field(default=1000, ge=100, le=3600000)
     deadband: float = Field(default=0.0, ge=0, allow_inf_nan=False)
+    mode: Literal['periodic', 'change'] = 'periodic'
 
 
 class HistorianSettings(Model):

@@ -8,6 +8,7 @@ import unittest
 from openhmi.logix import RuntimeDriver
 from openhmi.projects import Project, ProjectStore, default_project
 from openhmi.historian import Historian
+from openhmi.runtime_models import HistorianSettings
 from openhmi.server import create_app
 from fastapi.testclient import TestClient
 
@@ -204,6 +205,48 @@ class LogixHistoryTests(unittest.TestCase):
             self.assertEqual(len(rows), 20001)
             self.assertEqual({row['value'] for row in rows if row['tag'] == 'TankLevel'}, {'-2.5'})
             self.assertEqual(rows[-1]['value'], "'=1+1")
+
+    def test_on_change_logs_transitions_deadband_and_heartbeat(self):
+        store = ProjectStore()
+        self.addCleanup(store.close)
+        values = {
+            'Run': {'value': False, 'quality': 'good'},
+            'Message': {'value': 'Ready', 'quality': 'good'},
+            'Speed': {'value': 10.0, 'quality': 'good'},
+            'Legacy': {'value': True, 'quality': 'good'},
+        }
+        history = Historian(store, SimpleNamespace(sample_snapshot=lambda now: values))
+        settings = HistorianSettings.model_validate({'tags': [
+            {'tag': 'Run', 'mode': 'change'},
+            {'tag': 'Message', 'mode': 'change'},
+            {'tag': 'Speed', 'mode': 'change', 'deadband': 1.0},
+            {'tag': 'Legacy'},
+        ]})
+        self.assertEqual(settings.tags[-1].mode, 'periodic')
+        history.configure(settings.model_dump())
+        history.sample(1, 101)
+        values['Speed']['value'] = 10.5
+        history.sample(2, 102)
+        values['Speed']['value'] = 11.0
+        values['Run']['value'] = True
+        values['Message']['value'] = 'Running'
+        history.sample(3, 103)
+        values['Run']['quality'] = 'bad'
+        history.sample(4, 104)
+        history.sample(5, 105)
+        values['Run']['quality'] = 'good'
+        history.sample(6, 106)
+        history.sample(66, 166)
+
+        def recorded(tag):
+            return [(row['epoch'], row['value'], row['quality']) for row in history.query([tag], 100, 170)['samples']]
+
+        self.assertEqual(recorded('Run'), [
+            (101, False, 'good'), (103, True, 'good'), (104, None, 'bad'), (106, True, 'good'), (166, True, 'good'),
+        ])
+        self.assertEqual(recorded('Message'), [(101, 'Ready', 'good'), (103, 'Running', 'good'), (166, 'Running', 'good')])
+        self.assertEqual(recorded('Speed'), [(101, 10.0, 'good'), (103, 11.0, 'good'), (166, 11.0, 'good')])
+        self.assertEqual(len(recorded('Legacy')), 7)
 
     def test_faceplate_relative_members_and_no_code_actions_server_gates(self):
         app = create_app()

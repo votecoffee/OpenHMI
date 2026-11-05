@@ -34,6 +34,13 @@ test('History panel exports recorded tags without a trend control', async ({ pag
     expect(csv).toContain('TankLevel,');
     expect(csv).not.toContain('MotorRunning,');
     await expect(panel.getByRole('status')).toHaveText('CSV download started.');
+    const logging = page.getByRole('combobox', { name: 'MotorRunning logging mode', exact: true });
+    await expect(logging).toHaveValue('periodic');
+    await logging.selectOption('change');
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    const state = await (await page.request.get('/api/project')).json();
+    expect(state.active.historian.tags.find(item => item.tag === 'MotorRunning').mode).toBe('change');
   } finally {
     await save(original.active, true);
     await save(original.draft, false);
