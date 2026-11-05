@@ -57,7 +57,9 @@ The original overview remains compatible with existing saved projects. **Screens
 adds named screens and popups with independent update rates. Runtime navigation
 switches screens; button action types can navigate/open/close popups. Keyboard
 focus stays within the top popup. Press Escape to close it and return focus to
-the control that opened it. **Faceplates**
+the control that opened it. If a live apply removes an open popup, the runtime
+closes that popup and any popups opened from it, then updates its tag subscriptions.
+**Faceplates**
 defines a UDT type/member contract. Design its controls using `$.Member` tags,
 select an active UDT instance for live preview, then bind screen instances to
 compatible root tags. Nested faceplates are currently rejected. Equipment-specific

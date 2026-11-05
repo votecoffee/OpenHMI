@@ -196,6 +196,25 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await open.press('Enter');
     await details.getByRole('button', { name: 'Close popup', exact: true }).click();
     await expect(open).toBeFocused();
+    await open.press('Enter');
+    await Promise.all([subscribed('equipment,details,more'), more.press('Enter')]);
+    const withoutNested = structuredClone(latest);
+    withoutNested.screens = withoutNested.screens.filter(screen => screen.id !== 'more');
+    withoutNested.screens.find(screen => screen.id === 'details').controls =
+      withoutNested.screens.find(screen => screen.id === 'details').controls.filter(control => control.id !== 'more');
+    await Promise.all([subscribed('equipment,details'), saveProject(withoutNested)]);
+    await expect(nested).toHaveCount(0);
+    await expect(details.getByRole('button', { name: 'Close popup', exact: true })).toBeFocused();
+    await saveProject(latest);
+    await expect(more).toBeVisible();
+    await expect(nested).toHaveCount(0);
+    await Promise.all([subscribed('equipment,details,more'), more.press('Enter')]);
+    const withoutParent = structuredClone(latest);
+    withoutParent.screens = withoutParent.screens.filter(screen => screen.id !== 'details');
+    withoutParent.screens[0].controls = withoutParent.screens[0].controls.filter(control => control.id !== 'detailsButton');
+    await Promise.all([subscribed('equipment'), saveProject(withoutParent)]);
+    await expect(viewer.getByRole('dialog')).toHaveCount(0);
+    await expect(viewer.getByRole('button', { name: 'Equipment', exact: true })).toBeFocused();
     await viewer.reload();
     await expect(viewer.locator('[data-control="faceplate"]')).toContainText('Unit speed');
     expect(errors).toEqual([]);

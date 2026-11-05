@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Puck, Render } from '@puckeditor/core';
 import '@puckeditor/core/no-external.css';
@@ -236,12 +236,30 @@ function App({ initial, catalog }) {
   const [screenId, setScreenId] = useState(new URLSearchParams(location.search).get('screen') || 'overview');
   const [editorSubscription, setEditorSubscription] = useState({ screen: 'overview', root: '' });
   const [popups, setPopups] = useState([]);
+  const screenNavigation = useRef(null);
   const clientId = useRef(crypto.randomUUID());
+  const screens = useMemo(() => projectScreens(active.project), [active.project]);
   const currentScreen = scopedScreen(active.project, screenId);
+  const invalidPopup = popups.findIndex(({ id }) => !screens.some(screen => screen.id === id && screen.popup));
+  const visiblePopups = invalidPopup < 0 ? popups : popups.slice(0, invalidPopup);
+  useLayoutEffect(() => {
+    if (invalidPopup < 0) return;
+    setPopups(visiblePopups);
+    if (document.activeElement === document.body) {
+      const opener = popups[invalidPopup].opener;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      if (document.activeElement === document.body) {
+        const modal = Array.from(document.querySelectorAll('dialog.hmi-popup:modal')).at(-1);
+        const fallback = modal?.querySelector('header button')
+          ?? screenNavigation.current?.querySelector('[aria-pressed="true"]');
+        fallback?.focus({ preventScroll: true });
+      }
+    }
+  }, [invalidPopup, popups, visiblePopups]);
   const runtimeCatalog = useMemo(() => engineeringCatalog(catalog, getSettings(active.project)), [catalog, active.project]);
   const config = useMemo(() => createConfig(runtimeCatalog), [runtimeCatalog]);
   const updateRate = useRef(500);
-  updateRate.current = runtime ? Math.min(currentScreen.update_ms || 500, ...popups.map(({ id }) => projectScreens(active.project).find(item => item.id === id)?.update_ms || 500)) : 500;
+  updateRate.current = runtime ? Math.min(currentScreen.update_ms || 500, ...visiblePopups.map(({ id }) => screens.find(item => item.id === id)?.update_ms || 500)) : 500;
   const [screenConnected, setScreenConnected] = useState(true);
   const [session, setSession] = useState(null);
   const [identityAvailable, setIdentityAvailable] = useState(true);
@@ -261,7 +279,7 @@ function App({ initial, catalog }) {
     window.addEventListener('openhmi-editor-scope', editor);
     return () => { window.removeEventListener('openhmi-navigate', navigate); window.removeEventListener('openhmi-editor-scope', editor); };
   }, []);
-  const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...popups.map(({ id }) => id)].join(',') : '' : editorSubscription.screen;
+  const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...visiblePopups.map(({ id }) => id)].join(',') : '' : editorSubscription.screen;
   useEffect(() => {
     let stopped = false, timer;
     async function heartbeat() { try { await api('/api/subscriptions', json('POST', { client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [], preview_root: runtime ? '' : editorSubscription.root })); } catch {} if (!stopped) timer = setTimeout(heartbeat, 5000); }
@@ -309,9 +327,9 @@ function App({ initial, catalog }) {
     {runtime ? <main className={currentScreen.layout && location.pathname === '/runtime' ? 'runtime canvas-runtime' : 'runtime'}><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
       <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/commands">Commands</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/revisions">Revisions</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
       {location.pathname === '/revisions' ? <ProjectHistory /> : location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
-        <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
+        <nav ref={screenNavigation} className="screen-navigation" aria-label="HMI screens">{screens.filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
         <ScreenView screen={currentScreen} config={config} />
-        {popups.map(({ id, opener }) => <ScreenPopup key={id} screen={scopedScreen(active.project, id)} config={config}
+        {visiblePopups.map(({ id, opener }) => <ScreenPopup key={id} screen={scopedScreen(active.project, id)} config={config}
           opener={opener} close={() => setPopups(previous => previous.filter(item => item.id !== id))} />)}
       </>}</main> : editorStarted.current ? <MemoBuilder initial={initial} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
   </Live.Provider></SecurityContext.Provider>;
