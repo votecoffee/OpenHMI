@@ -119,6 +119,8 @@ Run the packaged-process drill against the extracted folder:
 The drill requires a new work folder and retains its report, logs and synthetic
 backup. It verifies manifest hashes, HTTP assets, second-runtime rejection, forced
 restart and backup/restore while removing Python/Node from the child process PATH.
+The backup drill checks that a locked canvas image and a saved trend CSV survive
+restoration.
 It kills only the exact subprocess handles it starts. This checks a packaged
 process on the build machine, not a clean machine. Test Ctrl+C shutdown separately
 in a console, along with the target identity/controller/operator environment.

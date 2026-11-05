@@ -1,7 +1,9 @@
 """Bounded offline smoke drill against an extracted package; no real PLC routes."""
 import argparse
+import csv
 import hashlib
 import http.cookiejar
+from io import BytesIO, StringIO
 import json
 import os
 from pathlib import Path
@@ -10,6 +12,8 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+
+from PIL import Image
 
 
 def main():
@@ -38,8 +42,10 @@ def main():
     base = f'http://127.0.0.1:{port}'
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     def request(path, data=None, method=None):
-        body = json.dumps(data).encode() if data is not None else None
-        with opener.open(urllib.request.Request(base + path, body, {'Content-Type': 'application/json'}, method=method), timeout=5) as response:
+        raw = isinstance(data, bytes)
+        body = data if raw else json.dumps(data).encode() if data is not None else None
+        content_type = 'image/png' if raw else 'application/json'
+        with opener.open(urllib.request.Request(base + path, body, {'Content-Type': content_type}, method=method), timeout=5) as response:
             return response.read()
     def start(log):
         process = subprocess.Popen([str(executable), '--project', str(project), '--port', str(port)], cwd=work, env=env,
@@ -62,6 +68,24 @@ def main():
             state['draft']['title'] = 'Packaged restart fixture'
             state['draft']['tags'] += [{'name': 'PackageMaximum', 'type': 'number', 'initial': 50.0}, {'name': 'PackageUser', 'type': 'string', 'initial': '', 'writable': True}, {'name': 'PackagePrivileges', 'type': 'integer', 'initial': 0, 'writable': True}]
             state['draft']['controls'] += [{'id': 'package_number', 'kind': 'input', 'label': 'Packaged number', 'tag': 'TankLevel', 'minimum': 10.0, 'maximum_tag': 'PackageMaximum'}, {'id': 'package_text', 'kind': 'text_input', 'label': 'Packaged text', 'tag': 'OperatorText', 'max_length': 4}]
+            state['draft']['controls'].append({
+                'id': 'package_trend', 'kind': 'trend', 'label': 'Packaged trend',
+                'tags': ['TankLevel', 'MotorRunning'], 'seconds': 10,
+                'recording': {'sample_ms': 100, 'max_samples': 30},
+            })
+            image = BytesIO()
+            Image.new('RGB', (40, 30), '#789abc').save(image, format='PNG')
+            image_id = json.loads(request('/api/canvas-images', image.getvalue(), 'POST'))['id']
+            state['draft']['layout'] = {
+                'boxes': {
+                    control['id']: {'x': (index % 4) * 160, 'y': (index // 4) * 100, 'width': 152, 'height': 90}
+                    for index, control in enumerate(state['draft']['controls'])
+                },
+                'decorations': {
+                    'machine': {'kind': 'image', 'label': 'Machine', 'image': image_id,
+                                'locked': True, 'x': 0, 'y': 0, 'width': 640, 'height': 400},
+                },
+            }
             state['draft']['identity_publication'] = {'enabled': True, 'username_tag': 'PackageUser', 'privileges_tag': 'PackagePrivileges', 'bits': [{'bit': 31, 'source': 'permission', 'name': 'security.manage'}]}
             alarm_button = next(control for control in state['draft']['controls'] if control['kind'] == 'button')
             alarm_button['action'] = 'toggle_alarm'
@@ -75,6 +99,22 @@ def main():
             except urllib.error.HTTPError as error:
                 assert error.code == 422
             report['bounded_numeric_and_text_edits'] = True
+            capture = json.loads(request('/api/trends/package_trend', {'action': 'start'}, 'POST'))
+            capture_path = f'/api/trend-captures/{capture["id"]}'
+            for _ in range(50):
+                if json.loads(request(capture_path))['samples']:
+                    break
+                time.sleep(.1)
+            else:
+                raise AssertionError('Packaged trend recorded no samples')
+            request('/api/trends/package_trend', {'action': 'stop', 'capture_id': capture['id']}, 'POST')
+            trend_csv = request(capture_path + '/csv')
+            values = {(row['tag'], row['value']) for row in csv.DictReader(StringIO(trend_csv.decode()))}
+            assert ('TankLevel', '25.0') in values
+            assert values & {('MotorRunning', 'true'), ('MotorRunning', 'false')}
+            asset_path = '/api/canvas-images/' + image_id
+            canvas_image = request(asset_path)
+            assert canvas_image[:4] == b'RIFF' and canvas_image[8:12] == b'WEBP'
             request(f'/api/controls/{alarm_button["id"]}/activate', {}, 'POST')
             alarm = json.loads(request('/api/alarms/occurrences'))['items'][0]
             shelved = json.loads(request(f'/api/alarms/occurrences/{alarm["occurrence_id"]}/shelve', {'duration_seconds': 3600, 'reason': 'Packaged shelf fixture'}, 'POST'))
@@ -125,7 +165,13 @@ def main():
             with opener.open(urllib.request.Request(target, backup, method='POST'), timeout=10) as response:
                 assert response.status == 200
             request('/api/workspace/open', {'file': 'Restored.openhmi.sqlite3'}, 'POST')
-            assert json.loads(request('/api/project'))['active']['title'] == 'Packaged restart fixture'
+            restored = json.loads(request('/api/project'))['active']
+            assert restored['title'] == 'Packaged restart fixture'
+            machine = restored['layout']['decorations']['machine']
+            assert machine['locked'] is True and machine['image'] == image_id
+            assert request(asset_path) == canvas_image
+            assert request(capture_path + '/csv') == trend_csv
+            report['canvas_image_and_trend_csv_preserved_by_backup'] = True
             assert json.loads(request('/api/tags'))['plc_hold'] is True
             shelf = json.loads(request('/api/alarms/shelves'))['items'][0]
             assert shelf['expires_at'] == shelved['expires_at']
