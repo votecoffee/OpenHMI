@@ -1,4 +1,5 @@
 import React from 'react';
+import { tagValue, Quality } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import './charts.css';
 
@@ -76,20 +77,19 @@ function RadarPlot({ rows, label }) {
   </svg>;
 }
 
-export function ProcessChart({ id, label, series = [], minimum, maximum, unit, radar, live, Quality, puck }) {
+export function ProcessChart({ id, label, series = [], minimum, maximum, unit, radar, live, puck }) {
   const { text, ui, language } = useLocalization();
   const title = text(`control.${id}.label`, label);
   const scaleOK = radar || validRange(minimum, maximum);
   const rows = series.map((item, index) => {
     const low = radar ? item.minimum : minimum, high = radar ? item.maximum : maximum;
-    const value = live.values[item.tag];
-    const valid = live.connected && Number.isFinite(value);
+    const { value, valid, problem } = tagValue(live, item.tag, 'number');
     const configured = validRange(low, high);
     const prefix = `control.${id}.series.${index}`;
     return {
       ...item, label: text(prefix + '.label', item.label || item.tag),
       unit: radar ? text(prefix + '.unit', item.unit) : text(`control.${id}.unit`, unit),
-      low, high, value, valid, configured, outside: valid && configured && (value < low || value > high),
+      low, high, value, valid, problem, configured, outside: valid && configured && (value < low || value > high),
       position: valid && configured ? percentage(value, low, high) : 0,
     };
   });
@@ -98,9 +98,9 @@ export function ProcessChart({ id, label, series = [], minimum, maximum, unit, r
     {rows.map((row, index) => <li key={index} data-chart-tag={row.tag}>
       <div className="chart-row"><span>{radar && `${index + 1}. `}{row.label}</span>
         {row.valid ? <strong className="chart-value">{readout(row.value, row.decimals, language.code)} {row.unit}</strong>
-          : <Quality text={live.connected ? 'BAD DATA' : 'COMM LOSS'} />}
+          : <Quality problem={row.problem} tag={row.tag} />}
       </div>
-      {radar ? <small>{row.configured ? `${row.low} – ${row.high} ${row.unit || ''}` : <Quality text="BAD RANGE" />}</small>
+      {radar ? <small>{row.configured ? `${row.low} – ${row.high} ${row.unit || ''}` : <Quality problem="badRange" />}</small>
         : scaleOK && <div className={row.valid ? 'bar-track' : 'bar-track chart-invalid'} aria-hidden="true" dir="ltr">
           {row.valid && <span className="bar-fill" data-bar-fill="" style={{
             left: Math.min(zero, row.position) + '%', width: Math.abs(zero - row.position) + '%',
@@ -113,7 +113,7 @@ export function ProcessChart({ id, label, series = [], minimum, maximum, unit, r
   </ul>;
   return <article className="hmi-control hmi-chart" data-control={radar ? 'radar' : 'bar'}>
     <span className="hmi-label">{title}</span>
-    {!scaleOK && <Quality text="BAD RANGE" />}
+    {!scaleOK && <Quality problem="badRange" />}
     {radar ? <div className="radar-content"><RadarPlot rows={rows} label={title} />{legend}</div> : legend}
     {!radar && scaleOK && <div className="analog-scale" dir="ltr">
       <span>{minimum}</span><span>{text(`control.${id}.unit`, unit)}</span><span>{maximum}</span>

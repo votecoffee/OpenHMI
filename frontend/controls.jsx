@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Live, useValue, tagValue, Quality, ConnectionStatus } from './live-quality.jsx';
 import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
@@ -10,21 +11,7 @@ import { Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
 import { ChartFields, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
 
-export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
-
-function useValue(tag, type) {
-  const live = useContext(Live);
-  const value = live.values[tag];
-  const valid = live.connected && typeof value === type && (type !== 'number' || Number.isFinite(value));
-  return { value, valid, problem: live.connected ? 'BAD DATA' : 'COMM LOSS' };
-}
-
-function Quality({ text }) {
-  const { ui } = useLocalization();
-  const key = { 'BAD DATA': 'badData', 'COMM LOSS': 'commLoss', 'BAD RANGE': 'badRange' }[text];
-  return <span className="hmi-quality"><span aria-hidden="true">×</span> {key ? ui(key) : text}</span>;
-}
 
 function TagReference({ tag, puck }) {
   return puck?.isEditing ? <span className="hmi-source">{tag}</span> : null;
@@ -51,7 +38,7 @@ function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   catch { formatted = valid ? value.toFixed(decimals) : ''; }
   return <article className="hmi-control hmi-numeric" data-control="numeric">
     <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
-    {valid ? <strong className="hmi-value">{formatted} <small>{text(`control.${id}.unit`, unit)}</small></strong> : <Quality text={problem} />}
+    {valid ? <strong className="hmi-value">{formatted} <small>{text(`control.${id}.unit`, unit)}</small></strong> : <Quality problem={problem} tag={tag} />}
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
@@ -61,7 +48,7 @@ function TextDisplay({ id, label, tag, puck }) {
   const { text } = useLocalization();
   return <article className="hmi-control" data-control="text">
     <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
-    {valid ? <strong className="hmi-text-value">{value}</strong> : <Quality text={problem} />}
+    {valid ? <strong className="hmi-text-value">{value}</strong> : <Quality problem={problem} tag={tag} />}
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
@@ -73,7 +60,7 @@ function Indicator({ id, label, tag, on_text = 'ON', off_text = 'OFF', puck }) {
     <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
     {valid ? <strong className={`hmi-state ${value ? 'is-on' : ''}`}>
       <span className="binary-symbol" aria-hidden="true" />{value ? text(`control.${id}.on_text`, on_text) : text(`control.${id}.off_text`, off_text)}
-    </strong> : <Quality text={problem} />}
+    </strong> : <Quality problem={problem} tag={tag} />}
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
@@ -90,11 +77,11 @@ function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_
     && Number.isFinite(maximum - minimum) && minimum <= normal_low && normal_low < normal_high && normal_high <= maximum;
   const position = number => Math.max(0, Math.min(100, (number - minimum) / (maximum - minimum) * 100));
   const outside = valid && (value < minimum || value > maximum);
-  const graphicLabel = valid ? `${label}: ${value} ${unit}, scale ${minimum} to ${maximum}, normal ${normal_low} to ${normal_high}${outside ? ', out of scale' : ''}` : `${label}: ${problem}`;
+  const graphicLabel = valid ? `${label}: ${value} ${unit}, scale ${minimum} to ${maximum}, normal ${normal_low} to ${normal_high}${outside ? ', out of scale' : ''}` : `${label}: ${ui(problem)}`;
   return <article className="hmi-control hmi-analog" data-control={tank ? 'tank' : 'analog'}>
     <div className="analog-heading"><span className="hmi-label">{label}</span>
-      {valid ? <strong className="hmi-value">{formatted} <small>{unit}</small></strong> : <Quality text={problem} />}</div>
-    {!configured ? <Quality text="BAD RANGE" /> : <>
+      {valid ? <strong className="hmi-value">{formatted} <small>{unit}</small></strong> : <Quality problem={problem} tag={tag} />}</div>
+    {!configured ? <Quality problem="badRange" /> : <>
       {tank ? <TankGraphic label={graphicLabel} position={valid ? position(value) : 0} valid={valid} minimum={minimum} maximum={maximum}
         normalLow={position(normal_low)} normalHigh={position(normal_high)} />
         : <div className={`analog-track ${!valid ? 'invalid' : ''}`} role="img" aria-label={graphicLabel}>
@@ -113,18 +100,25 @@ function AlarmIndicator({ id, label, tag, priority, puck }) {
   const { text, ui } = useLocalization();
   return <article className={`hmi-control hmi-alarm ${valid && value ? 'alarm-active' : ''}`} data-control="alarm">
     <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
-    {!valid ? <Quality text={problem} /> : value ? <strong className="alarm-state"><PrioritySymbol priority={priority} />P{priority} {ui('active')}</strong>
+    {!valid ? <Quality problem={problem} tag={tag} /> : value ? <strong className="alarm-state"><PrioritySymbol priority={priority} />P{priority} {ui('active')}</strong>
       : <span className="alarm-inactive">{ui('inactive')}</span>}
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
 
-function ActionButton({ id, label, action, mode = 'python', command = '', security_groups = [], puck, enabled_tag = '' }) {
+function ActionButton({ id, label, action, mode = 'python', command = '', target = '', security_groups = [], puck, enabled_tag = '' }) {
   const live = useContext(Live);
   const { session } = useContext(SecurityContext) || {};
   const definition = mode === 'command' ? live.project?.commands?.find(item => item.id === command) : null;
   const permitted = allowed(session, 'runtime.operate', security_groups) && (mode !== 'command' || !!definition && allowed(session, 'runtime.operate', definition.security_groups));
   const { text, ui } = useLocalization();
+  const targetTag = mode === 'command' ? definition?.root_tag : ['set', 'toggle'].includes(mode) ? target : '';
+  const permitTag = definition?.permit_member ? definition.root_tag + '.' + definition.permit_member : '';
+  const enabled = enabled_tag ? tagValue(live, enabled_tag, 'boolean') : null;
+  const permit = permitTag ? tagValue(live, permitTag, 'boolean') : null;
+  const targetState = targetTag ? tagValue(live, targetTag) : null;
+  const unavailable = !live.connected ? 'commLoss' : enabled?.problem || targetState?.problem || permit?.problem;
+  const unavailableTag = enabled?.problem ? enabled_tag : targetState?.problem ? targetTag : permitTag;
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [failed, setFailed] = useState(false);
@@ -159,11 +153,12 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
     finally { setBusy(false); }
   }
   return <article className="hmi-control hmi-command security-protected" data-control="button">
-    <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy || !permitted || !!enabled_tag && live.values[enabled_tag] !== true || !!definition?.permit_member && live.values[`${definition.root_tag}.${definition.permit_member}`] !== true || mode === 'command' && !!transaction && ['prepared', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
+    <button className="hmi-action" disabled={puck?.isEditing || !!unavailable || busy || !permitted || !!enabled && enabled.value !== true || !!permit && permit.value !== true || mode === 'command' && !!transaction && ['prepared', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
       {busy ? ui('working') : text(`control.${id}.label`, label)}
     </button><span className={failed ? 'hmi-quality' : 'command-feedback'}>
-      {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : !permitted ? 'Sign in with an authorized HMI group' : '')}
+      {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
+    {unavailable && !puck?.isEditing && <Quality problem={unavailable} tag={unavailableTag} />}
     {!permitted && !puck?.isEditing && <SecurityLock label={label} permission="runtime.operate" groups={security_groups} additionalGroups={definition?.security_groups || []} />}
     {mode === 'command' && permitted && !puck?.isEditing && transaction && <>
       <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>
@@ -204,7 +199,7 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
           : monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms')}
           {!!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}
       </div><h1>{text(screen_id === 'overview' ? 'screen.title' : `screen.${screen_id}.title`, title)}</h1></div>
-      <div className="station-mode"><LanguageSelector /><strong>{plcConfigured ? 'PLC' : ui('simulation')}</strong><span>{live.connected ? ui('dataConnected') : ui('commLoss')}</span></div>
+      <div className="station-mode"><LanguageSelector /><strong>{plcConfigured ? 'PLC' : ui('simulation')}</strong><ConnectionStatus /></div>
     </header>
     {canvas || <div className="station-workspace"><div className="hmi-grid" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>{children}</div>
       <aside className="station-sidebar" aria-label="State legend"><strong>{ui('state')}</strong><span><i className="binary-symbol legend-on" /> {ui('on')}</span>
@@ -216,9 +211,10 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
 
 function Conditional({ children, visible_tag, enabled_tag, color_tag, active_color, puck }) {
   const live = useContext(Live);
-  if (!puck?.isEditing && visible_tag && live.values[visible_tag] !== true) return null;
-  const disabled = !puck?.isEditing && enabled_tag && live.values[enabled_tag] !== true;
-  return <div className="binding-frame" style={color_tag && live.values[color_tag] === true ? { '--hmi-live': active_color } : {}}>
+  const isTrue = tag => { const state = tagValue(live, tag, 'boolean'); return state.valid && state.value; };
+  if (!puck?.isEditing && visible_tag && !isTrue(visible_tag)) return null;
+  const disabled = !puck?.isEditing && enabled_tag && !isTrue(enabled_tag);
+  return <div className="binding-frame" style={color_tag && isTrue(color_tag) ? { '--hmi-live': active_color } : {}}>
     <fieldset className="binding-contents" disabled={!!disabled}>{children}</fieldset></div>;
 }
 
@@ -229,7 +225,7 @@ function LiveTrend(props) {
 
 function LiveChart(props) {
   const live = useContext(Live);
-  return <ProcessChart {...props} live={live} Quality={Quality} />;
+  return <ProcessChart {...props} live={live} />;
 }
 
 export function createConfig(catalog) {

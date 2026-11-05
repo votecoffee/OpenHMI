@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { Live, PrioritySymbol } from './controls.jsx';
+import { PrioritySymbol } from './controls.jsx';
+import { Live } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';

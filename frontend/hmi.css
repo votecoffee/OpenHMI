@@ -27,6 +27,10 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .station-identity > strong { color: #333; font-size: 19.10px; }
 .station-mode { text-align: right; }
 .station-mode strong { font-size: 11.46px; }
+.route-status { position: relative; }
+.route-status > summary { cursor: pointer; }
+.route-status-list { position: absolute; z-index: 5; inset-inline-end: 0; top: 100%; width: max-content; max-width: min(25rem, 90vw); max-height: 50vh; overflow: auto; padding: 8px 12px; background: #eee; color: #222; border: 1px solid #777; }
+.route-status-list ul { margin: 5px 0 0; padding-inline-start: 18px; }
 .station-title { min-width: 0; }
 .station-title h1 { font: bold 18.14px "OpenHMI Noto", Arial, sans-serif; text-transform: uppercase; text-align: center; letter-spacing: 0; margin: 5px 0 0; overflow-wrap: anywhere; }
 .screen-alarm-banner { min-height: 26px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px; background: #d4d4d4; color: #333; font-size: 10.50px; }

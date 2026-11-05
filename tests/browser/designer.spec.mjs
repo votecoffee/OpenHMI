@@ -43,7 +43,7 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
   await expect(page.locator('[data-control]')).toHaveCount(6);
   await expect(viewer.locator('[data-control]')).toHaveCount(5);
   await page.route('**/api/tags', route => route.abort());
-  await expect(page.getByText('Simulator disconnected', { exact: true })).toBeVisible();
+  await expect(page.locator('.app-header .connection')).toHaveText('Simulator disconnected');
   await expect(page.locator('[data-control="numeric"]').first()).toContainText('COMM LOSS');
   expect(errors).toEqual([]);
 });
@@ -73,6 +73,91 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(page.locator('[data-control="indicator"]')).toContainText('BAD DATA');
   await expect(page.getByLabel('Screen alarm status')).toContainText('BAD DATA');
   await expect(page.locator('[data-control="alarm"]')).not.toContainText('INACTIVE');
+});
+
+test('PLC route status and binding quality distinguish loss, stale data and recovery', async ({ page }) => {
+  const configs = [
+    { id: 'line', name: 'Line PLC', enabled: true },
+    { id: 'utility', name: 'Utility PLC', enabled: true },
+    { id: 'spare', name: 'Spare PLC', enabled: false },
+  ];
+  function withRoutes(project) {
+    project.connections = configs;
+    const button = project.controls.find(control => control.id === 'toggle');
+    Object.assign(button, { mode: 'toggle', target: 'MotorRunning' });
+  }
+  await page.route('**/api/project', async route => {
+    const response = await route.fetch(), data = await response.json();
+    withRoutes(data.active);
+    await route.fulfill({ response, json: data });
+  });
+  await page.route('**/api/project/active', async route => {
+    const response = await route.fetch(), data = await response.json();
+    withRoutes(data.project);
+    await route.fulfill({ response, json: data });
+  });
+
+  const good = { quality: 'good' };
+  const old = { timestamp: '2026-01-01T12:00:00Z', age_seconds: 3.25 };
+  const values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false };
+  const online = [{ id: 'line', connected: true }, { id: 'utility', connected: true }];
+  let reachable = true;
+  let live = { values, connections: online, samples: { TankLevel: good, MotorRunning: good } };
+  await page.route('**/api/tags', route => reachable ? route.fulfill({ json: live }) : route.abort());
+  await page.goto('/runtime');
+  const header = page.locator('.app-header .connection');
+  const station = page.locator('.station-mode');
+  const numeric = page.locator('[data-control="numeric"]');
+  const indicator = page.locator('[data-control="indicator"]');
+  const button = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
+  await expect(header).toContainText('PLC routes connected (2/2)');
+  await expect(button).toBeEnabled();
+
+  live = { ...live, connections: [{ id: 'line', connected: false, error: 'Timeout' }, online[1]],
+    samples: { TankLevel: good, MotorRunning: { ...old, quality: 'bad', quality_reason: 'disconnected' } } };
+  await expect(station).toContainText('PLC partial outage (1/2 connected)');
+  await header.locator('summary').click();
+  await expect(header.getByText('Runtime connected', { exact: true })).toBeVisible();
+  await expect(header.getByText('Line PLC · Disconnected / retrying', { exact: true })).toBeVisible();
+  await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
+  await expect(header.getByText('Spare PLC · Disabled', { exact: true })).toBeVisible();
+  await expect(indicator).toContainText('PLC COMM LOSS');
+  await expect(numeric).toContainText('42.0');
+  await expect(button).toBeDisabled();
+
+  live = { ...live, connections: online, samples: {
+    TankLevel: { ...old, quality: 'stale', error: 'PLC sample is stale' },
+    MotorRunning: { ...old, quality: 'bad', quality_reason: 'recovering' },
+  } };
+  await expect(numeric).toContainText('STALE DATA');
+  await expect(numeric.getByText('3.3 s old', { exact: true })).toBeVisible();
+  await expect(numeric.locator('.hmi-quality')).toHaveAttribute('title', /PLC sample is stale/);
+  await expect(numeric).not.toContainText('42.0');
+  await expect(indicator).toContainText('WAITING FOR FRESH DATA');
+  await expect(button).toBeDisabled();
+
+  live = { ...live, plc_hold: true, connections: [], samples: {
+    TankLevel: { quality: 'bad', quality_reason: 'held' },
+    MotorRunning: { quality: 'bad', quality_reason: 'disabled' },
+  } };
+  await expect(station).toContainText('PLC acquisition held');
+  await expect(numeric).toContainText('ACQUISITION HELD');
+  await expect(indicator).toContainText('ROUTE DISABLED');
+
+  reachable = false;
+  await expect(station).toContainText('Runtime offline');
+  await expect(numeric).toContainText('COMM LOSS');
+  await expect(indicator).not.toContainText('ROUTE DISABLED');
+  await expect(button).toBeDisabled();
+
+  live = { values: { ...values, MotorRunning: false }, connections: online,
+    samples: { TankLevel: good, MotorRunning: { quality: 'pending' } } };
+  reachable = true;
+  await expect(indicator).toContainText('WAITING FOR DATA');
+  await expect(button).toBeDisabled();
+  live = { ...live, samples: { TankLevel: good, MotorRunning: good } };
+  await expect(indicator).toContainText('OFF');
+  await expect(button).toBeEnabled();
 });
 
 test('stale editor keeps its local draft and cannot overwrite another writer', async ({ page, context }) => {

@@ -10,7 +10,8 @@ import './security.css';
 import './engineering.css';
 import './operations.css';
 import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operations.jsx';
-import { Live, ScreenControls, ScreenFrame, createConfig } from './controls.jsx';
+import { Live, ConnectionStatus } from './live-quality.jsx';
+import { ScreenControls, ScreenFrame, createConfig } from './controls.jsx';
 import { CanvasEditor, CanvasSurface, initialCanvas } from './canvas.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
@@ -79,8 +80,12 @@ function Builder({ initial, catalog }) {
   const dynamicCatalog = useMemo(() => engineeringCatalog(catalog, settings, template), [catalog, settings, template]);
   const config = useMemo(() => createConfig(dynamicCatalog), [dynamicCatalog]);
   useEffect(() => { window.dispatchEvent(new CustomEvent('openhmi-editor-scope', { detail: { screen: scope.startsWith('faceplate:') ? 'overview' : scope, root: scope.startsWith('faceplate:') ? previewRoot : '' } })); }, [scope, previewRoot]);
-  const previewValues = { ...live.values };
-  if (template && previewRoot) for (const member of Object.keys(template.members)) previewValues[`$.${member}`] = live.values[`${previewRoot}.${member}`];
+  const previewValues = { ...live.values }, previewSamples = { ...live.samples };
+  if (template && previewRoot) for (const member of Object.keys(template.members)) {
+    const source = previewRoot + '.' + member;
+    if (Object.hasOwn(live.values, source)) previewValues['$.' + member] = live.values[source];
+    previewSamples['$.' + member] = live.samples?.[source];
+  }
 
   function compose(data, projectSettings = metadata.current) {
     const content = toProject(data);
@@ -196,7 +201,7 @@ function Builder({ initial, catalog }) {
     } finally { setBusy(false); }
   }
 
-  return <Localization project={previewProject}><Live.Provider value={{ ...live, values: previewValues, previewRoot: template ? previewRoot : '', project: previewProject }}><ScreenControls.Provider value={previewControls}>
+  return <Localization project={previewProject}><Live.Provider value={{ ...live, values: previewValues, samples: previewSamples, previewRoot: template ? previewRoot : '', project: previewProject }}><ScreenControls.Provider value={previewControls}>
     <div className="builder-guide"><p>Drop a control, select a tag, and apply your screen. No code required.</p>
       <div><button disabled={!canEdit} onClick={() => { clearTimeout(timer.current); save(latest.current); }}>Save draft</button>
         <button className="apply-button" onClick={apply} disabled={busy || !canEdit}>{busy ? 'Applying...' : 'Apply live'}</button>
@@ -297,16 +302,30 @@ function App({ initial, catalog }) {
     let stopped = false;
     let timer;
     async function tick() {
-      const [tags, alarms, recipe, identity] = await Promise.allSettled([api('/api/tags'), api('/api/alarms'), api('/api/recipes/selected'), api('/api/security/session')]);
+      try {
+        const tags = await api('/api/tags');
+        if (!stopped) setLive(previous => ({ ...previous, values: tags.values || {}, samples: tags.samples || {}, connected: true,
+          connections: tags.connections || [], plcHold: !!tags.plc_hold }));
+      } catch {
+        if (!stopped) setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false,
+          connections: [], plcHold: false }));
+      }
+      if (!stopped) timer = setTimeout(tick, updateRate.current);
+    }
+    tick();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [runtime]);
+  useEffect(() => {
+    let stopped = false, timer;
+    async function tick() {
+      const [alarms, recipe, identity] = await Promise.allSettled([api('/api/alarms'), api('/api/recipes/selected'), api('/api/security/session')]);
       if (!stopped) {
         setIdentityAvailable(identity.status === 'fulfilled');
         if (identity.status === 'fulfilled') setSession(identity.value);
       }
-      if (!stopped) setLive({ values: tags.status === 'fulfilled' ? tags.value.values : {}, connected: tags.status === 'fulfilled',
-        samples: tags.status === 'fulfilled' ? tags.value.samples : {}, driver: tags.status === 'fulfilled' ? tags.value.driver : null,
-        connections: tags.status === 'fulfilled' ? tags.value.connections || [] : [], plcHold: tags.status === 'fulfilled' && tags.value.plc_hold,
+      if (!stopped) setLive(previous => ({ ...previous,
         alarms: alarms.status === 'fulfilled' ? alarms.value : null, alarmConnected: alarms.status === 'fulfilled',
-        recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' });
+        recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' }));
       {
         try {
           const next = await api('/api/project/active');
@@ -323,11 +342,9 @@ function App({ initial, catalog }) {
     return () => { stopped = true; clearTimeout(timer); };
   }, [runtime]);
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
-  const plcConnected = live.connected && live.connections?.some(connection => connection.connected);
-  const plcStatus = live.plcHold ? 'PLC acquisition held' : plcConnected ? 'PLC data available' : 'PLC disconnected';
   const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
-      <span className={`connection ${(plcConfigured ? plcConnected : live.connected) ? 'connected' : ''}`}>{plcConfigured ? plcStatus : live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
+      <ConnectionStatus details /></header>
     <SecurityBar session={session} refresh={refreshSession} plcConfigured={plcConfigured} />
     {!identityAvailable && <p role="status" className="save-status">HMI identity status unavailable. Showing the last confirmed sign-in; the server checks permission on every operation.</p>}
     {projectChanged && <p role="alert" className="save-status">A different project was opened. Saves from this editor are blocked; copy any unsaved work before reloading. <button onClick={() => location.reload()}>Reload opened project</button></p>}

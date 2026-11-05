@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { api } from './api.mjs';
+import { tagValue, Quality } from './live-quality.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 import './trend.css';
 import { CaptureTools, useTrendCaptures } from './trend-recording.jsx';
@@ -257,13 +258,14 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const plotted = bindings.map((config, index) => {
     const name = config.tag;
     const tag = config.binding ?? name;
-    const current = Object.hasOwn(live.values, name) ? live.values[name] : undefined;
+    const state = tagValue(live, name);
+    const current = state.valid ? state.value : undefined;
     const samples = samplesByTag.get(name) ?? [];
     const kind = config.type ?? catalog.tags.find(item => item.name === tag || item.name === name)?.type;
     const digital = kind === 'boolean' || !kind && (typeof current === 'boolean' ||
       typeof samples.findLast(row => row.quality === 'good')?.value === 'boolean');
     const range = digital ? null : scale(config, samples);
-    return { binding: tag, tag: name || tag, digital, range, fixed: isFixed(config), current, samples, decimals: config.decimals ?? 1,
+    return { binding: tag, tag: name || tag, digital, range, fixed: isFixed(config), samples, decimals: config.decimals ?? 1,
       color: colors[index % colors.length], dash: digital ? undefined : dashes[index % dashes.length] };
   });
   const analog = plotted.filter(item => !item.digital);
@@ -323,11 +325,11 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
       <th>{ui('trendAtCursor')}</th><th>{ui('trendYAxisRange')}</th></tr></thead>
       <tbody>{plotted.map(item => {
         const atCursor = cursorEpoch == null ? undefined : cursorValue(item, cursorEpoch);
+        const current = tagValue(live, item.tag, item.digital ? 'boolean' : 'number');
         return <tr key={item.binding} data-trend-value={item.tag}>
         <th scope="row"><svg width="24" height="10" aria-hidden="true"><path d="M0 5H24" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} /></svg>{item.tag}</th>
-        <td>{!live.connected ? ui('commLoss')
-          : item.digital && typeof item.current === 'boolean' ? ui(item.current ? 'on' : 'off')
-            : !item.digital && isAnalog(item.current) ? formatValue(item.current, item.decimals) : ui('badData')}</td>
+        <td>{!current.valid ? <Quality problem={current.problem} tag={item.tag} />
+          : item.digital ? ui(current.value ? 'on' : 'off') : formatValue(current.value, item.decimals)}</td>
         <td data-trend-cursor-value="">{atCursor === undefined ? '—' : item.digital ? ui(atCursor ? 'on' : 'off') : formatValue(atCursor, item.decimals)}</td>
         <td>{item.digital ? '0 / 1'
           : item.range ? <>{ui('trendRange', { low: item.range[0], high: item.range[1] })} <small>{ui(item.fixed ? 'trendFixed' : 'trendObserved')}</small></>

@@ -211,6 +211,7 @@ class LogixHistoryTests(unittest.TestCase):
         for name in ('MotorA', 'MotorA.Running', 'MotorA.Speed', 'LevelA'):
             self.assertEqual(samples[name]['quality'], 'bad')
             self.assertIsNone(samples[name]['value'])
+        self.assertEqual(samples['LevelA']['quality_reason'], 'disconnected')
         self.assertEqual(samples['LevelA']['timestamp'], before['LevelA']['timestamp'])
         self.assertEqual(samples['OtherLevel']['quality'], 'good')
 
@@ -220,7 +221,7 @@ class LogixHistoryTests(unittest.TestCase):
         driver.poll(2.3)
         self.assertTrue(connection.connected)
         self.assertEqual(connection.client.reads, [])
-        self.assertEqual(driver.sample_snapshot(2.3)['LevelA']['quality'], 'bad')
+        self.assertEqual(driver.sample_snapshot(2.3)['LevelA']['quality_reason'], 'recovering')
 
         driver.lease('slow-viewer', ['slow'], 2.4)
         connection.client.values['Level'] = 40.0
@@ -228,6 +229,7 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertIn('Level', connection.client.reads[-1])
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['value'], 85.0)
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['quality'], 'good')
+        self.assertNotIn('quality_reason', driver.sample_snapshot(2.4)['LevelA'])
 
     def test_background_scans_keep_healthy_routes_fresh_while_another_read_waits(self):
         blocked, release = Event(), Event()

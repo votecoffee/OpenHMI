@@ -60,16 +60,15 @@ and [bench acceptance #3](https://github.com/votecoffee/OpenHMI/issues/3).
 
 ## M5 — Operator quality and camera control
 
-**Data quality.** The [runtime](../frontend/app.jsx) currently treats
-successful tag API requests as browser connectivity, and the station header can
-display “Data connected” while a PLC is unavailable. Separate browser-to-runtime
-reachability from individual PLC routes. Show per-binding quality and freshness
-on affected indicators, faceplates, edits and trend pens. Distinguish waiting for
-the first sample, held/disabled, bad, stale and fresh states. If a last-known
-value is shown, mark its age and quality and keep it out of permits and write
-decisions. Preserve gaps and quality in history and trends. Loss of a sample
-must never appear as an alarm returning to normal. Verify partial outages and
-fresh recovery in both dense overview screens and popups.
+**Data quality.** The [runtime](../frontend/live-quality.jsx) now separates
+browser-to-runtime reachability from individual PLC routes. The header names
+affected routes during partial outages. Bound displays, charts, current trend
+readouts and edit controls distinguish waiting, held, disabled, disconnected,
+recovering, stale and bad data. Inspect a quality badge for the source time,
+age and reason when available. Stale values remain unavailable for display and
+permit decisions. Preserve gaps and quality in history and trends. Loss of a
+sample must never appear as an alarm returning to normal. Verify partial outages
+and fresh recovery on the target display in dense screens and popups.
 [Operator quality #13](https://github.com/votecoffee/OpenHMI/issues/13)
 
 **Web Browser and Camera View.** Add a drag-and-drop control configured in the

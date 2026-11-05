@@ -432,6 +432,8 @@ class RuntimeDriver(SimulatorDriver):
                             result[f'{name}.{member}'] = {**result[name], 'value': member_value(self._tags[name], member)}
                         except (KeyError, TypeError, IndexError):
                             result[f'{name}.{member}'] = {'value': None, 'quality': 'bad', 'timestamp': utc_now(), 'error': 'Missing UDT member'}
+            held = {config['id'] for config in (self.project or {}).get('connections', [])
+                    if self.plc_hold and config['enabled']}
             for alias, (root, _) in self.sources.items():
                 tag = self.definitions[root]
                 if not tag['connection']:
@@ -440,11 +442,14 @@ class RuntimeDriver(SimulatorDriver):
                 connection = self.connections.get(tag['connection'])
                 generation = sample.pop('failure_generation', 0)
                 if connection is None:
-                    sample.update(value=None, quality='bad', error='PLC acquisition is held' if self.plc_hold else 'Connection is disabled')
-                elif not connection.connected and connection.error:
-                    sample.update(value=None, quality='bad', error=connection.error)
+                    reason = 'held' if tag['connection'] in held else 'disabled'
+                    error = 'PLC acquisition is held' if reason == 'held' else 'Connection is disabled'
+                    sample.update(value=None, quality='bad', quality_reason=reason, error=error)
+                elif not connection.connected and connection.error is not None:
+                    sample.update(value=None, quality='bad', quality_reason='disconnected', error=connection.error)
                 elif alias in self.samples and generation != connection.failure_generation:
-                    sample.update(value=None, quality='bad', error='Waiting for a fresh PLC sample after connection loss')
+                    sample.update(value=None, quality='bad', quality_reason='recovering',
+                                  error='Waiting for a fresh PLC sample after connection loss')
                 elif sample['quality'] == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
                     sample.update(quality='stale', error='PLC sample is stale')
                 sample.pop('monotonic', None)

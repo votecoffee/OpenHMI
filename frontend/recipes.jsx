@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
-import { Live } from './controls.jsx';
+import { Live } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext } from './security.jsx';
 import { RecipeTransferPanel } from './recipe-transfers.jsx';
