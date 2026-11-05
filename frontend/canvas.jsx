@@ -67,7 +67,14 @@ export function CanvasSurface({ data, config, editor }) {
   const { layout } = data.root.props;
   const content = new Map(data.content.map(item => [item.props.id, item]));
   const editing = !!editor;
-  return <div ref={editor?.viewport} className="canvas-scroll" dir="ltr">
+  return <div ref={editor?.viewport}
+    className={`canvas-scroll${editor?.panMode ? ' canvas-pan-mode' : ''}${editor?.panning ? ' canvas-panning' : ''}`} dir="ltr"
+    onPointerDownCapture={editor?.startPan}
+    onPointerMove={editor?.movePan}
+    onPointerUp={editor?.finishPan}
+    onPointerCancel={editor?.finishPan}
+    onLostPointerCapture={editor?.finishPan}
+    onClickCapture={editor?.panMode ? event => { event.preventDefault(); event.stopPropagation(); } : undefined}>
     <div ref={editor?.surface} className={`hmi-canvas${editing && layout.snap ? ' canvas-grid' : ''}`} dir="ltr"
       aria-label={editing ? 'Freeform canvas' : 'Freeform screen'}
       style={{ width: layout.width, height: layout.height, '--canvas-grid': layout.grid + 'px', zoom: editor?.zoom || 1 }}
@@ -154,6 +161,8 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   const { zoom } = view;
   const [preview, setPreview] = useState(null);
   const [marquee, setMarquee] = useState(null);
+  const [panMode, setPanMode] = useState(false);
+  const [panning, setPanning] = useState(false);
   const [message, setMessage] = useState('');
   const surface = useRef(null);
   const viewport = useRef(null);
@@ -164,6 +173,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   const history = useRef({ undo: [], redo: [], field: '' }).current;
   const dragging = useRef(false);
   const marqueeDrag = useRef(null);
+  const panDrag = useRef(null);
   useEffect(() => () => { pendingImage.current += 1; }, []);
   useLayoutEffect(() => {
     if (!view.center || !viewport.current) return;
@@ -239,12 +249,18 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   }
 
   function canvasShortcut(event) {
+    if (event.key === 'Escape' && (panMode || panDrag.current)) {
+      event.preventDefault();
+      finishPan();
+      setPanMode(false);
+      return;
+    }
     if (event.key === 'Escape' && marqueeDrag.current) {
       event.preventDefault();
       cancelMarquee();
       return;
     }
-    if (!canEdit || dragging.current || marqueeDrag.current || event.altKey ||
+    if (!canEdit || dragging.current || marqueeDrag.current || panDrag.current || event.altKey ||
         event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
     const command = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
@@ -523,6 +539,34 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     } });
   }
 
+  function startPan(event) {
+    if (event.button !== 1 && (!panMode || event.button !== 0)) return;
+    if (!event.isPrimary || dragging.current || marqueeDrag.current || panDrag.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const element = event.currentTarget;
+    editorRegion.current?.focus({ preventScroll: true });
+    element.setPointerCapture(event.pointerId);
+    panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY,
+      left: element.scrollLeft, top: element.scrollTop };
+    setPanning(true);
+  }
+
+  function movePan(event) {
+    const drag = panDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    event.currentTarget.scrollLeft = drag.left + drag.x - event.clientX;
+    event.currentTarget.scrollTop = drag.top + drag.y - event.clientY;
+  }
+
+  function finishPan(event) {
+    const drag = panDrag.current;
+    if (!drag || (event && drag.pointerId !== event.pointerId)) return;
+    panDrag.current = null;
+    setPanning(false);
+    if (viewport.current?.hasPointerCapture(drag.pointerId)) viewport.current.releasePointerCapture(drag.pointerId);
+  }
+
   function canvasPoint(event) {
     const rect = surface.current.getBoundingClientRect();
     return {
@@ -606,6 +650,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
       <button type="button" onClick={() => fitView({ x: 0, y: 0, width: layout.width, height: layout.height })}>Fit canvas</button>
       <button type="button" disabled={!freeSelection.length}
         onClick={() => fitView(bounds(freeSelection.map(key => objects[key])))}>Fit selection</button>
+      <button type="button" aria-pressed={panMode} onClick={() => setPanMode(value => !value)}>Pan canvas</button>
       <label>Background image<input type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { background(event.target.files[0]); event.target.value = ''; }} /></label>
       {layout.background && <button type="button" onClick={() => change(settings(layout, 'background', ''))}>Clear background</button>}
@@ -645,7 +690,8 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
       </aside>
       <CanvasSurface data={canvasData} config={config}
         editor={{ selected, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, viewport, zoom,
-          marquee, startMarquee, moveMarquee, finishMarquee, cancelMarquee, clearSelection: () => select([]) }} />
+          marquee, startMarquee, moveMarquee, finishMarquee, cancelMarquee, clearSelection: () => select([]),
+          panMode, panning, startPan, movePan, finishPan }} />
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
           <small>Drag a box from empty canvas or Shift-click to select multiple objects. Use arrows to nudge.</small>

@@ -25,6 +25,9 @@ dragging and resizing. The position fields accept exact pixels. **Zoom**, **Fit 
 objects as the canvas bounds allow, up to 200% zoom. The live canvas uses the
 configured pixel sizes and scrolls if the viewer is smaller.
 
+Toggle **Pan canvas** and drag to scroll around the editing view at the current
+zoom. Middle-button drag pans directly. Press **Escape** to exit Pan mode.
+
 Controls may overlap. Use **Objects** to select a control that is covered.
 **Bring to front** and **Send to back** change the stacking order. Drag a
 selection box from empty canvas to select objects it touches. Hold **Shift**

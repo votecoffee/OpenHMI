@@ -40,3 +40,7 @@
 .canvas-decoration-ellipse { border-radius: 50%; }
 .canvas-locked-outline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; overflow-wrap: anywhere; }
 .canvas-marquee { position: absolute; z-index: 10001; border: 1px dashed #002878; background: #00287820; pointer-events: none; }
+.canvas-pan-mode .hmi-canvas { touch-action: none; }
+.canvas-pan-mode :is(.hmi-canvas, .canvas-move, .canvas-resize) { cursor: grab; }
+.canvas-panning, .canvas-panning :is(.hmi-canvas, .canvas-move, .canvas-resize) { cursor: grabbing; }
+.canvas-toolbar button[aria-pressed="true"] { background: #002878; color: white; }

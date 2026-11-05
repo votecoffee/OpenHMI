@@ -385,6 +385,28 @@ test('fit canvas and fit selection adjust only the designer view', async ({ page
     });
     expect(Math.abs(position.x)).toBeLessThan(2);
     expect(Math.abs(position.y)).toBeLessThan(2);
+
+    const pan = page.getByRole('button', { name: 'Pan canvas', exact: true });
+    const scrollPosition = () => viewport.evaluate(element => ({ x: element.scrollLeft, y: element.scrollTop }));
+    async function dragOverObject(dx, dy, button = 'left') {
+      const item = await object.boundingBox();
+      const x = item.x + item.width / 2, y = item.y + item.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down({ button });
+      await page.mouse.move(x + dx, y + dy, { steps: 6 });
+      await page.mouse.up({ button });
+    }
+    const initial = await scrollPosition();
+    await pan.click();
+    await expect(pan).toHaveAttribute('aria-pressed', 'true');
+    await dragOverObject(-80, -40);
+    expect(await scrollPosition()).toEqual({ x: initial.x + 80, y: initial.y + 40 });
+    await expect(object).toHaveClass(/canvas-selected/);
+    await page.keyboard.press('Escape');
+    await expect(pan).toHaveAttribute('aria-pressed', 'false');
+    await dragOverObject(50, 20, 'middle');
+    expect(await scrollPosition()).toEqual({ x: initial.x + 30, y: initial.y + 20 });
+    await expect(object).toHaveClass(/canvas-selected/);
     await zoom.selectOption('1.5');
     await expect(zoom).toHaveValue('1.5');
     await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
