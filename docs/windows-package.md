@@ -72,6 +72,10 @@ Custom handlers load at startup; integrated Python editing/hot reload is deferre
 
 ## Update, rollback and removal
 
+Use the bundled [package manager](package-management.md) for hash-verified
+side-by-side installation, activation and launch. Manual extraction remains
+available; neither approach changes existing project data automatically.
+
 1. Stop OpenHMI, retain the old application folder, and export complete backups
    from **Projects** before updating. Back up trusted external handler files too.
 2. Extract the new ZIP into a separate folder. Run `--self-check`, then run it

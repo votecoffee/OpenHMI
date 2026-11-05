@@ -86,6 +86,10 @@ See [Windows package instructions](docs/windows-package.md) for building a previ
 project selection, logs, update/rollback and data preservation. No public release
 installer is published yet.
 
+The bundled `package` commands provide verified side-by-side installation, version
+selection and rollback while retaining project data. See
+[managed package installation](docs/package-management.md).
+
 ### Contributor installation
 
 Prerequisites: Python 3.11+, Node.js 20+/npm for building browser assets, and a

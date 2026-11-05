@@ -56,6 +56,7 @@ def main():
     bundle = output / 'OpenHMI'
     shutil.copyfile(ROOT / 'LICENSE', bundle / 'LICENSE.txt')
     shutil.copyfile(ROOT / 'docs/windows-package.md', bundle / 'READ-ME.md')
+    shutil.copyfile(ROOT / 'docs/package-management.md', bundle / 'package-management.md')
     shutil.copyfile(ROOT / 'requirements/windows-build.lock', bundle / 'BUILD-DEPENDENCIES.lock')
     inventory = []
     notices = ['OpenHMI build environment dependency notices (includes build tools)\n']

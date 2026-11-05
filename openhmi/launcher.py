@@ -89,7 +89,11 @@ def self_check():
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='OpenHMI local visual builder and runtime')
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == 'package':
+        from .package_manager import main as manage_packages
+        return manage_packages(arguments[1:])
+    parser = argparse.ArgumentParser(description='OpenHMI local visual builder and runtime', epilog='Manage application versions with: OpenHMI.exe package --help')
     parser.add_argument('--version', action='version', version=f'OpenHMI {application_version()}')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--self-check', action='store_true', help='Check bundled dependencies/assets without starting a project')
