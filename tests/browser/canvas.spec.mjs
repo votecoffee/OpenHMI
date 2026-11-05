@@ -180,6 +180,29 @@ test('freeform layout supports backgrounds, overlap, selection and containers th
     await undo.click();
     await expect(canvas.locator('.canvas-selected')).toHaveCSS('left', '304px');
     await expect(runtime.locator('[data-background-locked]')).toHaveCount(2);
+
+    const sourceGrid = canvas.locator('.canvas-object').filter({ has: page.locator('.canvas-container-grid') });
+    const sourceX = Number.parseInt(await sourceGrid.evaluate(element => element.style.left), 10);
+    await choose('Grid container');
+    await page.keyboard.press('Control+d');
+    await expect(canvas.locator('.canvas-container-grid')).toHaveCount(2);
+    const gridCopy = canvas.locator('.canvas-selected');
+    await expect(gridCopy.locator('.canvas-member')).toHaveCount(3);
+    await expect(gridCopy).toHaveCSS('left', (sourceX + 8) + 'px');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Shift+ArrowRight');
+    await expect(gridCopy).toHaveCSS('left', (sourceX + 17) + 'px');
+    await expect(sourceGrid.first()).toHaveCSS('left', sourceX + 'px');
+    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
+    const copiedProject = (await (await page.request.get('/api/project')).json()).draft;
+    const grids = Object.values(copiedProject.layout.containers);
+    expect(grids).toHaveLength(2);
+    expect(new Set(grids.flatMap(grid => grid.members)).size).toBe(6);
+    for (const grid of grids) {
+      expect(grid.members.map(id => copiedProject.controls.find(control => control.id === id).tag))
+        .toEqual(['MotorRunning', 'TankLevel', 'OperatorText']);
+    }
   } finally {
     await save(original.active);
     await save(original.draft, false);

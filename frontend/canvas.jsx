@@ -5,6 +5,7 @@ import './canvas.css';
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const id = () => 'canvas-' + crypto.randomUUID();
 const HISTORY_LIMIT = 60;
+const NUDGE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 const maxX = box => box.x + box.width;
 const maxY = box => box.y + box.height;
 const settings = (layout, key, value) => ({ ...layout, [key]: value });
@@ -192,13 +193,25 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     editorRegion.current?.focus({ preventScroll: true });
   }
 
-  function historyShortcut(event) {
-    if (!canEdit || !(event.ctrlKey || event.metaKey) || event.altKey ||
+  function canvasShortcut(event) {
+    if (!canEdit || dragging.current || event.altKey ||
         event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const command = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
-    if (key !== 'z' && key !== 'y') return;
-    event.preventDefault();
-    restore(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+    if (command && (key === 'z' || key === 'y')) {
+      event.preventDefault();
+      restore(key === 'y' || event.shiftKey ? 'redo' : 'undo');
+    } else if (command && key === 'd' && canDuplicate) {
+      event.preventDefault();
+      if (!event.repeat) duplicate();
+    } else if (!command && freeSelection.length && Object.hasOwn(NUDGE, event.key)) {
+      event.preventDefault();
+      const [x, y] = NUDGE[event.key];
+      const step = event.shiftKey ? layout.grid : 1;
+      const field = 'nudge:' + event.key + ':' + step + ':' + freeSelection.join(',');
+      if (!event.repeat) history.field = '';
+      nudge(x * step, y * step, field);
+    }
   }
 
   function boxesChanged(changes, original = layout) {
@@ -280,6 +293,58 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     element.addEventListener('pointerup', finish);
     element.addEventListener('pointercancel', finish);
     element.addEventListener('lostpointercapture', finish);
+  }
+
+  const duplicateRoots = top.filter(([key]) => freeSelection.includes(key));
+  const duplicateControls = duplicateRoots.flatMap(([key, object]) =>
+    object.members ?? (lookup(layout.boxes, key) ? [key] : []));
+  const canDuplicate = duplicateRoots.length > 0 && duplicateRoots.length === selected.length
+    && data.content.length + duplicateControls.length <= 100
+    && Object.keys(layout.containers).length + duplicateRoots.filter(([, object]) => object.members).length <= 30
+    && decorationEntries(layout).length + duplicateRoots.filter(([, object]) => object.kind).length <= 60;
+
+  function duplicate() {
+    if (!canDuplicate) return;
+    const copies = new Map([...new Set([...freeSelection, ...duplicateControls])].map(key => [key, id()]));
+    const groups = new Map();
+    const area = bounds(duplicateRoots.map(([, object]) => object));
+    const step = layout.snap ? layout.grid : 8;
+    const offset = (before, after) => after >= step ? step : before >= step ? -step : after || -before;
+    const dx = offset(area.x, layout.width - maxX(area));
+    const dy = offset(area.y, layout.height - maxY(area));
+    const next = boxesChanged(Object.fromEntries(top.map(([key], z) => [key, { z }])));
+    for (const key of duplicateControls) next.boxes[copies.get(key)] = { ...layout.boxes[key], group: '' };
+    duplicateRoots.forEach(([key, original], index) => {
+      if (original.group && !groups.has(original.group)) groups.set(original.group, id());
+      const copy = { ...original, x: original.x + dx, y: original.y + dy,
+        z: top.length + index, group: groups.get(original.group) ?? '' };
+      const newKey = copies.get(key);
+      if (original.members) {
+        next.containers[newKey] = { ...copy, members: original.members.map(member => copies.get(member)) };
+        for (const member of original.members) {
+          const box = next.boxes[copies.get(member)];
+          box.x = clamp(box.x + dx, 0, layout.width - box.width);
+          box.y = clamp(box.y + dy, 0, layout.height - box.height);
+        }
+      } else if (original.kind) next.decorations[newKey] = copy;
+      else next.boxes[newKey] = copy;
+    });
+    const controls = new Set(duplicateControls);
+    const content = data.content.filter(block => controls.has(block.props.id))
+      .map(block => ({ ...block, props: { ...structuredClone(block.props), id: copies.get(block.props.id) } }));
+    change(next, [...data.content, ...content]);
+    select(duplicateRoots.map(([key]) => copies.get(key)));
+    editorRegion.current?.focus({ preventScroll: true });
+  }
+
+  function nudge(dx, dy, field) {
+    const area = bounds(freeSelection.map(key => objects[key]));
+    const x = clamp(dx, -area.x, layout.width - maxX(area));
+    const y = clamp(dy, -area.y, layout.height - maxY(area));
+    if (!x && !y) return;
+    change(boxesChanged(Object.fromEntries(freeSelection.map(key => [key, {
+      x: objects[key].x + x, y: objects[key].y + y,
+    }]))), data.content, field);
   }
 
   function reorder(front) {
@@ -373,7 +438,7 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   const canPack = freeSelection.length > 0 && freeSelection.every(key => lookup(layout.boxes, key)) && Object.keys(layout.containers).length < 30;
   const minWidth = Math.max(160, ...Object.values(objects).map(maxX));
   const minHeight = Math.max(120, ...Object.values(objects).map(maxY));
-  return <section ref={editorRegion} tabIndex={-1} className="canvas-editor" aria-label="Freeform designer" onKeyDown={historyShortcut}
+  return <section ref={editorRegion} tabIndex={-1} className="canvas-editor" aria-label="Freeform designer" onKeyDown={canvasShortcut}
     onBlurCapture={() => { history.field = ''; }}>
     <fieldset className="canvas-toolbar" disabled={!canEdit}><legend>Canvas tools</legend>
       <button type="button" disabled={!history.undo.length} onClick={() => restore('undo')}>Undo</button>
@@ -428,7 +493,8 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
         editor={{ selected, select, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, zoom }} />
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
-          <small>Shift-click to select multiple objects.</small>
+          <small>Shift-click to select multiple objects. Use arrows to nudge.</small>
+          <button type="button" disabled={!canDuplicate} onClick={duplicate}>Duplicate selection</button>
           <button type="button" disabled={!canLock} onClick={lockBackground}>Lock as background</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(true)}>Bring to front</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(false)}>Send to back</button>

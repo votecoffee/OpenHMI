@@ -114,7 +114,8 @@ Source installs retain the cross-version dependency ranges in `pyproject.toml`.
 
 Select **Enable freeform layout** on the screen you want to design. Set the
 canvas size, upload a machine image, then drag and resize controls over it.
-The designer supports layers, snapping, grouping, alignment, equal spacing, undo and redo,
+The designer supports layers, snapping, grouping, alignment, equal spacing,
+object duplication, keyboard nudging, undo and redo,
 grid containers and scrollable stacks. Lock image and shape objects behind
 interactive controls. Freeform positions and backgrounds
 are included in project backups. See [screen layout](docs/screen-layout.md).

@@ -30,6 +30,12 @@ objects to select more than one. Align their edges or centers, or space three
 or more objects evenly. **Group** makes a selection move together and
 **Ungroup** restores individual selection.
 
+Use **Duplicate selection** or **Ctrl+D** to copy selected canvas objects.
+Copies retain their tag bindings and relative positions and receive new IDs.
+Duplicating a container also copies its contents. With focus on the canvas
+or an editor button, use the arrow keys to move the selection by one pixel,
+or hold **Shift** to move it by one grid interval.
+
 Use **Undo** and **Redo** in **Canvas tools** to revisit the last 60 edits in
 the open freeform editor. With focus on a canvas object or toolbar button,
 use **Ctrl+Z**, **Ctrl+Shift+Z** or **Ctrl+Y** (Command also works on macOS).
