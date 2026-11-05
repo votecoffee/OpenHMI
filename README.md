@@ -86,8 +86,9 @@ See [Windows package instructions](docs/windows-package.md) for building a previ
 project selection, logs, update/rollback and data preservation. Use `--preflight`
 under the intended Windows account to check package, folder access and the local
 port before starting. Use `--check-windows-mappings` to compare saved Windows
-account and group SIDs with the target host. No public release installer is
-published yet.
+account and group SIDs with the target host. Use `--check-windows-login
+<account>` to rehearse credential login and review the mapped HMI permissions.
+No public release installer is published yet.
 
 The bundled `package` commands provide verified side-by-side installation, version
 selection and rollback while retaining project data. To stop a managed launch,

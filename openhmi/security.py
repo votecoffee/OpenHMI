@@ -8,14 +8,16 @@ import json
 from pathlib import Path
 import re
 import secrets
+import sys
 from threading import RLock
 import time
+import warnings
 
 from fastapi import HTTPException
 from .alarms import utc_now
 from .projects import ProjectStore
 from .recipe_auth import hash_password, verify_password
-from .windows_identity import WindowsIdentity
+from .windows_identity import WindowsIdentity, read_security_database
 
 COOKIE = 'openhmi_session'
 PERMISSIONS = {'identity.publish', 'project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'alarms.comment', 'alarms.shelve', 'security.manage', 'activity.view', 'diagnostics.view',
@@ -45,6 +47,64 @@ class Principal:
     def public(self):
         return {'name': self.name, 'provider': self.provider, 'groups': sorted(self.groups),
                 'permissions': sorted(self.permissions), 'roles': sorted(self.roles)}
+
+
+def group_principal(db, name, provider, groups):
+    permissions = set()
+    for group, granted in db.execute('SELECT name,permissions FROM security_group'):
+        if group in groups:
+            permissions.update(json.loads(granted))
+    return Principal(name, provider, frozenset(groups), frozenset(permissions))
+
+
+def windows_principal(db, name, user_sid, token_groups):
+    groups = {group for sid, kind, group in db.execute('SELECT sid,kind,hmi_group FROM security_windows')
+              if (kind == 'user' and sid == user_sid) or (kind == 'group' and sid in token_groups)}
+    return group_principal(db, name, 'windows', groups) if groups else None
+
+
+def rehearse_windows_login(project, account, identity):
+    """Check native logon and HMI grants without issuing a session or writing the project."""
+    if not identity.available:
+        raise RuntimeError('Windows login rehearsal requires a Windows server')
+    if not account.strip() or len(account) > 200 or '\x00' in account:
+        raise RuntimeError('Provide a valid Windows account name')
+
+    def login_enabled(db):
+        row = db.execute('SELECT windows_enabled FROM security_settings WHERE id=1').fetchone()
+        if row is None:
+            raise RuntimeError('Project has no HMI security settings')
+        return bool(row[0])
+
+    disabled = {'ok': False, 'status': 'windows_login_disabled'}
+    with read_security_database(project) as db:
+        if not login_enabled(db):
+            return disabled
+    if not sys.stdin.isatty():
+        raise RuntimeError('Run the Windows login rehearsal in an interactive console')
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', getpass.GetPassWarning)
+            password = getpass.getpass('Windows test account password: ')
+    except (EOFError, KeyboardInterrupt, getpass.GetPassWarning) as error:
+        raise RuntimeError('Could not read a hidden password from the console') from error
+    try:
+        result = identity.authenticate(account, password)
+    except OSError:
+        return {'ok': False, 'status': 'windows_identity_unavailable'}
+    finally:
+        del password
+    if not result:
+        return {'ok': False, 'status': 'windows_logon_rejected'}
+
+    with read_security_database(project) as db:
+        db.execute('BEGIN')
+        if not login_enabled(db):
+            return disabled
+        principal = windows_principal(db, result['name'], result['sid'], result['groups'])
+    if principal is None:
+        return {'ok': False, 'status': 'no_hmi_group_assignment'}
+    return {'ok': True, 'status': 'mapped', 'user': principal.public()}
 
 
 class Security:
@@ -78,19 +138,10 @@ class Security:
                 row = db.execute('SELECT groups_json,enabled FROM security_user WHERE name=?', (identity['key'],)).fetchone()
                 if not row or not row[1]:
                     return None
-                groups = set(json.loads(row[0]))
-            else:
-                if not db.execute('SELECT windows_enabled FROM security_settings').fetchone()[0]:
-                    return None
-                groups = {group for sid, kind, group in db.execute('SELECT sid,kind,hmi_group FROM security_windows')
-                          if (kind == 'user' and sid == identity['key']) or (kind == 'group' and sid in identity['token_groups'])}
-                if not groups:
-                    return None
-            permissions = set()
-            for name, granted in db.execute('SELECT name,permissions FROM security_group'):
-                if name in groups:
-                    permissions.update(json.loads(granted))
-            return Principal(identity['name'], identity['provider'], frozenset(groups), frozenset(permissions))
+                return group_principal(db, identity['name'], 'local', set(json.loads(row[0])))
+            if not db.execute('SELECT windows_enabled FROM security_settings').fetchone()[0]:
+                return None
+            return windows_principal(db, identity['name'], identity['key'], identity['token_groups'])
 
     def login(self, name, password, peer, provider='local'):
         now = time.monotonic()

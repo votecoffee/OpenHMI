@@ -122,6 +122,24 @@ indicate a rename or an unavailable domain. The saved SID remains the binding.
 Keep the report private because it contains account and group information.
 Verify credential login and token group membership separately on the target host.
 
+### Rehearse Windows credentials and HMI grants
+
+Use an approved test account and a pilot project with Windows login enabled.
+Run this from an interactive console on the target host:
+
+```powershell
+.\OpenHMI.exe --project 'D:\HMI Data\projects\Pilot.openhmi.sqlite3' --check-windows-login 'DOMAIN\TestOperator'
+```
+
+OpenHMI prompts for the password with echo disabled. The check uses the same
+Windows logon and enabled-token-group rules as the HMI, then reports the HMI
+groups and permissions from the saved project. It opens the database read-only
+and creates no session or project audit record. Windows account policies and
+Windows auditing still apply. A disabled Windows provider, rejected logon or
+authenticated account with no HMI assignment returns exit code 1. Keep the
+report private. Use the actual HMI for browser login, session and authorization
+acceptance.
+
 Windows authentication runs on the Windows machine hosting Python. In **Security**,
 enable Windows login, enter `DOMAIN\Group` or `MACHINE\User`, choose its identity
 type and select the target HMI group. The server resolves the account SID and

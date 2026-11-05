@@ -156,6 +156,8 @@ def main(argv=None):
     mode.add_argument('--create-admin', metavar='USER', help='Create a local administrator while the runtime is stopped; password is prompted')
     mode.add_argument('--check-windows-mappings', action='store_true',
                       help='Compare saved Windows account/group mappings with current SIDs using read-only project access')
+    mode.add_argument('--check-windows-login', metavar='ACCOUNT',
+                      help='Rehearse Windows logon and HMI group mapping; prompts for the test account password')
     parser.add_argument('--project', type=Path, default=default_project(), help='Database path; its folder is the project library')
     parser.add_argument('--handlers', type=Path, help='Trusted local Python action module loaded at startup')
     parser.add_argument('--recipe-users', type=Path, default=None if getattr(sys, 'frozen', False) else Path('.local/recipe-users.json'), help='Optional legacy recipe account file')
@@ -170,10 +172,15 @@ def main(argv=None):
             print(json.dumps(self_check(), indent=2))
             return
         project = args.project.resolve()
-        if args.check_windows_mappings:
-            from .windows_identity import WindowsIdentity, check_mappings
+        if args.check_windows_mappings or args.check_windows_login is not None:
+            from .windows_identity import WindowsIdentity
             try:
-                report = check_mappings(project, WindowsIdentity())
+                if args.check_windows_mappings:
+                    from .windows_identity import check_mappings
+                    report = check_mappings(project, WindowsIdentity())
+                else:
+                    from .security import rehearse_windows_login
+                    report = rehearse_windows_login(project, args.check_windows_login, WindowsIdentity())
             except sqlite3.Error as error:
                 raise RuntimeError(f'Could not read project security mappings: {error}') from error
             print(json.dumps(report, indent=2))

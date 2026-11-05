@@ -43,8 +43,8 @@ Use a separate local application root when needed; put `--root` before the comma
 ```
 
 `launch` also accepts `--log-dir`, `--handlers`, `--open-browser`, `--self-check`
-and `--preflight`. It also forwards `--check-windows-mappings` for Windows login
-deployments. Preflight checks the selected executable and the target
+and `--preflight`. It also forwards `--check-windows-mappings` and
+`--check-windows-login <account>` for Windows login deployments. Preflight checks the selected executable and the target
 storage and port without starting the HMI. See [target account checks](windows-package.md#check-the-target-account-before-first-start).
 The selected package is verified before execution. Projects and logs explicitly
 placed inside the application installation are rejected. The runtime's existing

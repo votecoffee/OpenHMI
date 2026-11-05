@@ -10,7 +10,7 @@ import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from openhmi import launcher
 from openhmi.projects import ProjectStore
@@ -148,6 +148,41 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual({row['account']: row['status'] for row in report['mappings']}, {
                 'MatchedGroup': 'matched', 'ChangedGroup': 'mismatch', 'MissingGroup': 'unresolved',
             })
+            self.assertEqual(project.read_bytes(), before)
+            self.assertEqual(list(project.parent.iterdir()), [project])
+
+    def test_windows_login_rehearsal_uses_hmi_groups_without_persisting_a_session(self):
+        with TemporaryDirectory() as directory:
+            project = Path(directory) / 'Pilot.openhmi.sqlite3'
+            store = ProjectStore(project)
+            try:
+                Security(store)
+                with store.transaction() as db:
+                    db.execute('UPDATE security_settings SET windows_enabled=1')
+                    db.executemany('INSERT INTO security_windows VALUES(?,?,?,?)', [
+                        ('S-1-5-100', 'user', 'TestUser', 'Approvers'),
+                        ('S-1-5-200', 'group', 'EnabledGroup', 'Operators'),
+                        ('S-1-5-300', 'group', 'ExcludedGroup', 'Administrators'),
+                    ])
+            finally:
+                store.close()
+            before = project.read_bytes()
+            args = ['--project', str(project), '--check-windows-login', 'EXAMPLE\\TestUser']
+            authenticate = Mock(return_value={'name': 'EXAMPLE\\TestUser', 'sid': 'S-1-5-100', 'groups': ['S-1-5-200']})
+            identity = SimpleNamespace(available=True, authenticate=authenticate)
+            with patch('openhmi.windows_identity.WindowsIdentity', return_value=identity), patch('getpass.getpass', return_value=PASSWORD) as prompt:
+                with patch('sys.stdin.isatty', return_value=False), redirect_stderr(StringIO()), self.assertRaises(SystemExit):
+                    launcher.main(args)
+                prompt.assert_not_called()
+                authenticate.assert_not_called()
+                with patch('sys.stdin.isatty', return_value=True), redirect_stdout(StringIO()) as output:
+                    launcher.main(args)
+                authenticate.assert_called_once_with('EXAMPLE\\TestUser', PASSWORD)
+            report = json.loads(output.getvalue())
+            self.assertTrue(report['ok'])
+            self.assertEqual(report['user']['groups'], ['Approvers', 'Operators'])
+            self.assertNotIn('security.manage', report['user']['permissions'])
+            self.assertNotIn(PASSWORD, output.getvalue())
             self.assertEqual(project.read_bytes(), before)
             self.assertEqual(list(project.parent.iterdir()), [project])
 

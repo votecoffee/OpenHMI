@@ -1,7 +1,7 @@
 """Windows password validation and enabled token-group SIDs; no impersonation."""
 
 import ctypes
-from contextlib import closing
+from contextlib import closing, contextmanager
 from ctypes import wintypes as w
 import os
 import sqlite3
@@ -11,12 +11,18 @@ def enabled_group(attributes):
     return bool(attributes & 0x4) and not bool(attributes & 0x10)  # enabled, never deny-only
 
 
+@contextmanager
+def read_security_database(project):
+    with closing(sqlite3.connect(project.as_uri() + '?mode=ro', uri=True)) as db:
+        db.execute('PRAGMA trusted_schema=OFF')
+        yield db
+
+
 def check_mappings(project, identity):
     """Compare saved account names with current Windows SIDs without opening a runtime."""
     if not identity.available:
         raise RuntimeError('Windows mapping checks require a Windows server')
-    with closing(sqlite3.connect(project.as_uri() + '?mode=ro', uri=True)) as db:
-        db.execute('PRAGMA trusted_schema=OFF')
+    with read_security_database(project) as db:
         enabled = db.execute('SELECT windows_enabled FROM security_settings WHERE id=1').fetchone()
         bindings = db.execute('SELECT sid,kind,label,hmi_group FROM security_windows ORDER BY label,kind,hmi_group').fetchall()
     if enabled is None:
