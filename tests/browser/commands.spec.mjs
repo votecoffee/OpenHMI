@@ -77,10 +77,25 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   const statusPage = await page.context().newPage();
   await statusPage.goto(await uncertainLink.getAttribute('href'));
   await expect(statusPage.locator('.activity-table tbody tr')).toContainText('uncertain');
+  const historyPage = await page.context().newPage();
+  await historyPage.goto('/commands');
+  await historyPage.getByLabel('Command ID', { exact: true }).fill('cycle_demo');
+  const stateFilter = historyPage.getByLabel('Transaction state', { exact: true });
+  const applyFilters = historyPage.getByRole('button', { name: 'Apply command filters' });
+  await stateFilter.selectOption('unresolved');
+  await applyFilters.click();
+  const matching = historyPage.locator('.activity-table tbody tr');
+  await expect(matching).toHaveCount(1);
+  await expect(matching).toContainText('uncertain');
   await page.getByRole('button', { name: 'Simulate completion', exact: true }).click();
   await expect(page.getByText(/PLC command: completed/)).toBeVisible();
   await expect(statusPage.locator('.activity-table tbody tr')).toContainText('completed');
   await statusPage.close();
+  await expect(historyPage.getByText('No command transactions match these filters.')).toBeVisible();
+  await stateFilter.selectOption('completed');
+  await applyFilters.click();
+  await expect(matching).toHaveCount(2);
+  await historyPage.close();
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.RequestSequence']).toBe(2);
   if (process.env.OPENHMI_COMMAND_SCREENSHOT) { await page.goto('/commands'); await expect(page.locator('.activity-table tbody tr')).toHaveCount(2); await page.screenshot({ path: process.env.OPENHMI_COMMAND_SCREENSHOT, fullPage: true }); }
   expect(errors).toEqual([]);

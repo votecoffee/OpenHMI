@@ -61,6 +61,9 @@ are rejected. Trusted Python and other PLC clients remain outside this boundary.
    Inspect the **Commands** page for the durable sequence/state/event timeline.
    Select a transaction number to open its live details directly.
    The command button also links to the latest transaction for its contract.
+   Filter history by exact command ID and transaction state. **All unresolved**
+   includes prepared, staging, requested, accepted and uncertain transactions.
+   The list updates as transactions change state.
 5. For manual offline feedback, start with
    `openhmi --handlers examples/command_simulator.py` and bind three additional
    Python buttons to its simulated acceptance, success and rejection actions.

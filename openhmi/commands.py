@@ -4,10 +4,14 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 from threading import RLock
+from typing import Literal
 
 from fastapi import HTTPException
 from .alarms import utc_now
 from .logix import member_value
+
+CommandHistoryState = Literal['', 'unresolved', 'prepared', 'staging', 'requested', 'accepted',
+                              'uncertain', 'completed', 'failed', 'interrupted']
 
 
 def contract(project, definition):
@@ -64,6 +68,8 @@ class CommandService:
                   created_at TEXT NOT NULL,updated_at TEXT NOT NULL,deadline TEXT NOT NULL,
                   result_code INTEGER,error TEXT);
                 CREATE INDEX IF NOT EXISTS command_channel ON command_transaction(channel,state);
+                CREATE INDEX IF NOT EXISTS command_history_id ON command_transaction(command_id,id);
+                CREATE INDEX IF NOT EXISTS command_history_state ON command_transaction(state,id);
                 CREATE TABLE IF NOT EXISTS command_event(
                   id INTEGER PRIMARY KEY AUTOINCREMENT,transaction_id INTEGER NOT NULL,
                   timestamp TEXT NOT NULL,state TEXT NOT NULL,detail TEXT NOT NULL);
@@ -93,13 +99,25 @@ class CommandService:
                 'SELECT timestamp,state,detail FROM command_event WHERE transaction_id=? ORDER BY id', (identifier,))]
             return item
 
-    def recent(self, limit=100, before_id=None, command_id=''):
+    def recent(self, limit=100, before_id=None, command_id='', state=''):
+        conditions, values = [], []
+        if before_id is not None:
+            conditions.append('id < ?')
+            values.append(before_id)
+        if command_id:
+            conditions.append('command_id = ?')
+            values.append(command_id)
+        if state == 'unresolved':
+            conditions.append("state IN ('prepared','staging','requested','accepted','uncertain')")
+        elif state:
+            conditions.append('state = ?')
+            values.append(state)
+        where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
         with self.store._lock:
             ids = [row[0] for row in self.store._db.execute(
-                'SELECT id FROM command_transaction WHERE id < ? AND (? = \'\' OR command_id=?) ORDER BY id DESC LIMIT ?',
-                (before_id or 9223372036854775807, command_id, command_id, limit + 1))]
-        return {'items': [self.get(identifier) for identifier in ids[:limit]], 'has_more': len(ids) > limit,
-                'next_before_id': ids[limit - 1] if len(ids) > limit else None}
+                'SELECT id FROM command_transaction' + where + ' ORDER BY id DESC LIMIT ?', (*values, limit + 1))]
+            return {'items': [self.get(identifier) for identifier in ids[:limit]], 'has_more': len(ids) > limit,
+                    'next_before_id': ids[limit - 1] if len(ids) > limit else None}
 
     def validate_apply(self, project):
         definitions = {item['id']: item for item in project.get('commands', [])}
@@ -219,9 +237,10 @@ def add_command_routes(app, service, security):
 
     @app.get('/api/commands')
     def recent(request: Request, limit: int = Query(default=100, ge=1, le=200),
-               before_id: int | None = Query(default=None, ge=1, le=9223372036854775807), command_id: str = Query(default='', max_length=60)):
+               before_id: int | None = Query(default=None, ge=1, le=9223372036854775807),
+               command_id: str = Query(default='', max_length=60), state: CommandHistoryState = ''):
         security.require(request, 'runtime.operate')
-        return service.recent(limit, before_id, command_id)
+        return service.recent(limit, before_id, command_id, state)
 
     @app.get('/api/commands/{identifier}')
     def transaction(request: Request, identifier: int = Path(ge=1, le=9223372036854775807)):

@@ -87,9 +87,17 @@ class CommandTests(unittest.TestCase):
         app.state.driver._tags['CycleCommand'].update(RequestSequence=0, AcceptedSequence=0, CompletedSequence=0)
         second = self.dispatch(client)
         self.assertEqual(second['sequence'], 2)  # A PLC reset never reuses a sequence.
+        open_items = client.get('/api/commands?command_id=cycle&state=unresolved').json()['items']
+        self.assertEqual([item['id'] for item in open_items], [second['id']])
         self.observe(app, accepted=2, completed=2, result=17)
         self.assertEqual(app.state.commands.get(second['id'])['state'], 'failed')
         self.assertEqual(client.get('/api/commands?limit=1').json()['next_before_id'], second['id'])
+        previous = client.get('/api/commands', params={'command_id': 'cycle', 'limit': 1, 'before_id': second['id']}).json()
+        self.assertEqual([item['id'] for item in previous['items']], [first['id']])
+        completed = client.get('/api/commands?command_id=cycle&state=completed').json()
+        self.assertEqual([item['id'] for item in completed['items']], [first['id']])
+        self.assertEqual(client.get('/api/commands?state=unresolved').json()['items'], [])
+        self.assertEqual(client.get('/api/commands?state=invalid').status_code, 422)
         self.assertEqual(client.get('/api/commands?command_id=unknown').json()['items'], [])
         self.assertEqual(client.get('/api/commands?before_id=999999999999999999999').status_code, 422)
         self.assertEqual(client.get('/api/commands/999999999999999999999').status_code, 422)

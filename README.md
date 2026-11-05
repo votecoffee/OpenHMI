@@ -180,6 +180,7 @@ a result code and an optional PLC permit. Choose **PLC command transaction** on
 an action button and select the contract. Runtime feedback and the **Commands**
 page distinguish dispatch, acceptance, completion, failure and uncertainty.
 Command buttons link to the latest transaction for their contract.
+Filter command history by command ID, state or all unresolved transactions.
 Timeout/restart never replay a command. See the [contract and offline example](docs/command-transactions.md).
 Use **PLC recipes** for dedicated recipe transfer profiles and complete parameter
 mapping, then **Transfer revision to PLC** in the recipe viewer/editor. Reselect
