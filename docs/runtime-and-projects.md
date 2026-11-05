@@ -82,7 +82,10 @@ The trace breaks at bad quality or when the last record is older than 60 seconds
 plus the configured sample interval. Cursor values on those segments represent
 the held value. CSV exports include recorded rows only. The query API bounds result size
 and reports truncation. In **History**, select up to 12 configured tags under
-**Export recorded data**, choose the range and optionally set a local end time.
+**Export recorded data**, choose a preset range or **Custom start and end**.
+An empty end time uses the current time. Custom ranges can span up to 365 days.
+Choose local browser time or UTC. Use UTC to distinguish the two occurrences of
+an hour repeated when daylight saving time ends. Both range boundaries are inclusive.
 The CSV includes recorded values, quality and UTC timestamps. The History panel
 warns when the export is limited to the newest 20,000 rows per tag. To retrieve
 older rows, set an earlier end time and export a shorter range. Spreadsheet

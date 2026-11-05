@@ -195,7 +195,8 @@ keeps its running copy; test recipes carry production status false. See the
    enabled state and value color. Server checks also enforce conditional enablement.
 6. In **History**, choose tags, sampling, deadband and retention. Set **Logging
    mode** to **On change** for steady tags. Use **Export
-   recorded data** to download a CSV for selected tags and a time range. Drop a **Trend**
+   recorded data** to download a CSV for selected tags using a preset or exact
+   start and end times in local time or UTC. Drop a **Trend**
    onto a screen and add up to 12 numeric or Boolean tags. Set each numeric tag's
    decimal places and choose fixed or observed Y-axis bounds. Boolean tags appear
    as separate step traces under the analog chart. **On change** tags hold their

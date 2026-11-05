@@ -33,10 +33,26 @@ function Members({ value, change }) {
   </fieldset>;
 }
 
+function exportEpoch(value, zone, label) {
+  const stamp = value.length === 16 ? value + ':00' : value;
+  const instant = new Date(zone === 'utc' ? stamp + 'Z' : stamp);
+  const epoch = instant.getTime() / 1000;
+  if (!Number.isFinite(epoch) || epoch < 0 || epoch > 32503680000) {
+    throw new Error(`Choose a valid ${label} time.`);
+  }
+  const offset = zone === 'utc' ? 0 : instant.getTimezoneOffset() * 60000;
+  if (new Date(instant.getTime() - offset).toISOString().slice(0, 19) !== stamp) {
+    throw new Error(`The ${label} time does not exist in this time zone. Choose a different time or use UTC.`);
+  }
+  return epoch;
+}
+
 function HistoryExport({ tags, projectInstance }) {
   const [selected, setSelected] = useState([]);
-  const [seconds, setSeconds] = useState('3600');
+  const [range, setRange] = useState('3600');
+  const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [zone, setZone] = useState('local');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const names = tags.map(item => item.tag).filter(tag => selected.includes(tag));
@@ -46,11 +62,17 @@ function HistoryExport({ tags, projectInstance }) {
     setBusy(true);
     setMessage('');
     try {
-      const query = new URLSearchParams({ tags: names.join(','), seconds });
-      if (end) {
-        const epoch = Date.parse(end) / 1000;
-        if (!Number.isFinite(epoch) || epoch < 0) throw new Error('Choose a valid end time.');
-        query.set('end', String(epoch));
+      const query = new URLSearchParams({ tags: names.join(',') });
+      const finish = end ? exportEpoch(end, zone, 'end') : null;
+      if (finish !== null) query.set('end', String(finish));
+      if (range === 'custom') {
+        const begin = exportEpoch(start, zone, 'start');
+        const stop = finish ?? Date.now() / 1000;
+        if (begin >= stop) throw new Error('Start time must be before the end time.');
+        if (stop - begin > 31536000) throw new Error('Choose a range of 365 days or less.');
+        query.set('start', String(begin));
+      } else {
+        query.set('seconds', range);
       }
       const response = await fetch('/api/history.csv?' + query, { signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error(`History export failed (HTTP ${response.status}).`);
@@ -64,7 +86,7 @@ function HistoryExport({ tags, projectInstance }) {
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setMessage(response.headers.get('X-OpenHMI-Truncated') === 'true'
-        ? 'CSV contains only the newest 20,000 rows per tag. Choose a shorter range to export older rows.'
+        ? 'CSV contains only the newest 20,000 rows per tag. Set an earlier end time to export older rows.'
         : 'CSV download started.');
     } catch (error) {
       setMessage(error.message);
@@ -82,11 +104,17 @@ function HistoryExport({ tags, projectInstance }) {
         onChange={event => setSelected(event.target.checked ? [...names, tag] : names.filter(name => name !== tag))} />
         Include {tag}</label>)}
       <div>
-        <label>Export time range<select value={seconds} onChange={event => setSeconds(event.target.value)}>
+        <label>Export time range<select value={range} onChange={event => setRange(event.target.value)}>
           <option value="60">1 minute</option><option value="3600">1 hour</option>
           <option value="86400">24 hours</option><option value="604800">7 days</option>
+          <option value="custom">Custom start and end</option>
         </select></label>
-        <label>Export end time (local)<input type="datetime-local" step="1" value={end}
+        <label>Export time zone<select value={zone} onChange={event => setZone(event.target.value)}>
+          <option value="local">Local time</option><option value="utc">UTC</option>
+        </select></label>
+        {range === 'custom' && <label>Export start time<input type="datetime-local" step="1" required value={start}
+          onChange={event => setStart(event.target.value)} /></label>}
+        <label>Export end time<input type="datetime-local" step="1" value={end}
           onChange={event => setEnd(event.target.value)} /></label>
       </div>
       <p>Leave the end time blank to export through now.</p>

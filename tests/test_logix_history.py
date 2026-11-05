@@ -280,6 +280,22 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertTrue(truncated['truncated'])
         self.assertIsNone(truncated['change_context']['TankLevel']['previous'])
 
+    def test_history_csv_accepts_exact_inclusive_bounds_and_rejects_invalid_ranges(self):
+        app = create_app()
+        self.addCleanup(app.state.store.close)
+        client = TestClient(app)
+        with app.state.store.transaction() as db:
+            db.executemany('INSERT INTO tag_history(tag,timestamp,value,quality) VALUES(?,?,?,?)',
+                           [('TankLevel', stamp, str(stamp), 'good') for stamp in range(99, 104)])
+        params = {'tags': 'TankLevel', 'start': 100, 'end': 102, 'seconds': 1}
+        response = client.get('/api/history.csv', params=params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([row['value'] for row in csv.DictReader(StringIO(response.text))], ['100', '101', '102'])
+        for bounds in ({'start': 102}, {'start': 103}, {'start': -1}, {'start': 'NaN'},
+                       {'end': 'inf'}, {'end': 31536101}):
+            with self.subTest(bounds=bounds):
+                self.assertEqual(client.get('/api/history.csv', params={**params, **bounds}).status_code, 422)
+
     def test_faceplate_relative_members_and_no_code_actions_server_gates(self):
         app = create_app()
         with TestClient(app) as client:

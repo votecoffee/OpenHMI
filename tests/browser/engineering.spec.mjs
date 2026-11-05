@@ -34,6 +34,27 @@ test('History panel exports recorded tags without a trend control', async ({ pag
     expect(csv).toContain('TankLevel,');
     expect(csv).not.toContain('MotorRunning,');
     await expect(panel.getByRole('status')).toHaveText('CSV download started.');
+    await panel.getByRole('combobox', { name: 'Export time range', exact: true }).selectOption('custom');
+    await panel.getByRole('combobox', { name: 'Export time zone', exact: true }).selectOption('utc');
+    const end = new Date(Date.now() + 1000);
+    const start = new Date(end.getTime() - 60000);
+    const startTime = panel.getByLabel('Export start time', { exact: true });
+    const endTime = panel.getByLabel('Export end time', { exact: true });
+    await startTime.fill(end.toISOString().slice(0, 19));
+    await endTime.fill(start.toISOString().slice(0, 19));
+    await button.click();
+    await expect(panel.getByRole('status')).toHaveText('Start time must be before the end time.');
+    await startTime.fill(start.toISOString().slice(0, 19));
+    await endTime.fill(end.toISOString().slice(0, 19));
+    const [exactRequest, exactFile] = await Promise.all([
+      page.waitForRequest(request => request.url().includes('/api/history.csv?')),
+      page.waitForEvent('download', { timeout: 15000 }),
+      button.click(),
+    ]);
+    const bounds = new URL(exactRequest.url()).searchParams;
+    expect(Number(bounds.get('start'))).toBe(Math.floor(start.getTime() / 1000));
+    expect(Number(bounds.get('end'))).toBe(Math.floor(end.getTime() / 1000));
+    expect(await readFile(await exactFile.path(), 'utf8')).toContain('TankLevel,');
     const logging = page.getByRole('combobox', { name: 'MotorRunning logging mode', exact: true });
     await expect(logging).toHaveValue('periodic');
     await logging.selectOption('change');
