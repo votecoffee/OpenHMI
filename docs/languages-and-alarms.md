@@ -31,6 +31,10 @@ translation is generated automatically. Adding a language does not change tag
 names, action names, alarm IDs or stored numeric values. Number formatting follows
 the selected locale. The engineering editor remains in English.
 
+Trend tools, cursor readouts and saved capture controls use the project
+translations. Cursor and capture dates follow the selected locale. The plot
+keeps time increasing from left to right, and CSV fields use the export format.
+
 Language and alarm configuration are part of the draft and take effect in runtime
 with **Apply live**, alongside the screen. Existing projects receive compatible
 defaults when edited; opening them does not overwrite their saved content.

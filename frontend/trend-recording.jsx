@@ -1,8 +1,16 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
+import { formatLocalDateTime, useLocalization } from './localization.jsx';
 
 const defaults = { sample_ms: 250, max_samples: 4000, start_tag: '', stop_tag: '' };
+const stopReasons = new Map([
+  ['manual stop', 'trendManualStop'],
+  ['stop trigger', 'trendStopTrigger'],
+  ['runtime stopped', 'trendRuntimeStopped'],
+  ['configuration changed', 'trendConfigurationChanged'],
+  ['interrupted', 'trendInterrupted'],
+]);
 
 export function TrendRecordingFields({ value, onChange, catalog }) {
   const tags = catalog.tags.filter(tag => tag.type === 'boolean');
@@ -72,6 +80,7 @@ export function useTrendCaptures(id, editing, recording) {
 
 export function CaptureTools({ state, recording, setEndTime, endTime }) {
   const { session } = useContext(SecurityContext) ?? {};
+  const { language, ui } = useLocalization();
   const { enabled, captures, running, capture, selection, setSelection, command, busy, error } = state;
   const [confirm, setConfirm] = useState(null);
   if (!recording && !captures.length) return null;
@@ -84,33 +93,36 @@ export function CaptureTools({ state, recording, setEndTime, endTime }) {
   }
   const last = capture?.last;
   const first = capture?.first;
+  const captureDate = epoch => formatLocalDateTime(new Date(epoch * 1000), language.code);
+  const reasonKey = stopReasons.get(capture?.reason);
   return <div className="trend-captures">
     <div className="trend-tools">
-      <label>Trend data<select value={selection} onChange={event => select(event.target.value)}>
-        <option value="auto">Latest capture (or historian)</option>
-        <option value="history">Continuous historian</option>
-        {captures.map(item => <option key={item.id} value={item.id}>#{item.id} {new Date(item.started * 1000).toLocaleString()}</option>)}
+      <label>{ui('trendData')}<select value={selection} onChange={event => select(event.target.value)}>
+        <option value="auto">{ui('trendAutoSource')}</option>
+        <option value="history">{ui('trendHistorySource')}</option>
+        {captures.map(item => <option key={item.id} value={item.id}>{ui('trendCaptureOption', { id: item.id, time: captureDate(item.started) })}</option>)}
       </select></label>
       {enabled && <button type="button" disabled={busy || !!running || !canOperate}
-        onClick={() => { setEndTime(null); command('start', 0); }}>Run trend</button>}
+        onClick={() => { setEndTime(null); command('start', 0); }}>{ui('trendRun')}</button>}
       {enabled && <button type="button" disabled={busy || !running || !canOperate}
-        onClick={() => command('stop', running.id)}>Stop trend</button>}
-      <span role="status">{running ? 'Recording #' + running.id
-        : enabled && recording?.start_tag ? 'Armed for start trigger' : enabled ? 'Stopped' : ''}</span>
+        onClick={() => command('stop', running.id)}>{ui('trendStop')}</button>}
+      <span role="status">{running ? ui('trendRecording', { id: running.id })
+        : enabled && recording?.start_tag ? ui('trendArmed') : enabled ? ui('trendStopped') : ''}</span>
     </div>
     {capture && <>
-      <span>Capture #{capture.id} · {capture.retained} / {capture.max_samples} samples retained
-        {capture.rolled_off > 0 && ` · ${capture.rolled_off} rolled off`}{capture.reason && ` · ${capture.reason}`}</span>
-      {first != null && last > first && <label className="trend-seek">Capture position
+      <span>{ui('trendRetention', { id: capture.id, retained: capture.retained, max: capture.max_samples })}
+        {capture.rolled_off > 0 && ` · ${ui('trendRolledOff', { count: capture.rolled_off })}`}
+        {capture.reason && ` · ${reasonKey ? ui(reasonKey) : capture.reason}`}</span>
+      {first != null && last > first && <label className="trend-seek">{ui('trendCapturePosition')}
         <input type="range" min={first} max={last} step="any" value={Math.max(first, Math.min(last, endTime ?? last))}
-          aria-valuetext={new Date((endTime ?? last) * 1000).toLocaleString()}
+          aria-valuetext={captureDate(endTime ?? last)}
           onChange={event => setEndTime(event.target.valueAsNumber)} />
       </label>}
-      <div className="trend-tools"><a href={`/api/trend-captures/${capture.id}/csv`}>Export entire capture CSV</a>
+      <div className="trend-tools"><a href={`/api/trend-captures/${capture.id}/csv`}>{ui('trendExportCapture')}</a>
         {canDelete && capture.stopped !== null && (confirm === capture.id ? <>
-          <button type="button" disabled={busy} onClick={() => { command('delete', capture.id); setConfirm(null); setEndTime(null); }}>Confirm delete capture</button>
-          <button type="button" onClick={() => setConfirm(null)}>Cancel</button>
-        </> : <button type="button" disabled={busy} onClick={() => setConfirm(capture.id)}>Delete saved capture</button>)}
+          <button type="button" disabled={busy} onClick={() => { command('delete', capture.id); setConfirm(null); setEndTime(null); }}>{ui('trendConfirmDelete')}</button>
+          <button type="button" onClick={() => setConfirm(null)}>{ui('cancelEntry')}</button>
+        </> : <button type="button" disabled={busy} onClick={() => setConfirm(capture.id)}>{ui('trendDeleteCapture')}</button>)}
       </div>
     </>}
     {error && <span role="alert" className="hmi-quality">{error}</span>}

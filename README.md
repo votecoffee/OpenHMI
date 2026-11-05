@@ -215,6 +215,7 @@ keeps its running copy; test recipes carry production status false. See the
    to pin the cursor to a timestamp. Enable **Saved trend
    recording** for manual Run/Stop or optional Boolean triggers, independent
    rolling sample retention, saved capture review and full capture CSV export.
+   Configure trend labels and capture controls in **Languages**.
 7. In the **Live charts** palette section, drop in a **Tank level indicator**
    for a live fill and normal band, a **Bar graph** to compare numeric tags on
    one scale, or a **Radar chart** with independently scaled axes. Set tags,

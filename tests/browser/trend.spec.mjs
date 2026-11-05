@@ -78,6 +78,13 @@ test('configure independent trend scales, live precision, and aligned Boolean la
   try {
     const project = structuredClone(original.active);
     project.columns = 1;
+    project.languages.push({ code: 'fr-FR', name: 'Français', flag: 'fr', translations: {
+      'ui.trendTimeRangeLabel': 'Fenêtre de {label}', 'ui.trendCurrent': 'Valeur actuelle',
+      'ui.trendRun': 'Démarrer la tendance', 'ui.trendStop': 'Arrêter la tendance',
+      'ui.trendManualStop': 'arrêt manuel', 'ui.trendCursor': 'Curseur : {time}',
+      'ui.trendExportCapture': 'Exporter la capture CSV',
+      'ui.trendDeleteCapture': 'Supprimer la capture', 'ui.trendConfirmDelete': 'Confirmer la suppression',
+    } });
     project.tags.push(
       { name: 'TrendLevel', type: 'number', initial: 42 },
       { name: 'TrendPressure', type: 'number', initial: 1050.25 },
@@ -155,19 +162,28 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await analog.hover({ position: { x: point.width * 0.6, y: point.height / 2 } });
     await expect(chart.locator('[data-trend-value="TrendLevel"] [data-trend-cursor-value]')).toHaveText(/^.$/u);
 
-    await chart.getByRole('button', { name: 'Run trend' }).click();
+    await page.getByRole('button', { name: 'Language: English', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Français', exact: true }).click();
+    await expect(chart.getByLabel('Fenêtre de Process trend')).toHaveValue('17');
+    await expect(chart.getByRole('columnheader', { name: 'Valeur actuelle' })).toBeVisible();
+    await expect(chart.locator('[data-trend-value="TrendPressure"]')).toContainText('1050,25');
+    await chart.locator('.trend-plot').press('ArrowRight');
+    await expect(chart.locator('[data-trend-cursor-time]')).toContainText('Curseur :');
+    await chart.locator('.trend-plot').press('Escape');
+    await expect(chart.getByRole('link', { name: 'Export history CSV' })).toBeVisible();
+    await chart.getByRole('button', { name: 'Démarrer la tendance' }).click();
     await expect(chart.getByText(/10 \/ 10 samples retained.*rolled off/)).toBeVisible();
-    await chart.getByRole('button', { name: 'Stop trend' }).click();
-    await expect(chart.getByText(/manual stop/)).toBeVisible();
-    const download = chart.getByRole('link', { name: 'Export entire capture CSV' });
+    await chart.getByRole('button', { name: 'Arrêter la tendance' }).click();
+    await expect(chart.getByText(/arrêt manuel/)).toBeVisible();
+    const download = chart.getByRole('link', { name: 'Exporter la capture CSV' });
     const href = await download.getAttribute('href');
     const csv = await (await page.request.get(href)).text();
     expect(csv.trim().split(/\r?\n/)).toHaveLength(41);
     await page.reload();
-    await expect(chart.getByRole('link', { name: 'Export entire capture CSV' })).toHaveAttribute('href', href);
-    await chart.getByRole('button', { name: 'Delete saved capture' }).click();
-    await chart.getByRole('button', { name: 'Confirm delete capture' }).click();
-    await expect(chart.getByRole('link', { name: 'Export entire capture CSV' })).toHaveCount(0);
+    await expect(download).toHaveAttribute('href', href);
+    await chart.getByRole('button', { name: 'Supprimer la capture' }).click();
+    await chart.getByRole('button', { name: 'Confirmer la suppression' }).click();
+    await expect(download).toHaveCount(0);
     if (process.env.OPENHMI_TREND_SCREENSHOT) await chart.screenshot({ path: process.env.OPENHMI_TREND_SCREENSHOT });
   } finally {
     await save(page, original.active);

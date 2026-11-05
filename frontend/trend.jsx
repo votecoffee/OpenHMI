@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { api } from './api.mjs';
-import { useLocalization } from './localization.jsx';
+import { formatLocalDateTime, useLocalization } from './localization.jsx';
 import './trend.css';
 import { CaptureTools, useTrendCaptures } from './trend-recording.jsx';
 
@@ -144,6 +144,7 @@ const Trace = React.memo(function Trace({ series, start, seconds }) {
 
 function TrendPlot({ analog, digital, start, seconds, historical, label, cursor, pinned, setCursor, hasHistory }) {
   const clipId = useId();
+  const { ui } = useLocalization();
   function inspect(fraction, pinned) {
     const position = Math.max(0, Math.min(1, fraction));
     if (!pinned) setCursor({ fraction: position });
@@ -165,13 +166,13 @@ function TrendPlot({ analog, digital, start, seconds, historical, label, cursor,
   const pointer = { onPointerMove: point, onPointerDown: point };
   const line = height => cursor != null && <line className="trend-cursor" data-trend-cursor=""
     x1={cursor * 600} x2={cursor * 600} y1="0" y2={height} vectorEffect="non-scaling-stroke" />;
-  return <div className="trend-plot" dir="ltr" tabIndex={0} aria-label={label + ' timeline. Use left and right arrows to move the cursor.'}
+  return <div className="trend-plot" dir="ltr" tabIndex={0} aria-label={ui('trendTimeline', { label })}
     onPointerLeave={event => {
       if (event.pointerType === 'mouse') setCursor(previous => previous?.epoch === undefined ? null : previous);
     }} onKeyDown={key}>
     {analog.length > 0 && <div className="trend-plot-row">
-      <span>Analog</span>
-      <svg role="img" aria-label={label + ' trend'} viewBox="0 0 600 160" preserveAspectRatio="none" {...pointer}>
+      <span>{ui('trendAnalog')}</span>
+      <svg role="img" aria-label={ui('trendPlot', { label })} viewBox="0 0 600 160" preserveAspectRatio="none" {...pointer}>
         <defs><clipPath id={clipId}><rect width="600" height="160" /></clipPath></defs>
         <path className="trend-grid" d="M0 40H600 M0 80H600 M0 120H600" />
         {gridTimes.map(x => <path key={x} className="trend-grid" d={`M${x} 0V160`} />)}
@@ -181,21 +182,23 @@ function TrendPlot({ analog, digital, start, seconds, historical, label, cursor,
     </div>}
     {digital.map(item => <div className="trend-plot-row trend-lane" key={item.binding} data-trend-lane={item.tag}>
       <span title={item.tag}>{item.tag}</span>
-      <svg role="img" aria-label={item.tag + ' Boolean history'} viewBox="0 0 600 28" preserveAspectRatio="none" {...pointer}>
+      <svg role="img" aria-label={ui('trendBooleanHistory', { tag: item.tag })} viewBox="0 0 600 28" preserveAspectRatio="none" {...pointer}>
         <path className="trend-grid" d="M0 5H600 M0 23H600" />
         {gridTimes.map(x => <path key={x} className="trend-grid" d={`M${x} 0V28`} />)}
         <Trace series={item} start={start} seconds={seconds} />
         {line(28)}
       </svg>
     </div>)}
-    <div className="trend-plot-row"><span>Time</span><div className="trend-time"><span>{'-' + seconds + ' s'}</span><span>{historical ? 'End' : 'Now'}</span></div></div>
+    <div className="trend-plot-row"><span>{ui('time')}</span><div className="trend-time">
+      <span>{ui('trendSeconds', { count: -seconds })}</span><span>{ui(historical ? 'trendEnd' : 'trendNow')}</span>
+    </div></div>
   </div>;
 }
 
-function formatTime(seconds) {
-  if (seconds % 3600 === 0) return seconds / 3600 + ' h';
-  if (seconds % 60 === 0) return seconds / 60 + ' min';
-  return seconds + ' s';
+function formatTime(seconds, ui) {
+  if (seconds % 3600 === 0) return ui('trendHours', { count: seconds / 3600 });
+  if (seconds % 60 === 0) return ui('trendMinutes', { count: seconds / 60 });
+  return ui('trendSeconds', { count: seconds });
 }
 
 export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings, seconds = 300, recording, puck, live, catalog }) {
@@ -271,8 +274,8 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const cursorFraction = position >= 0 && position <= 1 ? position : null;
   const cursorEpoch = cursorFraction === null || !history ? null : cursor.epoch ?? history.start + cursorFraction * span;
   const cursorDate = cursorEpoch === null ? null : new Date(cursorEpoch * 1000);
-  const cursorTime = cursorDate?.toLocaleTimeString(undefined, {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3,
+  const cursorTime = cursorDate && formatLocalDateTime(cursorDate, language.code, {
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3,
   });
   const shownEnd = endTime === null ? null : new Date(endTime * 1000);
   const localEnd = shownEnd ? new Date(shownEnd.getTime() - shownEnd.getTimezoneOffset() * 60000).toISOString().slice(0, 19) : '';
@@ -294,19 +297,19 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   return <article className="hmi-control hmi-trend" data-control="trend">
     <span className="hmi-label">{label}</span>
     {!puck?.isEditing && <div className="trend-tools">
-      <label>Time range<select aria-label={label + ' time range'} value={windowSeconds}
+      <label>{ui('trendTimeRange')}<select aria-label={ui('trendTimeRangeLabel', { label })} value={windowSeconds}
         onChange={event => changeWindow(Number(event.target.value))}>
-        {[...new Set([windowSeconds, seconds, 10, 30, 60, 300, 900, 3600, 86400])].sort((a, b) => a - b).map(value => <option key={value} value={value}>{formatTime(value)}</option>)}
+        {[...new Set([windowSeconds, seconds, 10, 30, 60, 300, 900, 3600, 86400])].sort((a, b) => a - b).map(value => <option key={value} value={value}>{formatTime(value, ui)}</option>)}
       </select></label>
-      <label>Window (seconds)<input aria-label={label + ' window seconds'} type="number" min="1" max="604800"
+      <label>{ui('trendWindowSeconds')}<input aria-label={ui('trendWindowLabel', { label })} type="number" min="1" max="604800"
         value={windowInput} onChange={event => setWindowInput(event.target.value)} onBlur={applyWindow}
         onKeyDown={event => { if (event.key === 'Enter') applyWindow(); }} /></label>
-      <label>End time<input aria-label={label + ' history end'} type="datetime-local" step="1" value={localEnd}
+      <label>{ui('trendEndTime')}<input aria-label={ui('trendEndLabel', { label })} type="datetime-local" step="1" value={localEnd}
         onChange={event => {
           const epoch = Date.parse(event.target.value) / 1000;
           setEndTime(Number.isFinite(epoch) && epoch >= 0 && epoch <= 32503680000 ? epoch : null);
         }} /></label>
-      <button type="button" onClick={() => setEndTime(null)}>{capture?.stopped != null ? 'Latest' : 'Live'}</button>
+      <button type="button" onClick={() => setEndTime(null)}>{ui(capture?.stopped != null ? 'trendLatest' : 'trendLive')}</button>
     </div>}
     {!puck?.isEditing && <CaptureTools state={captures} recording={recording} endTime={endTime} setEndTime={setEndTime} />}
     {plotted.length > 0 && <TrendPlot analog={analog} digital={digital} start={history?.start ?? 0}
@@ -314,10 +317,10 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
       cursor={cursorFraction} pinned={cursorFraction !== null && cursor?.epoch !== undefined}
       setCursor={setCursor} hasHistory={!!history} />}
     {cursorDate && <div className="trend-cursor-readout"><span className="trend-cursor-time" data-trend-cursor-time="">
-      Cursor: {cursorDate.toLocaleDateString()} {cursorTime}
+      {ui('trendCursor', { time: cursorTime })}
     </span>{cursor.epoch !== undefined && <button type="button" onClick={() => setCursor(null)}>{ui('clearTrendCursor')}</button>}</div>}
-    {plotted.length > 0 && <table className="trend-legend"><thead><tr><th>Tag</th><th>Current (live)</th>
-      <th>At cursor</th><th>Y-axis range</th></tr></thead>
+    {plotted.length > 0 && <table className="trend-legend"><thead><tr><th>{ui('trendTag')}</th><th>{ui('trendCurrent')}</th>
+      <th>{ui('trendAtCursor')}</th><th>{ui('trendYAxisRange')}</th></tr></thead>
       <tbody>{plotted.map(item => {
         const atCursor = cursorEpoch == null ? undefined : cursorValue(item, cursorEpoch);
         return <tr key={item.binding} data-trend-value={item.tag}>
@@ -327,15 +330,15 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
             : !item.digital && isAnalog(item.current) ? formatValue(item.current, item.decimals) : ui('badData')}</td>
         <td data-trend-cursor-value="">{atCursor === undefined ? '—' : item.digital ? ui(atCursor ? 'on' : 'off') : formatValue(atCursor, item.decimals)}</td>
         <td>{item.digital ? '0 / 1'
-          : item.range ? <>{item.range.join(' to ')} <small>{item.fixed ? 'Fixed' : 'Observed'}</small></>
-            : item.fixed ? 'Invalid range' : 'Waiting for samples'}</td>
+          : item.range ? <>{ui('trendRange', { low: item.range[0], high: item.range[1] })} <small>{ui(item.fixed ? 'trendFixed' : 'trendObserved')}</small></>
+            : ui(item.fixed ? 'trendInvalidRange' : 'trendWaiting')}</td>
       </tr>; })}</tbody>
     </table>}
-    {error ? <span className="hmi-quality">{ui('badData')} - history unavailable</span>
-      : !plotted.length ? <p>Select trend tags.</p>
-        : history && !hasSamples ? <p>No recorded good samples in this window. Check acquisition settings and tag quality.</p> : null}
-    {history?.truncated && <p>Result limited; shorten the time range.</p>}
-    {Object.keys(history?.change_context ?? {}).length > 0 && <small>On-change traces hold the last recorded value between samples.</small>}
-    {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>Export history CSV</a>}
+    {error ? <span className="hmi-quality">{ui('badData')} - {ui('trendHistoryUnavailable')}</span>
+      : !plotted.length ? <p>{ui('trendSelectTags')}</p>
+        : history && !hasSamples ? <p>{ui('trendNoSamples')}</p> : null}
+    {history?.truncated && <p>{ui('trendLimited')}</p>}
+    {Object.keys(history?.change_context ?? {}).length > 0 && <small>{ui('trendOnChangeHint')}</small>}
+    {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>{ui('trendExportHistory')}</a>}
   </article>;
 }

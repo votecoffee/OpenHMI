@@ -3,6 +3,29 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 export const uiText = {
   canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
   clearTrendCursor: 'Clear trend cursor',
+  trendTimeline: '{label} timeline. Use left and right arrows to move the cursor.',
+  trendPlot: '{label} trend', trendBooleanHistory: '{tag} Boolean history', trendAnalog: 'Analog',
+  trendEnd: 'End', trendNow: 'Now', trendLive: 'Live', trendLatest: 'Latest',
+  trendHours: '{count} h', trendMinutes: '{count} min', trendSeconds: '{count} s',
+  trendTimeRange: 'Time range', trendTimeRangeLabel: '{label} time range',
+  trendWindowSeconds: 'Window (seconds)', trendWindowLabel: '{label} window seconds',
+  trendEndTime: 'End time', trendEndLabel: '{label} history end', trendCursor: 'Cursor: {time}',
+  trendTag: 'Tag', trendCurrent: 'Current (live)', trendAtCursor: 'At cursor', trendYAxisRange: 'Y-axis range',
+  trendRange: '{low} to {high}', trendFixed: 'Fixed', trendObserved: 'Observed',
+  trendInvalidRange: 'Invalid range', trendWaiting: 'Waiting for samples',
+  trendHistoryUnavailable: 'History unavailable', trendSelectTags: 'Select trend tags.',
+  trendNoSamples: 'No recorded good samples in this window. Check acquisition settings and tag quality.',
+  trendLimited: 'Result limited. Shorten the time range.',
+  trendOnChangeHint: 'On-change traces hold the last recorded value between samples.',
+  trendExportHistory: 'Export history CSV', trendData: 'Trend data',
+  trendAutoSource: 'Latest capture (or historian)', trendHistorySource: 'Continuous historian',
+  trendCaptureOption: '#{id} {time}', trendRun: 'Run trend', trendStop: 'Stop trend',
+  trendRecording: 'Recording #{id}', trendArmed: 'Armed for start trigger', trendStopped: 'Stopped',
+  trendRetention: 'Capture #{id} · {retained} / {max} samples retained', trendRolledOff: '{count} rolled off',
+  trendCapturePosition: 'Capture position', trendExportCapture: 'Export entire capture CSV',
+  trendDeleteCapture: 'Delete saved capture', trendConfirmDelete: 'Confirm delete capture',
+  trendManualStop: 'manual stop', trendStopTrigger: 'stop trigger', trendRuntimeStopped: 'runtime stopped',
+  trendConfigurationChanged: 'configuration changed', trendInterrupted: 'interrupted',
   closeDialog: 'Close {title}', closePopup: 'Close popup', entryLabel: 'Entry', passwordEntry: 'Password entry', numericKeypad: 'Numeric keypad',
   textKeyboard: 'Text keyboard', shiftKey: 'Shift', spaceKey: 'Space', backspaceKey: 'Backspace', clearEntry: 'Clear',
   cancelEntry: 'Cancel', acceptEntry: 'Accept entry', invalidNumericEntry: 'Enter a finite number',
@@ -86,6 +109,11 @@ export function Localization({ project, children }) {
 
 export function useLocalization() { return useContext(Context); }
 export function useUi() { return useContext(Context)?.ui ?? defaultUi; }
+
+export function formatLocalDateTime(date, code, options) {
+  try { return date.toLocaleString(code, options); }
+  catch { return date.toLocaleString(undefined, options); }
+}
 
 export function LanguageSelector() {
   const { language, languages, choose } = useLocalization();
