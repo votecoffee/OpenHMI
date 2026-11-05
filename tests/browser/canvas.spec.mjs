@@ -120,6 +120,39 @@ test('freeform layout supports backgrounds, overlap, selection and containers th
     await page.mouse.move(handle.x + 35, handle.y + 6, { steps: 8 });
     await page.mouse.up();
     await expect(added).toHaveCSS('width', '208px');
+
+    const imagesAndShapes = page.getByRole('group', { name: 'Images and shapes' });
+    await imagesAndShapes.getByRole('button', { name: 'Add rectangle' }).click();
+    await dimension('X', 304);
+    await dimension('Y', 224);
+    await imagesAndShapes.getByLabel('Image object').setInputFiles({ name: 'station.png', mimeType: 'image/png', buffer: pixel });
+    await expect(outline.getByRole('button', { name: 'station.png', exact: true })).toBeVisible();
+    await dimension('X', 304);
+    await dimension('Y', 224);
+    await choose('Rectangle', ['Shift']);
+    await page.getByRole('button', { name: 'Lock as background' }).click();
+    await expect(canvas.locator('[data-background-locked]')).toHaveCount(2);
+    await expect(canvas.locator('[data-background-locked] button')).toHaveCount(0);
+    const movable = canvas.getByRole('button', { name: 'Select and move Motor', exact: true });
+    await movable.scrollIntoViewIfNeeded();
+    const hit = await movable.boundingBox();
+    await page.mouse.move(hit.x + 32, hit.y + 28);
+    await page.mouse.down();
+    await page.mouse.move(hit.x + 64, hit.y + 28, { steps: 6 });
+    await page.mouse.up();
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('left', '360px');
+    await page.getByRole('button', { name: 'Send to back' }).click();
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('z-index', '1');
+    await expect(canvas.locator('.canvas-background-objects')).toHaveCSS('z-index', '0');
+
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    await expect(runtime.locator('[data-background-locked]')).toHaveCount(2);
+    await page.reload();
+    await expect(canvas.locator('[data-background-locked]')).toHaveCount(2);
+    await outline.getByRole('button', { name: 'Unlock station.png' }).click();
+    await expect(canvas.getByRole('button', { name: 'Select and move station.png' })).toBeVisible();
+    await expect(canvas.locator('[data-background-locked]')).toHaveCount(1);
   } finally {
     await save(original.active);
     await save(original.draft, false);

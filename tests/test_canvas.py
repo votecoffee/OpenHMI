@@ -31,6 +31,10 @@ class CanvasBackupTests(unittest.TestCase):
         request = {'project': project, 'expected_revision': state['draft_revision']}
         self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
         project['layout']['background'] = identifier
+        project['layout']['decorations'] = {'machine': {'kind': 'image', 'label': 'Machine', 'image': 'f' * 64,
+                                                       'locked': True, 'x': 0, 'y': 0, 'width': 640, 'height': 400}}
+        self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
+        project['layout']['decorations']['machine']['image'] = identifier
         saved = client.put('/api/project/draft', json=request)
         self.assertEqual(saved.status_code, 200, saved.text)
         applied = client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -41,6 +45,8 @@ class CanvasBackupTests(unittest.TestCase):
             restored_client = TestClient(restored)
             current = restored_client.get('/api/project').json()['active']
             self.assertEqual(current['layout']['background'], identifier)
+            self.assertTrue(current['layout']['decorations']['machine']['locked'])
+            self.assertEqual(current['layout']['decorations']['machine']['image'], identifier)
             asset = '/api/canvas-images/' + identifier
             self.assertEqual(restored_client.get(asset).content, client.get(asset).content)
         finally:

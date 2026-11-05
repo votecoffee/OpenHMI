@@ -28,6 +28,22 @@ class CanvasContainer(CanvasBox):
     members: list[str] = Field(default_factory=list, max_length=100)
 
 
+class CanvasDecoration(CanvasBox):
+    kind: Literal['image', 'rectangle', 'ellipse']
+    label: str = Field(min_length=1, max_length=100)
+    locked: bool = False
+    image: str = Field(default='', pattern=r'^(?:[a-f0-9]{64})?$')
+    fill: str = Field(default='#aaaaaa', pattern=r'^#[a-fA-F0-9]{6}$')
+
+    @model_validator(mode='after')
+    def valid_decoration(self):
+        if (self.kind == 'image') != bool(self.image):
+            raise ValueError('Only image objects require an image reference')
+        if self.locked and self.group:
+            raise ValueError('Locked background objects cannot belong to a group')
+        return self
+
+
 class CanvasLayout(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     width: int = Field(default=1024, ge=160, le=4096)
@@ -37,15 +53,17 @@ class CanvasLayout(BaseModel):
     background: str = Field(default='', pattern=r'^(?:[a-f0-9]{64})?$')
     boxes: dict[str, CanvasBox] = Field(default_factory=dict, max_length=100)
     containers: dict[str, CanvasContainer] = Field(default_factory=dict, max_length=30)
+    decorations: dict[str, CanvasDecoration] = Field(default_factory=dict, max_length=60)
 
     @model_validator(mode='after')
     def consistent(self):
-        if self.boxes.keys() & self.containers.keys():
-            raise ValueError('Control and container IDs must be distinct')
+        keys = [*self.boxes, *self.containers, *self.decorations]
+        if len(keys) != len(set(keys)):
+            raise ValueError('Canvas object IDs must be distinct')
         members = [member for container in self.containers.values() for member in container.members]
         if len(members) != len(set(members)) or set(members) - self.boxes.keys():
             raise ValueError('A control can belong to one canvas container')
-        for box in (*self.boxes.values(), *self.containers.values()):
+        for box in (*self.boxes.values(), *self.containers.values(), *self.decorations.values()):
             if box.x + box.width > self.width or box.y + box.height > self.height:
                 raise ValueError('Canvas objects must fit within the screen')
         return self
@@ -72,14 +90,14 @@ class CanvasImages:
             raise ValueError('Use a valid PNG, JPEG or WebP image') from error
         data = encoded.getvalue()
         if len(data) > MAX_IMAGE:
-            raise ValueError('Encoded background image exceeds 8 MiB')
+            raise ValueError('Encoded canvas image exceeds 8 MiB')
         identifier = hashlib.sha256(data).hexdigest()
         with self.store.transaction() as db:
             if db.execute('SELECT 1 FROM canvas_image WHERE id=?', (identifier,)).fetchone():
                 return identifier
             total = db.execute('SELECT COALESCE(SUM(length(data)),0) FROM canvas_image').fetchone()[0]
             if total + len(data) > MAX_PROJECT_IMAGES:
-                raise ValueError('Project background images exceed the 48 MiB storage budget')
+                raise ValueError('Project canvas images exceed the 48 MiB storage budget')
             db.execute('INSERT INTO canvas_image VALUES (?, ?, ?)', (identifier, 'image/webp', data))
         return identifier
 
@@ -88,12 +106,14 @@ class CanvasImages:
             return self.store._db.execute('SELECT media_type,data FROM canvas_image WHERE id=?', (identifier,)).fetchone()
 
     def validate(self, project):
-        identifiers = {layout.background for layout in [project.layout, *(screen.layout for screen in project.screens)]
-                       if layout and layout.background}
+        layouts = [project.layout, *(screen.layout for screen in project.screens)]
+        identifiers = {identifier for layout in layouts if layout
+                       for identifier in (layout.background, *(item.image for item in layout.decorations.values()))
+                       if identifier}
         with self.store._lock:
             for identifier in identifiers:
                 if not self.store._db.execute('SELECT 1 FROM canvas_image WHERE id=?', (identifier,)).fetchone():
-                    raise HTTPException(422, 'Screen references a background image missing from this project')
+                    raise HTTPException(422, 'Screen references a canvas image missing from this project')
 
 
 def add_canvas_routes(app, images, security):
@@ -105,7 +125,7 @@ def add_canvas_routes(app, images, security):
         data = bytearray()
         async for chunk in request.stream():
             if len(data) + len(chunk) > MAX_IMAGE:
-                raise HTTPException(413, 'Background image exceeds 8 MiB')
+                raise HTTPException(413, 'Canvas image exceeds 8 MiB')
             data.extend(chunk)
         try:
             return {'id': await run_in_threadpool(images.put, data)}

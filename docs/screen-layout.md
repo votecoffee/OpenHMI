@@ -30,6 +30,15 @@ objects to select more than one. Align their edges or centers, or space three
 or more objects evenly. **Group** makes a selection move together and
 **Ungroup** restores individual selection.
 
+## Locked background objects
+
+Under **Images and shapes**, add an **Image object**, **Rectangle** or **Ellipse**.
+Size and position it on the canvas. Select one or more image or shape objects
+and choose **Lock as background**. Locked objects sit behind all controls and
+containers in both the designer and runtime. They pass clicks and drags
+through. To edit one again, choose **Unlock** next to its name in **Objects**.
+A screen-wide background image sits below the locked objects.
+
 ## Grid and stack containers
 
 Select one or more freeform controls and choose **Pack into grid** or **Pack into

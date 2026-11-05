@@ -34,3 +34,8 @@
 .canvas-selected { outline: 2px solid #002878; outline-offset: -2px; }
 .canvas-resize { width: 14px; height: 14px; right: 0; bottom: 0; cursor: nwse-resize; background: #002878; border: 1px solid #fff; }
 .canvas-runtime { max-width: min(100%, 1800px); }
+.canvas-background-objects { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.canvas-decorative { pointer-events: none; }
+.canvas-decoration-art { display: block; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.canvas-decoration-ellipse { border-radius: 50%; }
+.canvas-locked-outline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; overflow-wrap: anywhere; }

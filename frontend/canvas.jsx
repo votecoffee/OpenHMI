@@ -7,6 +7,7 @@ const id = () => 'canvas-' + crypto.randomUUID();
 const maxX = box => box.x + box.width;
 const maxY = box => box.y + box.height;
 const settings = (layout, key, value) => ({ ...layout, [key]: value });
+const lookup = (map, key) => map && Object.hasOwn(map, key) ? map[key] : undefined;
 
 function size(type) {
   if (type === 'Trend') return { width: 480, height: 320 };
@@ -17,7 +18,7 @@ function size(type) {
 export function initialCanvas(data) {
   const columns = data.root.props.columns || 2;
   const width = Math.max(1024, columns * 340);
-  const boxes = {};
+  const boxes = Object.create(null);
   let y = 8;
   for (let start = 0; start < data.content.length; start += columns) {
     const row = data.content.slice(start, start + columns);
@@ -31,7 +32,7 @@ export function initialCanvas(data) {
   }
   const height = Math.max(640, Math.min(4096, y));
   for (const box of Object.values(boxes)) box.y = Math.min(box.y, height - box.height);
-  return { width, height, grid: 8, snap: true, background: '', boxes, containers: {} };
+  return { width, height, grid: 8, snap: true, background: '', boxes, containers: {}, decorations: {} };
 }
 
 function bounds(boxes) {
@@ -40,12 +41,19 @@ function bounds(boxes) {
 }
 
 const memberIDs = layout => new Set(Object.values(layout.containers).flatMap(container => container.members));
-const objectEntries = layout => [...Object.entries(layout.boxes), ...Object.entries(layout.containers)];
+const decorationEntries = layout => Object.entries(layout.decorations ?? {});
+const objectEntries = layout => [...Object.entries(layout.boxes), ...Object.entries(layout.containers), ...decorationEntries(layout)];
 const topObjects = layout => {
   const members = memberIDs(layout);
-  return objectEntries(layout).filter(([key]) => !members.has(key)).sort((a, b) => a[1].z - b[1].z);
+  return objectEntries(layout).filter(([key, object]) => !members.has(key) && !object.locked).sort((a, b) => a[1].z - b[1].z);
 };
 const boxStyle = box => ({ left: box.x, top: box.y, width: box.width, height: box.height, zIndex: box.z + 1 });
+
+function Decoration({ object }) {
+  return object.kind === 'image'
+    ? <img className="canvas-decoration-art" src={'/api/canvas-images/' + object.image} alt="" draggable={false} />
+    : <span className={`canvas-decoration-art canvas-decoration-${object.kind}`} style={{ backgroundColor: object.fill }} aria-hidden="true" />;
+}
 
 function renderBlock(config, item, editing) {
   const component = config.components[item.type];
@@ -64,13 +72,18 @@ export function CanvasSurface({ data, config, editor }) {
       onDragOver={editing ? event => event.preventDefault() : undefined}
       onDrop={editor?.drop}>
       {layout.background && <img className="canvas-background" src={'/api/canvas-images/' + layout.background} alt="" draggable={false} />}
+      <div className="canvas-background-objects" aria-hidden="true">
+        {decorationEntries(layout).filter(([, object]) => object.locked).sort((a, b) => a[1].z - b[1].z)
+          .map(([key, object]) => <div key={key} data-canvas-object={key} data-background-locked=""
+            className="canvas-object" style={boxStyle(object)}><Decoration object={object} /></div>)}
+      </div>
       {topObjects(layout).map(([key, box]) => {
-        const container = layout.containers[key], item = content.get(key);
+        const container = lookup(layout.containers, key), item = content.get(key), decoration = lookup(layout.decorations, key);
         const selection = editor?.selected.includes(key);
-        const label = item?.props.label || (container?.mode === 'grid' ? 'Grid container' : 'Scrollable stack');
-        return <div key={key} data-canvas-object={key} className={`canvas-object${selection ? ' canvas-selected' : ''}`} style={boxStyle(box)}>
+        const label = decoration?.label || item?.props.label || (container?.mode === 'grid' ? 'Grid container' : 'Scrollable stack');
+        return <div key={key} data-canvas-object={key} className={`canvas-object${selection ? ' canvas-selected' : ''}${decoration && !editing ? ' canvas-decorative' : ''}`} style={boxStyle(box)}>
           <div className="canvas-object-body" inert={editing || undefined}>
-            {container ? <div className={`canvas-container canvas-container-${container.mode}`}
+            {decoration ? <Decoration object={decoration} /> : container ? <div className={`canvas-container canvas-container-${container.mode}`}
               style={{ '--container-columns': container.columns }}>
               {container.members.map(member => content.has(member) && <div key={member} className="canvas-member">
                 {renderBlock(config, content.get(member), editing)}
@@ -134,9 +147,10 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   useEffect(() => () => { pendingImage.current += 1; }, []);
   const members = memberIDs(layout);
   const item = selected.length === 1 ? data.content.find(entry => entry.props.id === selected[0]) : null;
-  const selectedContainer = selected.length === 1 ? layout.containers[selected[0]] : null;
-  const object = selected.length === 1 ? layout.boxes[selected[0]] || selectedContainer : null;
-  const freeSelection = selected.filter(key => !members.has(key) && (layout.boxes[key] || layout.containers[key]));
+  const selectedContainer = selected.length === 1 ? lookup(layout.containers, selected[0]) : null;
+  const decoration = selected.length === 1 ? lookup(layout.decorations, selected[0]) : null;
+  const object = selected.length === 1 ? lookup(layout.boxes, selected[0]) || selectedContainer || decoration : null;
+  const freeSelection = selected.filter(key => !members.has(key) && (lookup(layout.boxes, key) || lookup(layout.containers, key) || lookup(layout.decorations, key)));
   const top = topObjects(layout);
   const objects = Object.fromEntries(objectEntries(layout));
 
@@ -145,9 +159,9 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   }
 
   function boxesChanged(changes, original = layout) {
-    const next = { ...original, boxes: { ...original.boxes }, containers: { ...original.containers } };
+    const next = { ...original, boxes: { ...original.boxes }, containers: { ...original.containers }, decorations: { ...original.decorations } };
     for (const [key, patch] of Object.entries(changes)) {
-      const map = next.boxes[key] ? next.boxes : next.containers;
+      const map = Object.hasOwn(next.boxes, key) ? next.boxes : Object.hasOwn(next.containers, key) ? next.containers : next.decorations;
       map[key] = { ...map[key], ...patch };
     }
     return next;
@@ -256,8 +270,8 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   }
 
   function remove() {
-    const next = { ...layout, boxes: { ...layout.boxes }, containers: { ...layout.containers } };
-    for (const key of selected) { delete next.boxes[key]; delete next.containers[key]; }
+    const next = { ...layout, boxes: { ...layout.boxes }, containers: { ...layout.containers }, decorations: { ...layout.decorations } };
+    for (const key of selected) { delete next.boxes[key]; delete next.containers[key]; delete next.decorations[key]; }
     for (const [key, container] of Object.entries(next.containers)) {
       next.containers[key] = { ...container, members: container.members.filter(member => !selected.includes(member)) };
     }
@@ -265,16 +279,37 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     select([]);
   }
 
-  async function background(file) {
+  function addDecoration(kind, label, image = '') {
+    const current = latest.current.data;
+    const activeLayout = current.root.props.layout;
+    if (decorationEntries(activeLayout).length >= 60) return;
+    const key = id();
+    const box = { kind, label, image, fill: '#aaaaaa', locked: false, x: 8, y: 8,
+      width: Math.min(240, activeLayout.width - 8), height: Math.min(160, activeLayout.height - 8),
+      z: topObjects(activeLayout).length, group: '' };
+    const next = { ...activeLayout, decorations: { ...activeLayout.decorations, [key]: box } };
+    latest.current.onChange({ ...current, root: { props: { ...current.root.props, layout: next } } });
+    select([key]);
+  }
+
+  function lockBackground() {
+    change(boxesChanged(Object.fromEntries(freeSelection.map(key => [key, { locked: true, group: '' }]))));
+    select([]);
+  }
+
+  async function background(file, asObject = false) {
     if (!file || !canEdit) return;
     const request = ++pendingImage.current;
     try {
       setMessage('Uploading image...');
       const image = await api('/api/canvas-images', { method: 'POST', body: file, signal: AbortSignal.timeout(15000) });
       if (request !== pendingImage.current) return;
-      const current = latest.current.data;
-      latest.current.onChange({ ...current, root: { props: { ...current.root.props,
-        layout: settings(current.root.props.layout, 'background', image.id) } } });
+      if (asObject) addDecoration('image', file.name.slice(0, 100) || 'Image', image.id);
+      else {
+        const current = latest.current.data;
+        latest.current.onChange({ ...current, root: { props: { ...current.root.props,
+          layout: settings(current.root.props.layout, 'background', image.id) } } });
+      }
       setMessage('');
     } catch (error) { if (request === pendingImage.current) setMessage(error.message); }
   }
@@ -286,7 +321,9 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   }
 
   const canvasData = preview ? { ...data, root: { props: { ...data.root.props, layout: preview } } } : data;
-  const canPack = freeSelection.length > 0 && freeSelection.every(key => layout.boxes[key]) && Object.keys(layout.containers).length < 30;
+  const canLock = freeSelection.length > 0 && freeSelection.every(key => lookup(layout.decorations, key));
+  const canAddDecoration = decorationEntries(layout).length < 60;
+  const canPack = freeSelection.length > 0 && freeSelection.every(key => lookup(layout.boxes, key)) && Object.keys(layout.containers).length < 30;
   const minWidth = Math.max(160, ...Object.values(objects).map(maxX));
   const minHeight = Math.max(120, ...Object.values(objects).map(maxY));
   return <section className="canvas-editor" aria-label="Freeform designer">
@@ -314,14 +351,27 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
           <button type="button" draggable={canEdit} onDragStart={event => event.dataTransfer.setData('application/x-openhmi-control', palette)}
             onClick={() => add(palette)} disabled={data.content.length >= 100}>Add or drag control</button>
         </fieldset>
+        <fieldset disabled={!canEdit || !canAddDecoration}><legend>Images and shapes</legend>
+          <label>Image object<input type="file" accept="image/png,image/jpeg,image/webp"
+            onChange={event => { background(event.target.files[0], true); event.target.value = ''; }} /></label>
+          <button type="button" onClick={() => addDecoration('rectangle', 'Rectangle')}>Add rectangle</button>
+          <button type="button" onClick={() => addDecoration('ellipse', 'Ellipse')}>Add ellipse</button>
+        </fieldset>
         <fieldset><legend>Objects</legend>
           {top.map(([key, box]) => <React.Fragment key={key}>
             <button type="button" aria-pressed={selected.includes(key)} onClick={event => select(selectionFor(key, event.shiftKey))}>
-              {data.content.find(block => block.props.id === key)?.props.label || (box.mode === 'grid' ? 'Grid container' : 'Scrollable stack')}
+              {lookup(layout.decorations, key)?.label || data.content.find(block => block.props.id === key)?.props.label || (box.mode === 'grid' ? 'Grid container' : 'Scrollable stack')}
             </button>
             {box.members?.map(member => <button type="button" className="canvas-outline-member" key={member}
               aria-pressed={selected.includes(member)} onClick={() => select([member])}>{data.content.find(block => block.props.id === member)?.props.label}</button>)}
           </React.Fragment>)}
+          {decorationEntries(layout).filter(([, entry]) => entry.locked).map(([key, entry]) => <div key={key} className="canvas-locked-outline">
+            <span>{entry.label} (background)</span>
+            <button type="button" disabled={!canEdit} aria-label={'Unlock ' + entry.label} onClick={() => {
+              change(boxesChanged({ [key]: { locked: false } }));
+              select([key]);
+            }}>Unlock</button>
+          </div>)}
         </fieldset>
       </aside>
       <CanvasSurface data={canvasData} config={config}
@@ -329,6 +379,7 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
           <small>Shift-click to select multiple objects.</small>
+          <button type="button" disabled={!canLock} onClick={lockBackground}>Lock as background</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(true)}>Bring to front</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(false)}>Send to back</button>
           <button type="button" disabled={freeSelection.length < 2} onClick={() => {
@@ -353,6 +404,12 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
           <NumberField label="Height" value={object.height} min={24} max={layout.height - object.y} change={height => change(boxesChanged({ [selected[0]]: { height } }))} />
           {selectedContainer?.mode === 'grid' && <NumberField label="Grid columns" value={selectedContainer.columns} min={1} max={8}
             change={columns => change(boxesChanged({ [selected[0]]: { columns } }))} />}
+        </fieldset>}
+        {decoration && <fieldset disabled={!canEdit}><legend>Image or shape properties</legend>
+          <label>Object label<input value={decoration.label} maxLength={100}
+            onChange={event => change(boxesChanged({ [selected[0]]: { label: event.target.value } }))} /></label>
+          {decoration.kind !== 'image' && <label>Fill color<input type="color" value={decoration.fill}
+            onChange={event => change(boxesChanged({ [selected[0]]: { fill: event.target.value } }))} /></label>}
         </fieldset>}
         <fieldset disabled={!canEdit} className="canvas-properties">
           <Properties item={item} component={config.components[item?.type]} onChange={(key, value) =>
