@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, Request, Query
 from fastapi.responses import Response, JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .drivers import SimulatorDriver
 from .application import Application
@@ -22,6 +22,7 @@ from .logix import RuntimeDriver
 from .historian import Historian
 from .screens import expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
+from .alarm_routes import add_alarm_routes
 from .recipe_routes import add_recipe_routes
 from .security import Security
 from .security_routes import add_security_routes
@@ -44,6 +45,21 @@ class SubscriptionRequest(BaseModel):
 class ValueRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     value: float
+
+
+class AcknowledgeRequest(ActionRequest):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    comment: str = Field(default='', max_length=1000)
+
+
+class SelectedAcknowledgement(AcknowledgeRequest):
+    occurrence_ids: list[int] = Field(min_length=1, max_length=200)
+
+    @model_validator(mode='after')
+    def valid_ids(self):
+        if len(set(self.occurrence_ids)) != len(self.occurrence_ids) or any(not 1 <= identifier <= 9223372036854775807 for identifier in self.occurrence_ids):
+            raise ValueError('Select 1–200 unique valid occurrence IDs')
+        return self
 
 
 def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None, hold_connections=False) -> FastAPI:
@@ -160,6 +176,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if not (web / "assets" / "flags" / f"{language.flag}.svg").is_file():
                 raise HTTPException(422, f"Unknown flag: {language.flag}")
         for alarm in project.alarms:
+            if alarm.related_screen:
+                target = screen_map(project.model_dump()).get(alarm.related_screen)
+                if not target or target.get('popup'):
+                    raise HTTPException(422, 'Alarm navigation requires an existing non-popup screen')
             if alarm.enabled:
                 expected = ('boolean', 'integer', 'number') if alarm.trigger_type == 'value' else ('integer',)
                 if kinds.get(alarm.tag) not in expected:
@@ -285,25 +305,36 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         return monitor.snapshot()
 
     @app.post("/api/alarms/acknowledge-all")
-    def acknowledge_all(request: ActionRequest, http: Request) -> dict:
-        return acknowledge_runtime(None, http)
+    def acknowledge_all(request: AcknowledgeRequest, http: Request) -> dict:
+        return acknowledge_runtime(None, http, request.comment)
+
+    @app.post('/api/alarms/acknowledge-selected')
+    def acknowledge_selected(request: SelectedAcknowledgement, http: Request):
+        return acknowledge_runtime(None, http, request.comment, request.occurrence_ids)
 
     @app.post("/api/alarms/{occurrence_id}/acknowledge")
-    def acknowledge(occurrence_id: int, request: ActionRequest, http: Request) -> dict:
-        return acknowledge_runtime(occurrence_id, http)
+    def acknowledge(occurrence_id: int, request: AcknowledgeRequest, http: Request) -> dict:
+        if not 1 <= occurrence_id <= 9223372036854775807:
+            raise HTTPException(422, 'Invalid occurrence ID')
+        return acknowledge_runtime(occurrence_id, http, request.comment)
 
-    def acknowledge_runtime(identifier, http):
+    def acknowledge_runtime(identifier, http, comment='', selected=None):
         def execute(ticket):
-            security.require(http, 'alarms.acknowledge')
+            principal = security.require(http, 'alarms.acknowledge')
+            identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
             with monitor.lock:
                 with store._lock:
-                    if identifier is not None and not store._db.execute('SELECT 1 FROM alarm_occurrence WHERE id=?', (identifier,)).fetchone():
+                    identifiers = selected if selected is not None else [identifier] if identifier is not None else None
+                    if identifiers is not None and store._db.execute('SELECT COUNT(*) FROM alarm_occurrence WHERE id IN (' + ','.join('?' for _ in identifiers) + ')', identifiers).fetchone()[0] != len(identifiers):
                         raise HTTPException(404, 'Alarm occurrence not found')
                 ticket.dispatch()
-                result = monitor.acknowledge(identifier)
+                result = monitor.acknowledge(identifier, occurrence_ids=selected, identity=identity, operation_id=ticket.id, comment=comment)
                 ticket.confirm(verification='alarm_acknowledged', occurrences=result['acknowledged'], count=len(result['acknowledged']))
                 return result
-        return activity.run(http, 'alarm_acknowledge', str(identifier) if identifier is not None else 'all', {'occurrence_id': identifier}, execute)
+        return activity.run(http, 'alarm_acknowledge', 'selected' if selected is not None else str(identifier) if identifier is not None else 'all',
+                            {'occurrence_id': identifier, 'selected_ids': selected, 'comment': comment}, execute)
+
+    add_alarm_routes(app, monitor, security, activity, application.driver, store)
 
     @app.post("/api/actions/{name}")
     def action(name: str, request: ActionRequest, http: Request) -> dict:

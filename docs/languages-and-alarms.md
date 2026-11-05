@@ -75,8 +75,9 @@ History records configuration and quality transitions. Message/priority edits do
 not retrigger an unchanged condition; occurrence text remains the original snapshot.
 Languages added after an occurrence fall back to its original source message.
 
-The alarm console provides outstanding alarms, individual/all acknowledgement,
-and event history. The header summarizes project-wide outstanding alarms,
+The [alarm console](alarm-workflows.md) provides filtered/paged occurrences,
+selected/individual/all acknowledgement, captured cause/response guidance,
+related-screen links, attributed append-only notes and event CSV export. The header summarizes project-wide outstanding alarms,
 including those with no screen graphic. Legacy Boolean alarm controls remain
 indicators and do not implicitly register a monitored trigger.
 
@@ -85,6 +86,7 @@ The configured history limit bounds events and completed occurrences; unresolved
 occurrences are retained beyond that limit. After restart, the service reconciles
 retained state with newly observed values. The simulator's tags reset on restart.
 
-This is local simulation functionality. Remote PLC acknowledgement handshakes,
-audible/silence behavior, shelving, controller downloads, multi-process runtime
-ownership and production user identity/access control remain unimplemented.
+Remote PLC acknowledgement handshakes, audible/silence behavior, shelving,
+controller downloads and multi-process runtime ownership remain unimplemented.
+HMI security protects acknowledgement and notes through separate permissions;
+real-controller and local/Windows identity commissioning remain separate work.

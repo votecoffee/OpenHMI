@@ -124,6 +124,9 @@ class AlarmDefinition(StrictModel):
     trigger_type: Literal["value", "bit", "lsbit"] = "value"
     trigger_value: int = Field(default=1, ge=-2147483648, le=2147483647)
     message: str = Field(min_length=1, max_length=500)
+    cause: str = Field(default='', max_length=2000)
+    response: str = Field(default='', max_length=2000)
+    related_screen: str = Field(default='', max_length=60)
     priority: Literal[1, 2, 3, 4] = 2
     ack_required: bool = True
     enabled: bool = True

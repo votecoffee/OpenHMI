@@ -194,8 +194,10 @@ value/position, message, priority and acknowledgement policy. Apply the draft.
 The service samples the active configuration every 250 ms with no browser required.
 Bit positions are one-based: position 1 represents PLC bit 0 in a 32-bit word.
 
-Open [Alarms](http://127.0.0.1:8000/alarms) for outstanding alarms, individual/all
-acknowledgement and event history. Acknowledgement never clears the source tag.
+Open [Alarms](http://127.0.0.1:8000/alarms) for searchable, filtered alarm lists,
+selected/individual/all acknowledgement, captured cause/response guidance,
+related-screen navigation, attributed operator notes and event CSV export.
+Acknowledgement records the first user and never clears the source tag.
 Returned but unacknowledged occurrences remain visible. The project database
 retains alarm state/history across restarts; simulator tag values themselves reset.
 The built-in **Toggle simulated process alarm** action can be assigned to a button
@@ -203,7 +205,8 @@ for testing. Polling can miss short pulses. Remote PLC handshakes, audible/silen
 behavior and shelving are not implemented. HMI security can require group
 permission for acknowledgement; production commissioning remains separate work.
 
-See [language and alarm semantics](docs/languages-and-alarms.md) for trigger,
+See [operator alarm workflows](docs/alarm-workflows.md) for filters, permissions,
+export and retention, and [language and alarm semantics](docs/languages-and-alarms.md) for trigger,
 translation, persistence, quality and retention details and the FactoryTalk ME references.
 
 The default project database is `.local/project.sqlite3`, relative to the working

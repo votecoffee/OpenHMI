@@ -53,7 +53,8 @@ editable defaults, not fixed Windows roles. Supported permissions:
 | `project.edit` | Save/apply screen, language and alarm configurations |
 | `runtime.operate` | Invoke an action bound to an active button |
 | `runtime.write` | Write a value through an active numeric input |
-| `alarms.acknowledge` | Acknowledge individual/all monitored alarms |
+| `alarms.acknowledge` | Acknowledge selected/individual/all monitored alarms |
+| `alarms.comment` | Append attributed operator notes to alarm occurrences |
 | `security.manage` | Manage security; override control-specific group membership |
 | `activity.view` | Inspect/export the runtime operator activity journal |
 | `diagnostics.view` | Inspect/export cached runtime connection and tag diagnostics |
@@ -64,9 +65,12 @@ editable defaults, not fixed Windows roles. Supported permissions:
 
 `security.manage` does not implicitly grant the other operation permissions.
 Administrators initially receive all permissions. Engineers initially receive
-project editing, runtime operation/writing, alarm acknowledgement and recipe
-engineering. Operators receive runtime operation, alarm acknowledgement and recipe
+project editing, runtime operation/writing, alarm acknowledgement/commenting and recipe
+engineering. Operators receive runtime operation, alarm acknowledgement/commenting and recipe
 loading. Approvers receive recipe review. Add the groups needed for a user's job.
+Existing groups retain their saved permissions; grant `alarms.comment` explicitly
+when upgrading an existing project. Alarm lists/details/history remain public
+read-only views, consistent with the existing alarm monitor.
 
 New Engineers groups also receive activity/diagnostics viewing. Existing group
 definitions are preserved; grant new permissions through Security as needed.

@@ -33,7 +33,7 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
   ]), ...(settings.screens || []).flatMap(screen => [[`screen.${screen.id}.title`, screen.title], ...screen.controls.flatMap(control => [
     [`control.${screen.id}__${control.id}.label`, control.label], ...('unit' in control ? [[`control.${screen.id}__${control.id}.unit`, control.unit]] : []),
     ...(control.kind === 'indicator' ? [[`control.${screen.id}__${control.id}.on_text`, control.on_text || 'ON'], [`control.${screen.id}__${control.id}.off_text`, control.off_text || 'OFF']] : [])])]),
-    ...settings.alarms.map(alarm => [`alarm.${alarm.id}.message`, alarm.message]), ...Object.entries(uiText).map(([key, value]) => [`ui.${key}`, value])];
+    ...settings.alarms.flatMap(alarm => [['message', alarm.message], ['cause', alarm.cause || ''], ['response', alarm.response || '']].map(([field, value]) => [`alarm.${alarm.id}.${field}`, value])), ...Object.entries(uiText).map(([key, value]) => [`ui.${key}`, value])];
   function updateAlarm(index, change) { onChange({ ...settings, alarms: settings.alarms.map((alarm, i) => i === index ? { ...alarm, ...change } : alarm) }); }
   if (tab === 'languages') return <section className="project-settings" aria-label="Language settings">
     <h2>Project languages</h2><p>Only added languages appear in the runtime flag selector. Empty translations use the source text.</p>
@@ -74,6 +74,9 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
       <label>Trigger type<select value={alarm.trigger_type} onChange={event => updateAlarm(index, { trigger_type: event.target.value })}>{['value', 'bit', 'lsbit'].map(value => <option key={value}>{value}</option>)}</select></label>
       <label>Trigger value / bit position<input type="number" value={alarm.trigger_value} onChange={event => updateAlarm(index, { trigger_value: Number(event.target.value) })} /></label>
       <label>Alarm message<input value={alarm.message} maxLength={500} onChange={event => updateAlarm(index, { message: event.target.value })} /></label>
+      <label>Possible cause<textarea aria-label={`${alarm.id} cause`} value={alarm.cause || ''} maxLength={2000} onChange={event => updateAlarm(index, { cause: event.target.value })} /></label>
+      <label>Operator response<textarea aria-label={`${alarm.id} response`} value={alarm.response || ''} maxLength={2000} onChange={event => updateAlarm(index, { response: event.target.value })} /></label>
+      <label>Related screen<select aria-label={`${alarm.id} related screen`} value={alarm.related_screen || ''} onChange={event => updateAlarm(index, { related_screen: event.target.value })}><option value="">No related screen</option>{catalog.screens.filter(screen => !screen.popup).map(screen => <option key={screen.id} value={screen.id}>{screen.title}</option>)}</select></label>
       <label>Priority<select value={alarm.priority} onChange={event => updateAlarm(index, { priority: Number(event.target.value) })}>{[1, 2, 3, 4].map(value => <option key={value}>{value}</option>)}</select></label>
       <label><input type="checkbox" checked={alarm.ack_required} onChange={event => updateAlarm(index, { ack_required: event.target.checked })} />Acknowledgement required</label>
       <label><input type="checkbox" checked={alarm.enabled} onChange={event => updateAlarm(index, { enabled: event.target.checked })} />Enabled</label>

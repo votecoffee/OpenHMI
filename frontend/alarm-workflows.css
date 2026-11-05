@@ -1,0 +1,14 @@
+.alarm-filters, .alarm-actions { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 12px 0; }
+.alarm-console label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.alarm-console :is(input:not([type="checkbox"]), select, textarea) { font: inherit; padding: 6px; min-height: 36px; border: 1px solid #888; background: #eee; color: #333; }
+.alarm-console button { background: #002878; color: white; margin: 3px; }
+.alarm-console input[type="checkbox"] { width: 22px; height: 22px; }
+.alarm-console td { vertical-align: top; }
+.alarm-console td small { display: block; }
+.alarm-console .alarm-detail { border: 1px solid #999; padding: 16px; margin: 18px 0; }
+.alarm-console .alarm-detail textarea { width: 100%; min-height: 70px; }
+.alarm-console .alarm-guidance { white-space: pre-wrap; overflow-wrap: anywhere; }
+.alarm-console .alarm-actions a { padding: 8px; color: #002878; }
+.alarm-console button:focus-visible, .alarm-console :is(input, select, textarea, a):focus-visible { outline: 2px solid #002878; outline-offset: 2px; }
+.project-settings textarea { font: inherit; min-height: 70px; min-width: 220px; padding: 6px; border: 1px solid #888; background: #eee; color: #333; }
+@media (max-width: 750px) { .alarm-console { overflow-x: auto; } .alarm-console .alarm-filters input { max-width: 230px; } }

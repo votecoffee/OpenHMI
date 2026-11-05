@@ -17,6 +17,19 @@ export const uiText = {
   recipeApprovedBy: 'Approved by', recipeParameter: 'Parameter', recipeValue: 'Value', recipeUnits: 'Units', recipeLoadedCopy: 'Loaded copy',
   recipeLibrary: 'Recipe library / revision', recipeLoad: 'Load recipe', recipeClear: 'Clear loaded copy',
   recipePlcDecision: 'Production approval travels with the loaded copy. The PLC decides whether to run, reject parts or inhibit operation.',
+  alarmSearch: 'Alarm search', alarmStateFilter: 'Occurrence state', allPriorities: 'All priorities', allStates: 'All states', outstanding: 'Outstanding',
+  filterAlarms: 'Apply alarm filters', alarmStart: 'Start time', alarmEnd: 'End time', selectAlarm: 'Select occurrence {id}',
+  selectAlarmPage: 'Select unacknowledged on this page', acknowledgeSelected: 'Acknowledge selected', selectedCount: '{count} selected',
+  acknowledgementComment: 'Acknowledgement comment', acknowledgedCount: '{count} alarms acknowledged', acknowledgedBy: 'Acknowledged by',
+  alarmDetails: 'Alarm details', inspectAlarm: 'Details {id}', triggerQuality: 'Current trigger quality', possibleCause: 'Possible cause', operatorResponse: 'Operator response',
+  noGuidance: 'No response guidance configured for this occurrence', openRelatedScreen: 'Open related screen', relatedScreenUnavailable: 'Related screen unavailable in the active project',
+  operatorNotes: 'Operator notes', operatorNote: 'Operator note', saveOperatorNote: 'Save operator note', noteSaved: 'Operator note recorded', operator_note: 'Operator note',
+  olderAlarms: 'Older alarms', newestAlarms: 'Newest alarms', olderEvents: 'Older events', newestEvents: 'Newest events', olderNotes: 'Older notes', newestNotes: 'Newest notes',
+  alarmEventFilter: 'Event filter', allEvents: 'All events', exportAlarmCsv: 'Export alarm events CSV', alarmHistoryHint: 'History shares priority, search and time filters; occurrence state applies to the alarm list only.',
+  alarmCountsHint: 'Global counts include all outstanding alarms, independent of these filters. Acknowledge all includes every unacknowledged occurrence.',
+  alarmFilteredEmpty: 'No alarms match these filters', alarmReadError: 'Alarm review unavailable; retained rows may be outdated.', recordedUser: 'Recorded user',
+  legacyIdentity: 'Not recorded (legacy)', acknowledgementNotRequired: 'Not required (automatic)', monitorEvent: 'Monitor',
+  alarmAckPending: 'Acknowledged; activity finalization pending. Operation {id}', alarmNotePending: 'Note saved; activity finalization pending. Operation {id}',
 };
 const Context = createContext(null);
 const english = { code: 'en', name: 'English', flag: 'us', direction: 'ltr', translations: {} };
