@@ -12,6 +12,65 @@ async function save(page, project, apply = true) {
   }
 }
 
+test('runtime fit width preserves canvas alignment, controls and trend cursor', async ({ page }) => {
+  await page.setViewportSize({ width: 620, height: 780 });
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    const uploaded = await page.request.post('/api/canvas-images', { data: pixel });
+    expect(uploaded.ok(), await uploaded.text()).toBe(true);
+    const image = (await uploaded.json()).id;
+    await save(page, { ...original.active, screens: [], controls: [
+      { id: 'trend', kind: 'trend', label: 'Station trend', tags: ['TankLevel'], seconds: 10 },
+      { id: 'station_toggle', kind: 'button', label: 'Toggle fixture motor', action: 'toggle_motor' },
+    ], layout: { width: 1200, height: 720, background: image, boxes: {
+      trend: { x: 16, y: 20, width: 640, height: 480 },
+      station_toggle: { x: 976, y: 32, width: 180, height: 86 },
+    }, decorations: {
+      machine: { kind: 'image', label: 'Machine', image, locked: true, x: 900, y: 20, width: 280, height: 150 },
+    } } });
+    await page.route(url => url.pathname === '/api/history', route => route.fulfill({ json: {
+      start: 100, end: 110, truncated: false,
+      samples: [{ tag: 'TankLevel', epoch: 100, value: 10, quality: 'good' },
+        { tag: 'TankLevel', epoch: 110, value: 30, quality: 'good' }],
+    } }));
+    await page.goto('/runtime');
+    const canvas = page.getByLabel('Freeform screen', { exact: true });
+    const display = page.getByRole('group', { name: 'Canvas display', exact: true });
+    await expect(display.getByRole('button', { name: 'Actual size', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect((await canvas.boundingBox()).width).toBe(1200);
+    await display.getByRole('button', { name: 'Fit width', exact: true }).click();
+    await expect(display).toContainText('52% scale');
+    const area = await canvas.boundingBox();
+    const background = await canvas.locator('.canvas-background').boundingBox();
+    const control = await canvas.locator('[data-canvas-object="station_toggle"]').boundingBox();
+    const machine = await canvas.locator('[data-background-locked]').boundingBox();
+    expect(area.width).toBeLessThanOrEqual(620);
+    expect(background.width).toBeCloseTo(area.width, 0);
+    expect(control.x - area.x).toBeCloseTo(976 * area.width / 1200, 0);
+    expect(machine.x - area.x).toBeCloseTo(900 * area.width / 1200, 0);
+
+    const initial = (await (await page.request.get('/api/tags')).json()).values.MotorRunning;
+    await canvas.getByRole('button', { name: 'Toggle fixture motor', exact: true }).click();
+    await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.MotorRunning).toBe(!initial);
+    const analog = canvas.getByRole('img', { name: 'Station trend trend', exact: true });
+    const bounds = await analog.boundingBox();
+    await analog.hover({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+    const atCursor = canvas.locator('[data-trend-value="TankLevel"] [data-trend-cursor-value]');
+    await expect.poll(async () => Math.abs(Number(await atCursor.textContent()) - 20)).toBeLessThan(0.5);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(display).toContainText('100% scale');
+    await page.setViewportSize({ width: 620, height: 780 });
+    await expect(display).toContainText('52% scale');
+    await display.getByRole('button', { name: 'Actual size', exact: true }).click();
+    expect((await canvas.boundingBox()).width).toBe(1200);
+    expect((await (await page.request.get('/api/project')).json()).active.layout.width).toBe(1200);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('freeform layout supports backgrounds, overlap, selection and containers through apply', async ({ page, context }) => {
   test.setTimeout(120000);
   const original = await (await page.request.get('/api/project')).json();

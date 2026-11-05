@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from './api.mjs';
+import { useLocalization } from './localization.jsx';
 import './canvas.css';
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -67,7 +68,28 @@ export function CanvasSurface({ data, config, editor }) {
   const { layout } = data.root.props;
   const content = new Map(data.content.map(item => [item.props.id, item]));
   const editing = !!editor;
-  return <div ref={editor?.viewport}
+  const { ui } = useLocalization();
+  const runtimeViewport = useRef(null);
+  const [fit, setFit] = useState(false);
+  const [fitZoom, setFitZoom] = useState(1);
+  useLayoutEffect(() => {
+    if (editing || !fit) return;
+    const viewport = runtimeViewport.current;
+    function resize() {
+      if (viewport.clientWidth > 0) setFitZoom(Math.min(1, viewport.clientWidth / layout.width));
+    }
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [editing, fit, layout.width]);
+  const zoom = editing ? editor.zoom : fit ? fitZoom : 1;
+  return <>{!editing && <div className="canvas-view-controls" role="group" aria-label={ui('canvasDisplay')}>
+    <button type="button" aria-pressed={!fit} onClick={() => setFit(false)}>{ui('canvasActualSize')}</button>
+    <button type="button" aria-pressed={fit} onClick={() => setFit(true)}>{ui('canvasFitWidth')}</button>
+    <span>{ui('canvasDisplayScale', { percent: Math.round(zoom * 100) })}</span>
+  </div>}
+  <div ref={editor?.viewport ?? runtimeViewport}
     className={`canvas-scroll${editor?.panMode ? ' canvas-pan-mode' : ''}${editor?.panning ? ' canvas-panning' : ''}`} dir="ltr"
     onPointerDownCapture={editor?.startPan}
     onPointerMove={editor?.movePan}
@@ -77,7 +99,7 @@ export function CanvasSurface({ data, config, editor }) {
     onClickCapture={editor?.panMode ? event => { event.preventDefault(); event.stopPropagation(); } : undefined}>
     <div ref={editor?.surface} className={`hmi-canvas${editing && layout.snap ? ' canvas-grid' : ''}`} dir="ltr"
       aria-label={editing ? 'Freeform canvas' : 'Freeform screen'}
-      style={{ width: layout.width, height: layout.height, '--canvas-grid': layout.grid + 'px', zoom: editor?.zoom || 1 }}
+      style={{ width: layout.width, height: layout.height, '--canvas-grid': layout.grid + 'px', zoom }}
       onClick={event => {
         if (event.target === event.currentTarget && event.nativeEvent.pointerType === 'touch') editor?.clearSelection();
       }}
@@ -119,7 +141,7 @@ export function CanvasSurface({ data, config, editor }) {
       {editor?.marquee && <div className="canvas-marquee" aria-hidden="true"
         style={{ left: editor.marquee.x, top: editor.marquee.y, width: editor.marquee.width, height: editor.marquee.height }} />}
     </div>
-  </div>;
+  </div></>;
 }
 
 function NumberField({ label, value, min, max, change }) {

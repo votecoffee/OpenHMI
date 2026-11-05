@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export const uiText = {
+  canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
   alarmShelving: 'Alarm shelving', shelfExplanation: 'Shelving applies to this alarm and its retriggers until expiry. Monitoring and history continue. Global counts and Acknowledge all include shelved alarms. This registry is independent of list filters.',
   shelfReason: 'Reason for shelving or restoring', shelfDuration: 'Shelf duration', shelfMinutes: '{count} minutes', shelfExpiry: 'Shelved until',
   shelfFilter: 'Shelving filter', unshelved: 'Unshelved', shelved: 'Shelved', allShelving: 'All shelving states',

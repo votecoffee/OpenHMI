@@ -145,9 +145,10 @@ const Trace = React.memo(function Trace({ series, start, seconds }) {
 function TrendPlot({ analog, digital, start, seconds, historical, label, cursor, setCursor }) {
   const clipId = useId();
   function point(event) {
-    const svg = event.currentTarget;
-    const left = svg.getBoundingClientRect().left + svg.clientLeft;
-    setCursor(Math.max(0, Math.min(1, (event.clientX - left) / svg.clientWidth)));
+    const matrix = event.currentTarget.getScreenCTM();
+    if (!matrix) return;
+    const location = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    if (Number.isFinite(location.x)) setCursor(Math.max(0, Math.min(1, location.x / 600)));
   }
   function key(event) {
     if (event.key === 'Escape') { setCursor(null); return; }

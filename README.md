@@ -123,8 +123,9 @@ The designer supports layer ordering, snapping, grouping, alignment, equal spaci
 matching object sizes, pan and fit-to-view zoom,
 object search, drag-box selection, copy and paste, keyboard nudging, undo and redo,
 grid containers and scrollable stacks. Lock image and shape objects behind
-interactive controls. Freeform positions and backgrounds
-are included in project backups. See [screen layout](docs/screen-layout.md).
+interactive controls. On a live freeform screen, use **Fit width** to show the
+full canvas width or **Actual size** for configured pixel sizes. Freeform
+positions and backgrounds are included in project backups. See [screen layout](docs/screen-layout.md).
 
 ### Sample project
 

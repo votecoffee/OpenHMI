@@ -23,7 +23,14 @@ exact **X**, **Y**, **Width** and **Height** values. **Snap to grid** applies to
 dragging and resizing. The position fields accept exact pixels. **Zoom**, **Fit canvas**, and
 **Fit selection** change the editing view. Fit selection centers the selected
 objects as the canvas bounds allow, up to 200% zoom. The live canvas uses the
-configured pixel sizes and scrolls if the viewer is smaller.
+configured pixel sizes by default and scrolls if the viewer is smaller.
+
+On a live freeform screen, **Fit width** scales the canvas, background and
+controls together to the available width, up to 100%. Vertical scrolling is
+still available. The displayed percentage follows window resizing. Choose
+**Actual size** to return to the configured pixel sizes. These view controls
+leave the project layout intact. Check readability and touch target sizes on
+the intended display, especially at reduced scale.
 
 Toggle **Pan canvas** and drag to scroll around the editing view at the current
 zoom. Middle-button drag pans directly. Press **Escape** to exit Pan mode.
