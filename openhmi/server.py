@@ -1,7 +1,6 @@
 """Local live HMI builder with simulation and startup-loaded Python actions."""
 
 from pathlib import Path
-import argparse
 from contextlib import asynccontextmanager
 import logging
 import asyncio
@@ -510,18 +509,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
 
 def main() -> None:
-    import uvicorn
-
-    parser = argparse.ArgumentParser(description="OpenHMI local live builder (simulation)")
-    parser.add_argument("--project", type=Path, default=Path(".local/project.sqlite3"), help="Project database path")
-    parser.add_argument("--handlers", type=Path, help="Trusted local Python action module loaded at startup")
-    parser.add_argument("--recipe-users", type=Path, default=Path('.local/recipe-users.json'), help="Server-managed recipe account file")
-    args = parser.parse_args()
-    assets = Path(__file__).parent / "web" / "vendor" / "app.js"
-    if not assets.exists():
-        raise SystemExit("Missing designer assets. Run npm ci and npm run build first.")
-    from .workspace import ProjectWorkspace
-    uvicorn.run(ProjectWorkspace(args.project, args.handlers, args.recipe_users), host="127.0.0.1", port=8000)
+    from .launcher import main as launch
+    launch()
 
 
 if __name__ == "__main__":

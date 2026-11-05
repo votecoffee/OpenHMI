@@ -65,11 +65,30 @@ logic, memory-copy behavior and hardware acceptance remain open.
 
 ## Install
 
-This is contributor setup, not the intended packaged end-user installation.
-Prerequisites: Python 3.11+, Node.js 20+/npm for building browser assets, and a
-browser. Windows/Python 3.14 is the locally checked environment.
+### Portable Windows preview
 
-From the checkout:
+The portable Windows x64 package includes Python, dependencies and browser assets.
+Extract the complete package into a new folder, then run:
+
+```powershell
+.\OpenHMI.exe --self-check
+.\OpenHMI.exe --open-browser
+```
+
+Projects default to `%LOCALAPPDATA%\OpenHMI\projects`, separately from application
+files. Stop with Ctrl+C. Use `--create-admin admin` while stopped to create a local
+administrator with a prompted password. No Python, Node or npm installation is
+needed by the packaged HMI developer. This is an unsigned development preview;
+clean-machine, Windows service and pilot acceptance remain open.
+
+See [Windows package instructions](docs/windows-package.md) for building a preview,
+project selection, logs, update/rollback and data preservation. No public release
+installer is published yet.
+
+### Contributor installation
+
+Prerequisites: Python 3.11+, Node.js 20+/npm for building browser assets, and a
+browser. Windows/Python 3.14 is the locally checked environment. From the checkout:
 
 ```powershell
 python -m venv .venv
@@ -80,8 +99,8 @@ npm.cmd run build
 
 Assets are bundled locally, with no CDN or cloud editor requirement. The running
 server needs Python and a browser; Node is a build/contributor dependency.
-Release packaging should eventually hide this setup from HMI developers.
-Python dependencies currently use version ranges rather than a deployment lockfile.
+Portable preview builds use [pinned Windows build/runtime dependencies](requirements/windows-build.lock).
+Source installs retain the cross-version dependency ranges in `pyproject.toml`.
 
 ## Usage
 

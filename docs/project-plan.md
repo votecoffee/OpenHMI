@@ -27,7 +27,7 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | M3 — PLC transactions and recipe deployment | Software checkpoints delivered; hardware acceptance pending | Configurable command handshakes and versioned recipe staging/commit/copy verification delivered offline. Named PLC logic and bench acceptance remain open. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Complete software checkpoint | Applied history, identity-aware diff/merge, staged rollback and browser/server recovery with validated migration/restore; 81 Python and 14 browser tests passed. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
 | M5 — Operator workflows and equipment library | Alarm operator software delivered; equipment selection remains open | Filtered alarm review, captured guidance, selected acknowledgement, attributed notes and CSV delivered. Equipment faceplates, shelving/PLC acknowledgement and target-display/operator review remain open. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
-| M6 — Packaged pilot release | Planned | Clean-machine installation, local/Windows identity acceptance and documented pilot/recovery results. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
+| M6 — Packaged pilot release | Portable Windows software checkpoint delivered; acceptance open | Bundled Python/browser preview, pinned dependencies, local launcher/ownership/logs and preservation instructions delivered. Clean-machine installation, local/Windows identity and pilot/recovery acceptance remain open. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
 | M7 — Python IDE and deliberate reload | Deferred by owner | Integrated Python editing, event templates, autocomplete, diagnostics and a defined reload lifecycle. | [M7](https://github.com/votecoffee/OpenHMI/milestone/8), [#2](https://github.com/votecoffee/OpenHMI/issues/2) |
 
 M0 is a source/test checkpoint, not a production release. GitHub issues are the
@@ -110,8 +110,12 @@ Review font coverage, translation expansion, keyboard focus and touch targets on
 the actual operator display. Generic UDT capability is already available; no
 motor/valve/pump layout is preselected by this plan.
 
-M6 supplies an installation/update/run workflow that hides Node/npm and contributor
-tooling. Verify a clean supported Windows installation, process/service lifecycle,
+M6 supplies a [portable Windows preview](windows-package.md) with bundled Python,
+dependencies/assets, library ownership locking, rotating logs and a bundled
+administrator setup command. Update/removal preserve externally stored projects.
+The local software drill covers startup, forced restart and backup/restore with
+Python/Node absent from PATH. Clean-machine and service lifecycle acceptance remain
+open. Verify a clean supported Windows installation, process/service lifecycle,
 project restore and preservation of data/security. Test actual local/Windows
 credentials and intended group membership in the target environment. Automatic
 browser SSO is optional future scope, not a pilot prerequisite.

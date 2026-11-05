@@ -214,11 +214,11 @@ class Security:
         return self.snapshot()
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description='Bootstrap a local OpenHMI administrator; password is prompted')
     parser.add_argument('--project', type=Path, default=Path('.local/project.sqlite3'))
     parser.add_argument('--user', required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if not re.fullmatch(r'[A-Za-z0-9_. -]{1,60}', args.user) or args.user != args.user.strip():
         parser.error('Use a user name of 1–60 letters, numbers, spaces, dots, underscores or hyphens, without surrounding spaces')
     from .security_routes import SecurityChange
