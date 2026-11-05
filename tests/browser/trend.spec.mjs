@@ -15,23 +15,28 @@ test('configure independent trend scales, live precision, and aligned Boolean la
   try {
     const project = structuredClone(original.active);
     project.columns = 1;
-    project.tags.push({ name: 'Pressure', type: 'number', initial: 1050.25 });
-    project.controls.push({ id: 'trend', kind: 'trend', label: 'Process trend', tags: ['TankLevel'], seconds: 60 });
+    project.tags.push(
+      { name: 'TrendLevel', type: 'number', initial: 42 },
+      { name: 'TrendPressure', type: 'number', initial: 1050.25 },
+      { name: 'TrendMotor', type: 'boolean', initial: true },
+      { name: 'TrendAlarm', type: 'boolean', initial: false },
+    );
+    project.controls.push({ id: 'trend', kind: 'trend', label: 'Process trend', tags: ['TrendLevel'], seconds: 60 });
     await save(project);
     await page.goto('/');
     await page.locator('[data-control="trend"] .hmi-label').click();
     const fields = page.getByRole('group', { name: 'Trend tags', exact: true });
-    await fields.getByLabel('Add trend tag').selectOption('Pressure');
-    await fields.getByLabel('Add trend tag').selectOption('MotorRunning');
-    await fields.getByLabel('Add trend tag').selectOption('ProcessAlarm');
-    await fields.getByLabel('TankLevel decimal places').selectOption('3');
-    await fields.getByLabel('Pressure decimal places').selectOption('2');
-    await fields.getByLabel('TankLevel Y-axis range').selectOption('fixed');
-    await fields.getByLabel('TankLevel minimum').fill('20');
-    await fields.getByLabel('TankLevel maximum').fill('10');
+    await fields.getByLabel('Add trend tag').selectOption('TrendPressure');
+    await fields.getByLabel('Add trend tag').selectOption('TrendMotor');
+    await fields.getByLabel('Add trend tag').selectOption('TrendAlarm');
+    await fields.getByLabel('TrendLevel decimal places').selectOption('3');
+    await fields.getByLabel('TrendPressure decimal places').selectOption('2');
+    await fields.getByLabel('TrendLevel Y-axis range').selectOption('fixed');
+    await fields.getByLabel('TrendLevel minimum').fill('20');
+    await fields.getByLabel('TrendLevel maximum').fill('10');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Fixed trend scale requires');
-    await fields.getByLabel('TankLevel maximum').fill('60');
+    await fields.getByLabel('TrendLevel maximum').fill('60');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
 
@@ -43,28 +48,28 @@ test('configure independent trend scales, live precision, and aligned Boolean la
       const start = end - seconds;
       const sample = (tag, position, value, quality = 'good') => ({ tag, epoch: start + position * seconds, value, quality });
       return route.fulfill({ json: { start, end, truncated: false, samples: [
-        sample('TankLevel', 0, 30), sample('TankLevel', 0.25, 50), sample('TankLevel', 0.5, null, 'bad'), sample('TankLevel', 0.75, 50),
-        sample('Pressure', 0, 1000), sample('Pressure', 0.25, 1200),
-        sample('MotorRunning', 0, false), sample('MotorRunning', 0.25, true),
-        sample('ProcessAlarm', 0, true), sample('ProcessAlarm', 0.25, false),
+        sample('TrendLevel', 0, 30), sample('TrendLevel', 0.25, 50), sample('TrendLevel', 0.5, null, 'bad'), sample('TrendLevel', 0.75, 50),
+        sample('TrendPressure', 0, 1000), sample('TrendPressure', 0.25, 1200),
+        sample('TrendMotor', 0, false), sample('TrendMotor', 0.25, true),
+        sample('TrendAlarm', 0, true), sample('TrendAlarm', 0.25, false),
       ] } });
     });
     await page.goto('/runtime');
     const chart = page.locator('[data-control="trend"]');
-    const tank = chart.locator('[data-trend-tag="TankLevel"]');
+    const tank = chart.locator('[data-trend-tag="TrendLevel"]');
     await expect(tank.locator('polyline')).toHaveAttribute('points', '0,120 150,40');
     await expect(tank.locator('circle')).toHaveCount(1);
-    await expect(chart.locator('[data-trend-tag="Pressure"] polyline')).toHaveAttribute('points', '0,160 150,0');
-    await expect(chart.locator('[data-trend-lane="MotorRunning"] polyline')).toHaveAttribute('points', '0,23 150,23 150,5');
-    await expect(chart.locator('[data-trend-lane="ProcessAlarm"] polyline')).toHaveAttribute('points', '0,5 150,5 150,23');
-    await expect(chart.locator('[data-trend-value="TankLevel"]')).toContainText('42.000');
-    await expect(chart.locator('[data-trend-value="TankLevel"]')).toContainText('20 to 60 Fixed');
-    await expect(chart.locator('[data-trend-value="Pressure"]')).toContainText('1050.25');
-    await expect(chart.locator('[data-trend-value="Pressure"]')).toContainText('1000 to 1200 Observed');
-    await expect(chart.locator('[data-trend-value="MotorRunning"]')).toContainText('ON');
+    await expect(chart.locator('[data-trend-tag="TrendPressure"] polyline')).toHaveAttribute('points', '0,160 150,0');
+    await expect(chart.locator('[data-trend-lane="TrendMotor"] polyline')).toHaveAttribute('points', '0,23 150,23 150,5');
+    await expect(chart.locator('[data-trend-lane="TrendAlarm"] polyline')).toHaveAttribute('points', '0,5 150,5 150,23');
+    await expect(chart.locator('[data-trend-value="TrendLevel"]')).toContainText('42.000');
+    await expect(chart.locator('[data-trend-value="TrendLevel"]')).toContainText('20 to 60 Fixed');
+    await expect(chart.locator('[data-trend-value="TrendPressure"]')).toContainText('1050.25');
+    await expect(chart.locator('[data-trend-value="TrendPressure"]')).toContainText('1000 to 1200 Observed');
+    await expect(chart.locator('[data-trend-value="TrendMotor"]')).toContainText('ON');
     await page.getByLabel('Process trend history end').fill('2026-01-01T08:00');
     await expect(chart.getByRole('link', { name: 'Export history CSV' })).toHaveAttribute('href', /&end=\d+/);
-    await expect(chart.locator('[data-trend-value="TankLevel"]')).toContainText('42.000');
+    await expect(chart.locator('[data-trend-value="TrendLevel"]')).toContainText('42.000');
     await chart.getByRole('button', { name: 'Live', exact: true }).click();
     await expect(chart.getByRole('link', { name: 'Export history CSV' })).not.toHaveAttribute('href', /&end=/);
     if (process.env.OPENHMI_TREND_SCREENSHOT) await chart.screenshot({ path: process.env.OPENHMI_TREND_SCREENSHOT });
