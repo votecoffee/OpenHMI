@@ -7,6 +7,7 @@ import logging.config
 import os
 from pathlib import Path
 import socket
+import sqlite3
 import stat
 import sys
 from tempfile import TemporaryFile
@@ -153,6 +154,8 @@ def main(argv=None):
     mode.add_argument('--self-check', action='store_true', help='Check bundled dependencies/assets without starting a project')
     mode.add_argument('--preflight', action='store_true', help='Check package, storage access and loopback port without starting the runtime')
     mode.add_argument('--create-admin', metavar='USER', help='Create a local administrator while the runtime is stopped; password is prompted')
+    mode.add_argument('--check-windows-mappings', action='store_true',
+                      help='Compare saved Windows account/group mappings with current SIDs using read-only project access')
     parser.add_argument('--project', type=Path, default=default_project(), help='Database path; its folder is the project library')
     parser.add_argument('--handlers', type=Path, help='Trusted local Python action module loaded at startup')
     parser.add_argument('--recipe-users', type=Path, default=None if getattr(sys, 'frozen', False) else Path('.local/recipe-users.json'), help='Optional legacy recipe account file')
@@ -167,6 +170,16 @@ def main(argv=None):
             print(json.dumps(self_check(), indent=2))
             return
         project = args.project.resolve()
+        if args.check_windows_mappings:
+            from .windows_identity import WindowsIdentity, check_mappings
+            try:
+                report = check_mappings(project, WindowsIdentity())
+            except sqlite3.Error as error:
+                raise RuntimeError(f'Could not read project security mappings: {error}') from error
+            print(json.dumps(report, indent=2))
+            if not report['ok']:
+                raise SystemExit(1)
+            return
         if args.preflight:
             logs = (args.log_dir or project.parent / 'logs').resolve()
             report = preflight(project, logs, args.port)

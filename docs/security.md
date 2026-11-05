@@ -105,6 +105,23 @@ that permission is an engineering privilege.
 
 ## Windows login
 
+### Review saved mappings on the target Windows host
+
+Run the mapping check against the pilot project before testing logon:
+
+```powershell
+.\OpenHMI.exe --project 'D:\HMI Data\projects\Pilot.openhmi.sqlite3' --check-windows-mappings
+```
+
+The command opens the project database read-only and resolves each saved Windows
+name using the current host. It reports the saved SID, the resolved SID when
+available, and `matched`, `mismatch` or `unresolved` for each assignment. It
+returns exit code 1 if there are no assignments or any assignment needs review.
+The check is available with Windows login disabled. An unresolved name can
+indicate a rename or an unavailable domain. The saved SID remains the binding.
+Keep the report private because it contains account and group information.
+Verify credential login and token group membership separately on the target host.
+
 Windows authentication runs on the Windows machine hosting Python. In **Security**,
 enable Windows login, enter `DOMAIN\Group` or `MACHINE\User`, choose its identity
 type and select the target HMI group. The server resolves the account SID and

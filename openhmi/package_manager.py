@@ -224,6 +224,7 @@ def main(argv=None):
     mode = launch.add_mutually_exclusive_group()
     mode.add_argument('--self-check', action='store_true')
     mode.add_argument('--preflight', action='store_true')
+    mode.add_argument('--check-windows-mappings', action='store_true')
     args = parser.parse_args(argv)
     packages = Packages(args.root)
     try:
@@ -246,6 +247,7 @@ def main(argv=None):
             if args.open_browser: arguments += ['--open-browser']
             if args.self_check: arguments += ['--self-check']
             if args.preflight: arguments += ['--preflight']
+            if args.check_windows_mappings: arguments += ['--check-windows-mappings']
             executable = packages.release(selection['release']) / 'OpenHMI/OpenHMI.exe'
             with subprocess.Popen([str(executable), *arguments]) as runtime:
                 while True:

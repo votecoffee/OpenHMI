@@ -79,6 +79,8 @@ Use the same `--project` path when running a custom project. Sign in to the HMI
 and use **Security** to manage users, local application groups and Windows
 account/group mappings. Administrator setup rejects an existing account. The
 packaged runtime does not create a default password or bypass existing security.
+For Windows login deployments, run the [saved mapping check](https://github.com/votecoffee/OpenHMI/blob/main/docs/security.md#review-saved-mappings-on-the-target-windows-host)
+on the target host before testing credentials.
 
 ## Logs, diagnostics and Python customization
 

@@ -8,6 +8,7 @@ import socket
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -115,6 +116,40 @@ class LauncherTests(unittest.TestCase):
             self.assertEqual(error.exception.code, 1)
             self.assertIn(f'Cannot bind 127.0.0.1:{port}', output.getvalue())
             self.assertFalse(project.parent.exists())
+
+    def test_windows_mapping_check_reports_drift_without_writing_database(self):
+        def resolve(name, kind):
+            self.assertEqual(kind, 'group')
+            if name == 'MissingGroup':
+                raise OSError('Lookup unavailable')
+            return 'S-1-5-32-545'
+
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()) as output:
+            project = Path(directory) / 'Fixture #1.openhmi.sqlite3'
+            store = ProjectStore(project)
+            try:
+                Security(store)
+                with store.transaction() as db:
+                    db.executemany('INSERT INTO security_windows VALUES(?,?,?,?)', [
+                        ('S-1-5-32-545', 'group', 'MatchedGroup', 'Operators'),
+                        ('S-1-5-32-544', 'group', 'ChangedGroup', 'Operators'),
+                        ('S-1-5-32-546', 'group', 'MissingGroup', 'Operators'),
+                    ])
+            finally:
+                store.close()
+            before = project.read_bytes()
+            identity = SimpleNamespace(available=True, resolve=resolve)
+            with patch('openhmi.windows_identity.WindowsIdentity', return_value=identity), self.assertRaises(SystemExit) as error:
+                launcher.main(['--project', str(project), '--check-windows-mappings'])
+            self.assertEqual(error.exception.code, 1)
+            report = json.loads(output.getvalue())
+            self.assertFalse(report['windows_login_enabled'])
+            self.assertEqual(report['checked'], 3)
+            self.assertEqual({row['account']: row['status'] for row in report['mappings']}, {
+                'MatchedGroup': 'matched', 'ChangedGroup': 'mismatch', 'MissingGroup': 'unresolved',
+            })
+            self.assertEqual(project.read_bytes(), before)
+            self.assertEqual(list(project.parent.iterdir()), [project])
 
     def test_bundled_admin_setup_preserves_existing_users_and_requires_library_ownership(self):
         with TemporaryDirectory() as directory:

@@ -1,12 +1,45 @@
 """Windows password validation and enabled token-group SIDs; no impersonation."""
 
 import ctypes
+from contextlib import closing
 from ctypes import wintypes as w
 import os
+import sqlite3
 
 
 def enabled_group(attributes):
     return bool(attributes & 0x4) and not bool(attributes & 0x10)  # enabled, never deny-only
+
+
+def check_mappings(project, identity):
+    """Compare saved account names with current Windows SIDs without opening a runtime."""
+    if not identity.available:
+        raise RuntimeError('Windows mapping checks require a Windows server')
+    with closing(sqlite3.connect(project.as_uri() + '?mode=ro', uri=True)) as db:
+        db.execute('PRAGMA trusted_schema=OFF')
+        enabled = db.execute('SELECT windows_enabled FROM security_settings WHERE id=1').fetchone()
+        bindings = db.execute('SELECT sid,kind,label,hmi_group FROM security_windows ORDER BY label,kind,hmi_group').fetchall()
+    if enabled is None:
+        raise RuntimeError('Project has no HMI security settings')
+
+    results = []
+    for sid, kind, label, group in bindings:
+        item = {'account': label, 'kind': kind, 'hmi_group': group, 'saved_sid': sid}
+        try:
+            if kind not in ('user', 'group') or not label or '\x00' in label:
+                raise ValueError('Invalid stored Windows identity')
+            resolved = identity.resolve(label, kind)
+        except (OSError, ValueError) as error:
+            item.update(status='unresolved', error=str(error))
+        else:
+            item.update(status='matched' if resolved == sid else 'mismatch', resolved_sid=resolved)
+        results.append(item)
+
+    report = {'ok': bool(results) and all(item['status'] == 'matched' for item in results),
+              'windows_login_enabled': bool(enabled[0]), 'checked': len(results), 'mappings': results}
+    if not results:
+        report['message'] = 'No Windows assignments are configured.'
+    return report
 
 
 class WindowsIdentity:
