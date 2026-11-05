@@ -81,6 +81,23 @@ function goodSample(row, digital) {
   return row?.quality === 'good' && (digital ? typeof row.value === 'boolean' : isAnalog(row.value));
 }
 
+function holdChangeSamples(samples, context, start, end) {
+  const rows = context.previous && samples[0]?.epoch !== start ? [context.previous, ...samples] : samples;
+  const points = [];
+  rows.forEach((row, index) => {
+    if (row.epoch >= start) points.push(row);
+    if (row.quality !== 'good') return;
+    const from = Math.max(start, row.epoch);
+    const next = rows[index + 1]?.epoch ?? end;
+    const until = Math.min(next, row.epoch + context.hold_seconds);
+    if (until < from) return;
+    if (row.epoch < start) points.push({ ...row, epoch: from });
+    if (until > from) points.push({ ...row, epoch: until });
+    if (until < next) points.push({ epoch: until, quality: 'stale' });
+  });
+  return points;
+}
+
 function cursorValue({ samples, digital }, epoch) {
   let first = 0, last = samples.length;
   while (first < last) {
@@ -193,7 +210,7 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const follow = endTime === null && (!capture || capture.stopped === null);
   const parameters = new URLSearchParams({ seconds: windowSeconds, ...(endTime === null ? {} : { end: endTime }) });
   if (!capture) parameters.set('tags', names);
-  const query = capture ? `/api/trend-captures/${capture.id}?${parameters}` : names ? `/api/history?${parameters}` : '';
+  const query = capture ? `/api/trend-captures/${capture.id}?${parameters}` : names ? `/api/history?${parameters}&trend_context=true` : '';
   useEffect(() => {
     if (!query) return;
     let stopped = false, timer;
@@ -217,6 +234,9 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     for (const row of history?.samples ?? []) {
       if (!result.has(row.tag)) result.set(row.tag, []);
       result.get(row.tag).push(row);
+    }
+    for (const [tag, context] of Object.entries(history?.change_context ?? {})) {
+      result.set(tag, holdChangeSamples(result.get(tag) ?? [], context, history.start, history.end));
     }
     return result;
   }, [history]);
@@ -302,6 +322,7 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
       : !plotted.length ? <p>Select trend tags.</p>
         : history && !hasSamples ? <p>No recorded good samples in this window. Check acquisition settings and tag quality.</p> : null}
     {history?.truncated && <p>Result limited; shorten the time range.</p>}
+    {Object.keys(history?.change_context ?? {}).length > 0 && <small>On-change traces hold the last recorded value between samples.</small>}
     {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>Export history CSV</a>}
   </article>;
 }

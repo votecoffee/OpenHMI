@@ -76,8 +76,11 @@ and a maximum row count. **Periodic** is the default logging mode. **On change**
 records the first sample, changes in value or quality, and a heartbeat on the
 first due sample after 60 seconds without a record. Numeric deadband is measured
 from the last recorded value. Both modes use the configured sample interval, so
-changes between samples can be missed. Use **Periodic** with zero deadband for
-regular points in short trend windows. The query API bounds result size
+changes between samples can be missed. Trends for applied **On change** tags hold
+the last good recorded value across the window boundary and between samples.
+The trace breaks at bad quality or when the last record is older than 60 seconds
+plus the configured sample interval. Cursor values on those segments represent
+the held value. CSV exports include recorded rows only. The query API bounds result size
 and reports truncation. In **History**, select up to 12 configured tags under
 **Export recorded data**, choose the range and optionally set a local end time.
 The CSV includes recorded values, quality and UTC timestamps. The History panel

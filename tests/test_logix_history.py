@@ -248,6 +248,38 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(recorded('Speed'), [(101, 10.0, 'good'), (103, 11.0, 'good'), (166, 11.0, 'good')])
         self.assertEqual(len(recorded('Legacy')), 7)
 
+    def test_trend_context_uses_latest_quality_and_keeps_csv_in_range(self):
+        app = create_app()
+        self.addCleanup(app.state.store.close)
+        client = TestClient(app)
+        app.state.historian.configure(HistorianSettings.model_validate({'tags': [
+            {'tag': 'MotorRunning', 'mode': 'change'},
+            {'tag': 'TankLevel', 'mode': 'change'},
+            {'tag': 'ProcessAlarm'},
+        ]}).model_dump())
+        with app.state.store.transaction() as db:
+            db.executemany(
+                'INSERT INTO tag_history(tag,timestamp,value,quality) VALUES(?,?,?,?)',
+                [('MotorRunning', 960, 'true', 'good'), ('MotorRunning', 985, None, 'bad'),
+                 ('TankLevel', 900, '42', 'good'), ('TankLevel', 992, '20', 'good'),
+                 ('TankLevel', 995, '30', 'good'), ('ProcessAlarm', 989, 'false', 'good')],
+            )
+        params = {'tags': 'MotorRunning,TankLevel,ProcessAlarm', 'seconds': 10, 'end': 1000}
+        response = client.get('/api/history', params={**params, 'trend_context': 'true'}).json()
+        self.assertEqual(response['change_context'], {
+            'MotorRunning': {'hold_seconds': 61.0, 'previous': {'epoch': 985.0, 'value': None, 'quality': 'bad'}},
+            'TankLevel': {'hold_seconds': 61.0, 'previous': None},
+        })
+        self.assertNotIn('change_context', client.get('/api/history', params=params).json())
+        self.assertEqual([row['value'] for row in response['samples']], [20, 30])
+        rows = list(csv.DictReader(StringIO(client.get('/api/history.csv', params=params).text)))
+        self.assertEqual([(row['tag'], row['value']) for row in rows], [('TankLevel', '20'), ('TankLevel', '30')])
+        with app.state.store.transaction() as db:
+            db.execute("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES('TankLevel',980,'42','good')")
+        truncated = client.get('/api/history', params={**params, 'trend_context': 'true', 'limit': 1}).json()
+        self.assertTrue(truncated['truncated'])
+        self.assertIsNone(truncated['change_context']['TankLevel']['previous'])
+
     def test_faceplate_relative_members_and_no_code_actions_server_gates(self):
         app = create_app()
         with TestClient(app) as client:

@@ -1,16 +1,55 @@
 import { test, expect } from '@playwright/test';
 
+async function save(page, project, apply = true) {
+  const state = await (await page.request.get('/api/project')).json();
+  const result = await page.request.put('/api/project/draft', { data: { expected_revision: state.draft_revision, project } });
+  expect(result.ok(), await result.text()).toBe(true);
+  if (apply) {
+    const applied = await page.request.post('/api/project/apply', { data: { expected_revision: (await result.json()).draft_revision } });
+    expect(applied.ok(), await applied.text()).toBe(true);
+  }
+}
+
+test('on-change trend holds prior values and leaves a gap after a missed heartbeat', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    const project = structuredClone(original.active);
+    project.controls.push({ id: 'sparse_trend', kind: 'trend', label: 'On-change trend',
+      tags: ['TankLevel', 'MotorRunning'], seconds: 10 });
+    await save(page, project);
+    await page.route(url => url.pathname === '/api/history' && url.searchParams.get('trend_context') === 'true',
+      route => route.fulfill({ json: {
+        start: 100, end: 110, truncated: false,
+        samples: [{ tag: 'TankLevel', epoch: 108, value: 20, quality: 'good' }],
+        change_context: {
+          TankLevel: { hold_seconds: 61, previous: { epoch: 45, value: 10, quality: 'good' } },
+          MotorRunning: { hold_seconds: 61, previous: { epoch: 50, value: false, quality: 'good' } },
+        },
+      } }));
+    await page.goto('/runtime');
+    const chart = page.locator('[data-control="trend"]');
+    const analog = chart.getByRole('img', { name: 'On-change trend trend', exact: true });
+    const traces = analog.locator('[data-trend-tag="TankLevel"] polyline');
+    await expect(traces).toHaveCount(2);
+    await expect(traces.nth(0)).toHaveAttribute('points', '0,160 360,160');
+    await expect(traces.nth(1)).toHaveAttribute('points', '480,0 600,0');
+    await expect(chart.locator('[data-trend-lane="MotorRunning"] polyline')).toHaveAttribute('points', '0,23 600,23 600,23');
+    const bounds = await analog.boundingBox();
+    const atLevel = chart.locator('[data-trend-value="TankLevel"] [data-trend-cursor-value]');
+    await analog.hover({ position: { x: bounds.width / 2, y: bounds.height / 2 } });
+    await expect(atLevel).toHaveText('10.0');
+    await expect(chart.locator('[data-trend-value="MotorRunning"] [data-trend-cursor-value]')).toHaveText('OFF');
+    await analog.hover({ position: { x: bounds.width * 0.7, y: bounds.height / 2 } });
+    await expect(atLevel).toHaveText('—');
+    await expect(chart.getByRole('link', { name: 'Export history CSV' })).not.toHaveAttribute('href', /trend_context/);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('configure independent trend scales, live precision, and aligned Boolean lanes', async ({ page }) => {
   const original = await (await page.request.get('/api/project')).json();
-  async function save(project, apply = true) {
-    const state = await (await page.request.get('/api/project')).json();
-    const result = await page.request.put('/api/project/draft', { data: { expected_revision: state.draft_revision, project } });
-    expect(result.ok(), await result.text()).toBe(true);
-    if (apply) {
-      const applied = await page.request.post('/api/project/apply', { data: { expected_revision: (await result.json()).draft_revision } });
-      expect(applied.ok(), await applied.text()).toBe(true);
-    }
-  }
 
   try {
     const project = structuredClone(original.active);
@@ -22,7 +61,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
       { name: 'TrendAlarm', type: 'boolean', initial: false },
     );
     project.controls.push({ id: 'trend', kind: 'trend', label: 'Process trend', tags: ['TrendLevel'], seconds: 60 });
-    await save(project);
+    await save(page, project);
     await page.goto('/');
     await page.locator('[data-control="trend"] .hmi-label').click();
     const fields = page.getByRole('group', { name: 'Trend tags', exact: true });
@@ -107,7 +146,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await expect(chart.getByRole('link', { name: 'Export entire capture CSV' })).toHaveCount(0);
     if (process.env.OPENHMI_TREND_SCREENSHOT) await chart.screenshot({ path: process.env.OPENHMI_TREND_SCREENSHOT });
   } finally {
-    await save(original.active);
-    await save(original.draft, false);
+    await save(page, original.active);
+    await save(page, original.draft, false);
   }
 });

@@ -198,8 +198,10 @@ keeps its running copy; test recipes carry production status false. See the
    recorded data** to download a CSV for selected tags and a time range. Drop a **Trend**
    onto a screen and add up to 12 numeric or Boolean tags. Set each numeric tag's
    decimal places and choose fixed or observed Y-axis bounds. Boolean tags appear
-   as separate step traces under the analog chart. The control shows current live
-   values alongside time-range/end-time selection and CSV export.
+   as separate step traces under the analog chart. **On change** tags hold their
+   last recorded value across short gaps until quality drops or the heartbeat
+   expires. The control shows current live values alongside time-range/end-time
+   selection and CSV export.
    Set a 10-second, 1-minute or custom viewing window and move the cursor
    across the plot to read every tag at the same time. Enable **Saved trend
    recording** for manual Run/Stop or optional Boolean triggers, independent

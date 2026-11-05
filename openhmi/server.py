@@ -532,7 +532,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         return {'tags': list(connection.metadata.values()), 'error': connection.error}
 
     @app.get('/api/history')
-    def history(tags: str, seconds: int = Query(default=300, ge=1, le=31536000), limit: int = Query(default=2000, ge=1, le=20000), end: float | None = None):
+    def history(tags: str, seconds: int = Query(default=300, ge=1, le=31536000), limit: int = Query(default=2000, ge=1, le=20000), end: float | None = None, trend_context: bool = False):
         import time
         import math
         names = list(dict.fromkeys(tags.split(',')))
@@ -541,7 +541,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         finish = end if end is not None else time.time()
         if not math.isfinite(finish) or not 0 <= finish <= 32503680000:
             raise HTTPException(422, 'Invalid history end timestamp')
-        return historian.query(names, finish - seconds, finish, limit)
+        return historian.query(names, finish - seconds, finish, limit, trend_context)
 
     @app.get('/api/history.csv')
     def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000), end: float | None = None):
