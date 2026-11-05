@@ -60,6 +60,7 @@ class RecipeTransfers:
             db.execute('''CREATE TABLE IF NOT EXISTS recipe_transfer(
                 id INTEGER PRIMARY KEY,profile_id TEXT NOT NULL,definition_json TEXT NOT NULL,
                 snapshot_json TEXT NOT NULL,envelope_json TEXT NOT NULL,transfer_hash TEXT NOT NULL)''')
+            db.execute('CREATE INDEX IF NOT EXISTS recipe_transfer_profile ON recipe_transfer(profile_id,id)')
         commands.completion_verifier = self.verify_completion
 
     def _read(self, identifier):
@@ -83,16 +84,34 @@ class RecipeTransfers:
             raise HTTPException(404, 'Recipe transfer not found')
         return {**record, 'transaction': self.commands.get(identifier)}
 
-    def recent(self, limit=25, before_id=None):
+    def recent(self, limit=25, before_id=None, profile_id='', production_approved=None, verified_profile=''):
         state = self.store.snapshot()
+        conditions, values = [], []
+        if before_id is not None:
+            conditions.append('id < ?')
+            values.append(before_id)
+        if profile_id:
+            conditions.append('profile_id = ?')
+            values.append(profile_id)
+        if production_approved is not None:
+            conditions.append("json_extract(snapshot_json, '$.production_approved') = ?")
+            values.append(int(production_approved))
+        where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
         with self.store._lock:
-            ids = [row[0] for row in self.store._db.execute('SELECT id FROM recipe_transfer WHERE id < ? ORDER BY id DESC LIMIT ?',
-                                                        (before_id or 9223372036854775807, limit + 1))]
+            db = self.store._db
+            ids = [row[0] for row in db.execute(
+                'SELECT id FROM recipe_transfer' + where + ' ORDER BY id DESC LIMIT ?', (*values, limit + 1))]
             unresolved = [row[0] for row in self.store._db.execute("SELECT DISTINCT r.profile_id FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id WHERE c.state IN ('prepared','staging','requested','accepted','uncertain')")]
-        return {'items': [self.get(identifier) for identifier in ids[:limit]], 'has_more': len(ids) > limit,
-                'next_before_id': ids[limit - 1] if len(ids) > limit else None,
-                'profiles': state['active'].get('recipe_transfers', []), 'active_revision': state['active_revision'],
-                'unresolved_profiles': unresolved}
+            verified = db.execute("""SELECT r.id FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id
+                                     WHERE r.profile_id=? AND c.state='completed' ORDER BY r.id DESC LIMIT 1""",
+                                  (verified_profile,)).fetchone() if verified_profile else None
+            items = [self.get(identifier) for identifier in ids[:limit]]
+            latest = next((item for item in items if verified and item['id'] == verified[0]), None)
+            return {'items': items, 'has_more': len(ids) > limit,
+                    'has_history': bool(ids) or bool(db.execute('SELECT 1 FROM recipe_transfer LIMIT 1').fetchone()),
+                    'next_before_id': ids[limit - 1] if len(ids) > limit else None,
+                    'profiles': state['active'].get('recipe_transfers', []), 'active_revision': state['active_revision'],
+                    'unresolved_profiles': unresolved, 'verified': latest or (self.get(verified[0]) if verified else None)}
 
     @staticmethod
     def expected(record):

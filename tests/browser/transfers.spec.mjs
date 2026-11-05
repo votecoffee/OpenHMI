@@ -150,6 +150,21 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(viewer.getByText('No PLC transfer targets are configured. Recorded transfers are available below.')).toBeVisible();
   await expect(viewer.getByRole('button', { name: 'Transfer revision to PLC' })).toHaveCount(0);
   await expect(viewer.locator('tbody tr')).toHaveCount(2);
+  const historyTarget = viewer.getByLabel('History target ID', { exact: true });
+  const historyProduction = viewer.getByLabel('Captured production status', { exact: true });
+  const filterHistory = viewer.getByRole('button', { name: 'Apply transfer history filters' });
+  await historyTarget.fill('missing');
+  await filterHistory.click();
+  await expect(viewer.getByText('No recipe transfers match these filters.')).toBeVisible();
+  await historyTarget.fill('product');
+  await historyProduction.selectOption('true');
+  await filterHistory.click();
+  await expect(viewer.locator('tbody tr')).toHaveCount(1);
+  await expect(viewer.getByRole('link', { name: `Transfer #${transaction.id}`, exact: true })).toBeVisible();
+  await historyProduction.selectOption('false');
+  await filterHistory.click();
+  await expect(viewer.locator('tbody tr')).toHaveCount(1);
+  await expect(viewer.locator('tbody tr')).toContainText('Test / not production approved');
   await viewer.locator('tbody tr').first().getByText('Transfer details', { exact: true }).click();
   await expect(viewer.locator('tbody tr').first()).toContainText('production BOOL verified');
   const [download] = await Promise.all([page.waitForEvent('download'),

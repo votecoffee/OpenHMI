@@ -98,11 +98,13 @@ def add_recipe_routes(app, store, application, users=None, security=None, comman
 
     @app.get('/api/recipe-transfers')
     def transfer_history(request: Request, limit: int = Query(default=25, ge=1, le=100),
-                         before_id: int | None = Query(default=None, ge=1, le=9223372036854775807)):
+                         before_id: int | None = Query(default=None, ge=1, le=9223372036854775807),
+                         profile_id: str = Query(default='', max_length=60), production_approved: bool | None = None,
+                         verified_profile: str = Query(default='', max_length=60)):
         current = user(request)
         if not current.roles:
             raise HTTPException(403, 'Recipe permission is required')
-        return transfers.recent(limit, before_id)
+        return transfers.recent(limit, before_id, profile_id, production_approved, verified_profile)
 
     @app.get('/api/recipe-transfers/{identifier}')
     def transfer_record(request: Request, identifier: int = Path(ge=1, le=9223372036854775807), download: bool = False):

@@ -134,6 +134,9 @@ Transfer history lists all targets independently of the selected dispatch
 target. Rows show the target name captured at dispatch and mark profiles that
 are absent from the applied project as retired. Their records and downloads
 remain available even if the project has no configured transfer targets.
+Filter by the exact captured target ID or by production approval at dispatch.
+Filters apply before pagination. The selected dispatch target's verification
+card and unresolved-transfer checks stay independent of the history filters.
 
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts

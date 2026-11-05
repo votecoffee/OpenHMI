@@ -183,8 +183,20 @@ class RecipeTransferTests(unittest.TestCase):
         self.assertFalse(second['snapshot']['production_approved'])
         self.assertNotEqual(first['transfer_hash'], second['transfer_hash'])
         self.assertEqual(self.values(app)['Running'], running)
+        approved = client.get('/api/recipe-transfers', params={'profile_id': 'product', 'production_approved': True, 'limit': 1}).json()
+        self.assertEqual([item['id'] for item in approved['items']], [first['id']])
+        self.assertFalse(approved['has_more'])
+        self.assertEqual(approved['unresolved_profiles'], ['product'])
         self.publish(app)
         self.assertFalse(self.values(app)['Running']['RecipeProductionApproved'])
+        approved = client.get('/api/recipe-transfers', params={
+            'profile_id': 'product', 'production_approved': True, 'verified_profile': 'product', 'limit': 1,
+        }).json()
+        self.assertEqual([item['id'] for item in approved['items']], [first['id']])
+        self.assertEqual(approved['verified']['id'], second['id'])
+        missing = client.get('/api/recipe-transfers', params={'profile_id': 'missing'}).json()
+        self.assertTrue(missing['has_history'])
+        self.assertEqual(missing['items'], [])
 
     def test_matching_ack_with_wrong_running_payload_stays_uncertain_until_verified(self):
         app, client = self.setup_app()

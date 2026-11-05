@@ -7,20 +7,29 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
   const canInspectCommand = hasPermission(hmiSession, 'runtime.operate');
   const [data, setData] = useState(null);
   const [selection, setSelection] = useState(null);
+  const [filters, setFilters] = useState({ profile: '', production: '' });
+  const [applied, setApplied] = useState(filters);
   const [before, setBefore] = useState(null);
   const [error, setError] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [loadedVersion, setLoadedVersion] = useState(0);
   const [receipt, setReceipt] = useState(null);
   const identity = session.user?.name;
+  const parameters = new URLSearchParams({ limit: '25' });
+  if (before) parameters.set('before_id', before);
+  if (applied.profile) parameters.set('profile_id', applied.profile);
+  if (applied.production) parameters.set('production_approved', applied.production);
+  const historyQuery = parameters.toString();
+  if (selection) parameters.set('verified_profile', selection.id);
+  const endpoint = `/api/recipe-transfers?${parameters}`;
   useEffect(() => {
     if (!identity) { setData(null); return; }
     let stopped = false, timer;
     async function refresh() {
       try {
-        const result = await api(`/api/recipe-transfers?limit=25${before ? `&before_id=${before}` : ''}`);
+        const result = await api(endpoint);
         if (!stopped) {
-          setData(result);
+          setData({ ...result, historyQuery });
           if (result.profiles.length) setSelection(previous => previous ?? { id: result.profiles[0].id, revision: result.active_revision });
           setLoadedVersion(refreshVersion);
           setError('');
@@ -30,9 +39,9 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [identity, before, refreshVersion]);
+  }, [identity, endpoint, historyQuery, refreshVersion]);
   if (!identity) return null;
-  if (!data || (!data.profiles.length && !data.items.length && !before)) {
+  if (!data || (!data.profiles.length && !data.has_history)) {
     return error ? <p role="alert">PLC transfer status unavailable: {error}</p> : null;
   }
   const target = selection && selection.revision === data.active_revision && data.profiles.some(item => item.id === selection.id)
@@ -40,7 +49,8 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
   const unresolved = data.unresolved_profiles.includes(target);
   const waitingForStatus = loadedVersion !== refreshVersion;
   const allowed = identity && session.user.roles.some(role => ['operator', 'engineer', 'administrator'].includes(role));
-  const verified = data.items.find(item => item.profile_id === target && item.transaction.state === 'completed');
+  const verified = data.verified?.profile_id === target ? data.verified : null;
+  const history = data.historyQuery === historyQuery ? data.items : null;
   async function dispatch() {
     if (!target) return;
     if (!source || !reason.trim()) { setMessage('Choose a recipe revision and enter a transfer reason.'); return; }
@@ -74,7 +84,22 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
     {error && <p role="alert">PLC transfer status unavailable: {error}. Retained records may be outdated.</p>}
     {verified && <div className="loaded-recipe"><div>{verified.snapshot.content.image_id && <img className="recipe-image" src={`/api/recipe-images/${verified.snapshot.content.image_id}`} alt={verified.snapshot.content.title} />}</div><div><strong>Verified transfer record: {verified.snapshot.content.title}</strong><p>{verified.snapshot.code} · revision {verified.snapshot.number} · {verified.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}</p><p>Verified at {verified.transaction.updated_at}. This is historical evidence; the PLC may change its running copy independently.</p></div></div>}
     <h3>Transfer history</h3>
-    <table className="recipe-history"><thead><tr><th>Recipe / transfer</th><th>Captured target</th><th>Production status</th><th>PLC outcome</th><th>Details</th></tr></thead><tbody>{data.items.map(item => <tr key={item.id}>
+    <form className="operations-filters" onSubmit={event => {
+      event.preventDefault();
+      setApplied({ ...filters, profile: filters.profile.trim() });
+      setBefore(null);
+    }}>
+      <label>History target ID<input value={filters.profile} maxLength={60}
+        onChange={event => setFilters({ ...filters, profile: event.target.value })} /></label>
+      <label>Captured production status<select aria-label="Captured production status" value={filters.production}
+        onChange={event => setFilters({ ...filters, production: event.target.value })}>
+        <option value="">All production states</option>
+        <option value="true">Production approved</option>
+        <option value="false">Test / not production approved</option>
+      </select></label>
+      <button>Apply transfer history filters</button>
+    </form>
+    <table className="recipe-history"><thead><tr><th>Recipe / transfer</th><th>Captured target</th><th>Production status</th><th>PLC outcome</th><th>Details</th></tr></thead><tbody>{history?.map(item => <tr key={item.id}>
       <td>{item.snapshot.content.title} · {item.snapshot.code} r{item.snapshot.number}<br />
         {canInspectCommand ? <a href={`/commands?transaction=${item.id}`}>Transfer #{item.id}</a> : `Transfer #${item.id}`} · sequence {item.transaction.sequence}</td>
       <td>{item.profile.name} ({item.profile_id})
@@ -85,7 +110,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
         <p><a href={`/api/recipe-transfers/${item.id}?download=true`}>Download recipe transfer JSON</a></p>
         <a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
     </tr>)}</tbody></table>
-    {!data.items.length && <p>No recipe transfers on this page.</p>}
-    <button onClick={() => setBefore(null)}>Newest transfers</button> <button disabled={!data.has_more} onClick={() => setBefore(data.next_before_id)}>Older transfers</button>
+    {history?.length === 0 && <p>{applied.profile || applied.production ? 'No recipe transfers match these filters.' : 'No recipe transfers on this page.'}</p>}
+    <button onClick={() => setBefore(null)}>Newest transfers</button> <button disabled={!history || !data.has_more} onClick={() => setBefore(data.next_before_id)}>Older transfers</button>
   </section>;
 }
