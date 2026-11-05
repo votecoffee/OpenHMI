@@ -1,9 +1,10 @@
 """Integrity, Windows path boundaries and data-preserving preview updates."""
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 import hashlib
 from io import StringIO
 import json
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -120,7 +121,7 @@ class PackageTests(unittest.TestCase):
         archive, digest = self.archive()
         self.packages.install(archive, digest); self.packages.activate(digest)
         with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
-            runtime = run.return_value.__enter__.return_value
+            runtime = run.return_value
             runtime.wait.return_value = 0
             main(['--root', str(self.packages.root), 'launch', '--project', str(self.root / 'projects/Machine.sqlite3'), '--port', '8012', '--open-browser'])
         self.assertEqual(error.exception.code, 0)
@@ -133,12 +134,36 @@ class PackageTests(unittest.TestCase):
         archive, digest = self.archive()
         self.packages.install(archive, digest); self.packages.activate(digest)
         with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
-            runtime = run.return_value.__enter__.return_value
-            runtime.wait.side_effect = [KeyboardInterrupt, 7]
+            runtime = run.return_value
+            runtime.wait.side_effect = [subprocess.TimeoutExpired('runtime', 0.25), KeyboardInterrupt, 7]
             main(['--root', str(self.packages.root), 'launch'])
         self.assertEqual(error.exception.code, 7)
-        self.assertEqual(runtime.wait.call_count, 2)
+        self.assertEqual(runtime.wait.call_count, 3)
+        self.assertGreater(runtime.wait.call_args.kwargs['timeout'], 0)
         runtime.kill.assert_not_called()
+
+    def test_managed_launch_uses_one_deadline_and_terminates_only_its_child(self):
+        archive, digest = self.archive()
+        self.packages.install(archive, digest)
+        self.packages.activate(digest)
+        with patch('subprocess.Popen') as run, patch('openhmi.package_manager.time.monotonic', side_effect=[100, 101, 102, 103, 104]), \
+                redirect_stderr(StringIO()) as errors, self.assertRaises(SystemExit) as error:
+            runtime = run.return_value
+            runtime.wait.side_effect = [KeyboardInterrupt, KeyboardInterrupt, subprocess.TimeoutExpired('runtime', 1), 1]
+            runtime.poll.return_value = None
+            main(['--root', str(self.packages.root), 'launch', '--shutdown-timeout', '3'])
+        self.assertEqual(error.exception.code, 124)
+        self.assertEqual([call.kwargs.get('timeout') for call in runtime.wait.call_args_list], [0.25, 2, 1, 4])
+        runtime.kill.assert_called_once_with()
+        run.assert_called_once()
+        self.assertNotIn('--shutdown-timeout', run.call_args.args[0])
+        self.assertIn('exceeded the 3s shutdown grace period', errors.getvalue())
+
+    def test_managed_launch_rejects_invalid_shutdown_timeout_before_launch(self):
+        with patch('subprocess.Popen') as run, redirect_stderr(StringIO()), self.assertRaises(SystemExit) as error:
+            main(['--root', str(self.packages.root), 'launch', '--shutdown-timeout', '0'])
+        self.assertEqual(error.exception.code, 2)
+        run.assert_not_called()
 
     def test_launcher_package_dispatch_and_manager_lock(self):
         with redirect_stdout(StringIO()) as output:

@@ -11,11 +11,14 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 
 MAX_ARCHIVE = 256 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
 MAX_FILES = 5000
+DEFAULT_SHUTDOWN_TIMEOUT = 30
+FORCED_SHUTDOWN_EXIT_CODE = 124
 
 
 def sha256(path):
@@ -208,6 +211,49 @@ class Packages:
         return {'active': selection, 'releases': result}
 
 
+def wait_until_exit(runtime, deadline):
+    while True:
+        try:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return runtime.poll()
+            return runtime.wait(timeout=remaining)
+        except KeyboardInterrupt:
+            continue
+        except subprocess.TimeoutExpired:
+            return runtime.poll()
+
+
+def wait_for_runtime(runtime, shutdown_timeout):
+    try:
+        while True:
+            try:
+                # A short wait also lets Python handle console signals between waits on Windows.
+                return runtime.wait(timeout=0.25)
+            except subprocess.TimeoutExpired:
+                continue
+    except KeyboardInterrupt:
+        # The child shares the console and receives its own stop signal.
+        deadline = time.monotonic() + shutdown_timeout
+
+    exit_code = wait_until_exit(runtime, deadline)
+    if exit_code is not None:
+        return exit_code
+    print(f'OpenHMI runtime exceeded the {shutdown_timeout}s shutdown grace period. '
+          'Terminating this launch; verify any pending operation before retrying.', file=sys.stderr)
+    # Keep using the original child handle even if the PID could be reused.
+    try:
+        runtime.kill()
+    except ProcessLookupError:
+        exit_code = runtime.poll()
+        if exit_code is not None:
+            return exit_code
+        raise
+    if wait_until_exit(runtime, time.monotonic() + 5) is None:
+        raise RuntimeError('Could not confirm that the managed runtime terminated')
+    return FORCED_SHUTDOWN_EXIT_CODE
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     root = Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData/Local')) / 'OpenHMI/application' if getattr(sys, 'frozen', False) else Path('.local/application')
@@ -221,12 +267,16 @@ def main(argv=None):
     launch.add_argument('--project', type=Path); launch.add_argument('--port', type=int, default=8000)
     launch.add_argument('--handlers', type=Path); launch.add_argument('--log-dir', type=Path)
     launch.add_argument('--open-browser', action='store_true')
+    launch.add_argument('--shutdown-timeout', metavar='SECONDS', type=int, default=DEFAULT_SHUTDOWN_TIMEOUT,
+                        help=f'Ctrl+C grace period before terminating the launched runtime (default {DEFAULT_SHUTDOWN_TIMEOUT})')
     mode = launch.add_mutually_exclusive_group()
     mode.add_argument('--self-check', action='store_true')
     mode.add_argument('--preflight', action='store_true')
     mode.add_argument('--check-windows-mappings', action='store_true')
     mode.add_argument('--check-windows-login', metavar='ACCOUNT')
     args = parser.parse_args(argv)
+    if args.operation == 'launch' and not 1 <= args.shutdown_timeout <= 600:
+        parser.error('Shutdown timeout must be between 1 and 600 seconds.')
     packages = Packages(args.root)
     try:
         if args.operation == 'install': result = packages.install(args.archive, args.sha256)
@@ -251,16 +301,8 @@ def main(argv=None):
             if args.check_windows_mappings: arguments += ['--check-windows-mappings']
             if args.check_windows_login is not None: arguments += ['--check-windows-login', args.check_windows_login]
             executable = packages.release(selection['release']) / 'OpenHMI/OpenHMI.exe'
-            with subprocess.Popen([str(executable), *arguments]) as runtime:
-                while True:
-                    try:
-                        exit_code = runtime.wait()
-                        break
-                    except KeyboardInterrupt:
-                        # The runtime shares this console and handles Ctrl+C itself.
-                        # Keep waiting so it can finish shutdown and release its library.
-                        continue
-            raise SystemExit(exit_code)
+            runtime = subprocess.Popen([str(executable), *arguments])
+            raise SystemExit(wait_for_runtime(runtime, args.shutdown_timeout))
         print(json.dumps(result, indent=2))
     except (OSError, ValueError, RuntimeError, zipfile.BadZipFile) as error:
         parser.exit(1, f'OpenHMI package: {error}\n')

@@ -49,8 +49,21 @@ storage and port without starting the HMI. See [target account checks](windows-p
 The selected package is verified before execution. Projects and logs explicitly
 placed inside the application installation are rejected. The runtime's existing
 library lock prevents simultaneous launchers from owning the same project library.
-When running in a console, press Ctrl+C and wait for the managed launch command
-to return. The runtime handles shutdown and the manager returns its exit code.
+
+## Managed shutdown
+
+When running in a console, press **Ctrl+C** and wait for the managed launch
+command to return. The runtime receives the console stop signal and gets a
+30-second grace period by default. Set **--shutdown-timeout SECONDS** to a
+value from 1 to 600 for a different grace period. The manager returns the
+runtime's exit code if it stops during that period.
+
+At the deadline the manager checks and terminates only the child it launched.
+It allows up to five seconds to confirm termination and returns exit code
+124 on a confirmed forced stop. Review the runtime log and reconcile pending
+operations before starting OpenHMI again. The manager reports an error if
+it cannot confirm termination. The deadline applies to **package launch**
+after Ctrl+C. Direct launches follow the foreground runtime's shutdown.
 
 ## Update and rollback
 

@@ -100,9 +100,10 @@ Each worker has one invocation in flight and retries exceptions with backoff.
 [Diagnostics](activity-and-diagnostics.md#runtime-diagnostics) reports last
 success, retries and overdue work. Workers still depend on shared resources such
 as SQLite. Shutdown drains in-flight work before releasing resources and logs
-delayed or failed cleanup. A hard upper bound on shutdown and I/O waits remains
-part of qualification. Verify restart under
-the supported Windows launch method and recovery when the network, controller,
+delayed or failed cleanup. Managed Windows package launch bounds the Ctrl+C
+grace period and confirms any forced termination of its own child. Qualify that
+behavior in the frozen package and define the station watchdog policy. Verify
+restart and recovery when the network, controller,
 database or a trusted Python handler fails. Preserve durable command/recipe
 state and require reconciliation of uncertain operations after restart.
 
