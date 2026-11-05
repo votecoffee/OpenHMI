@@ -70,7 +70,14 @@ export function CanvasSurface({ data, config, editor }) {
     <div ref={editor?.surface} className={`hmi-canvas${editing && layout.snap ? ' canvas-grid' : ''}`} dir="ltr"
       aria-label={editing ? 'Freeform canvas' : 'Freeform screen'}
       style={{ width: layout.width, height: layout.height, '--canvas-grid': layout.grid + 'px', zoom: editor?.zoom || 1 }}
-      onClick={event => { if (event.target === event.currentTarget) editor?.select([]); }}
+      onClick={event => {
+        if (event.target === event.currentTarget && event.nativeEvent.pointerType === 'touch') editor?.clearSelection();
+      }}
+      onPointerDown={editor?.startMarquee}
+      onPointerMove={editor?.moveMarquee}
+      onPointerUp={editor?.finishMarquee}
+      onPointerCancel={editor?.cancelMarquee}
+      onLostPointerCapture={editor?.cancelMarquee}
       onDragOver={editing ? event => event.preventDefault() : undefined}
       onDrop={editor?.drop}>
       {layout.background && <img className="canvas-background" src={'/api/canvas-images/' + layout.background} alt="" draggable={false} />}
@@ -101,6 +108,8 @@ export function CanvasSurface({ data, config, editor }) {
           </>}
         </div>;
       })}
+      {editor?.marquee && <div className="canvas-marquee" aria-hidden="true"
+        style={{ left: editor.marquee.x, top: editor.marquee.y, width: editor.marquee.width, height: editor.marquee.height }} />}
     </div>
   </div>;
 }
@@ -141,6 +150,7 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   const [palette, setPalette] = useState(Object.keys(config.components)[0]);
   const [zoom, setZoom] = useState(1);
   const [preview, setPreview] = useState(null);
+  const [marquee, setMarquee] = useState(null);
   const [message, setMessage] = useState('');
   const surface = useRef(null);
   const editorRegion = useRef(null);
@@ -149,6 +159,7 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   latest.current = { data, onChange, canEdit, selected };
   const history = useRef({ undo: [], redo: [], field: '' }).current;
   const dragging = useRef(false);
+  const marqueeDrag = useRef(null);
   useEffect(() => () => { pendingImage.current += 1; }, []);
   const members = memberIDs(layout);
   const item = selected.length === 1 ? data.content.find(entry => entry.props.id === selected[0]) : null;
@@ -194,7 +205,12 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   }
 
   function canvasShortcut(event) {
-    if (!canEdit || dragging.current || event.altKey ||
+    if (event.key === 'Escape' && marqueeDrag.current) {
+      event.preventDefault();
+      cancelMarquee();
+      return;
+    }
+    if (!canEdit || dragging.current || marqueeDrag.current || event.altKey ||
         event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
     const command = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
@@ -426,10 +442,63 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     } catch (error) { if (request === pendingImage.current) setMessage(error.message); }
   }
 
+  function canvasPoint(event) {
+    const rect = surface.current.getBoundingClientRect();
+    return {
+      x: clamp((event.clientX - rect.left) / zoom, 0, layout.width),
+      y: clamp((event.clientY - rect.top) / zoom, 0, layout.height),
+    };
+  }
+
+  function startMarquee(event) {
+    if (event.target !== event.currentTarget || event.button !== 0 || event.pointerType === 'touch'
+        || dragging.current || marqueeDrag.current) return;
+    event.preventDefault();
+    editorRegion.current?.focus({ preventScroll: true });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    marqueeDrag.current = { pointerId: event.pointerId, start: canvasPoint(event), extend: event.shiftKey };
+  }
+
+  function selectionBox(event, drag) {
+    const end = canvasPoint(event), start = drag.start;
+    const width = Math.abs(end.x - start.x), height = Math.abs(end.y - start.y);
+    if (Math.max(width, height) * zoom < 3) return null;
+    return { x: Math.min(start.x, end.x), y: Math.min(start.y, end.y), width, height };
+  }
+
+  function moveMarquee(event) {
+    const drag = marqueeDrag.current;
+    if (drag?.pointerId === event.pointerId) setMarquee(selectionBox(event, drag));
+  }
+
+  function cancelMarquee(event) {
+    const drag = marqueeDrag.current;
+    if (!drag || (event && drag.pointerId !== event.pointerId)) return;
+    marqueeDrag.current = null;
+    setMarquee(null);
+    if (surface.current?.hasPointerCapture(drag.pointerId)) surface.current.releasePointerCapture(drag.pointerId);
+  }
+
+  function finishMarquee(event) {
+    const drag = marqueeDrag.current;
+    if (drag?.pointerId !== event.pointerId) return;
+    const area = selectionBox(event, drag);
+    cancelMarquee(event);
+    if (!area) {
+      if (!drag.extend) select([]);
+      return;
+    }
+    const hits = top.filter(([, box]) => box.x < maxX(area) && maxX(box) > area.x
+      && box.y < maxY(area) && maxY(box) > area.y);
+    const groups = new Set(hits.map(([, box]) => box.group).filter(Boolean));
+    const keys = new Set(hits.map(([key]) => key));
+    const matched = top.filter(([key, box]) => keys.has(key) || groups.has(box.group)).map(([key]) => key);
+    select(drag.extend ? [...new Set([...selected, ...matched])] : matched);
+  }
+
   function drop(event) {
     event.preventDefault();
-    const rect = surface.current.getBoundingClientRect();
-    add(event.dataTransfer.getData('application/x-openhmi-control'), { x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom });
+    add(event.dataTransfer.getData('application/x-openhmi-control'), canvasPoint(event));
   }
 
   const canvasData = preview ? { ...data, root: { props: { ...data.root.props, layout: preview } } } : data;
@@ -490,10 +559,11 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
         </fieldset>
       </aside>
       <CanvasSurface data={canvasData} config={config}
-        editor={{ selected, select, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, zoom }} />
+        editor={{ selected, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, zoom,
+          marquee, startMarquee, moveMarquee, finishMarquee, cancelMarquee, clearSelection: () => select([]) }} />
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
-          <small>Shift-click to select multiple objects. Use arrows to nudge.</small>
+          <small>Drag a box from empty canvas or Shift-click to select multiple objects. Use arrows to nudge.</small>
           <button type="button" disabled={!canDuplicate} onClick={duplicate}>Duplicate selection</button>
           <button type="button" disabled={!canLock} onClick={lockBackground}>Lock as background</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(true)}>Bring to front</button>

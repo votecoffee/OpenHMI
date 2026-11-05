@@ -2,20 +2,21 @@ import { test, expect } from '@playwright/test';
 
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=', 'base64');
 
+async function save(page, project, apply = true) {
+  const state = await (await page.request.get('/api/project')).json();
+  const response = await page.request.put('/api/project/draft', { data: { expected_revision: state.draft_revision, project } });
+  expect(response.ok(), await response.text()).toBe(true);
+  if (apply) {
+    const result = await page.request.post('/api/project/apply', { data: { expected_revision: (await response.json()).draft_revision } });
+    expect(result.ok(), await result.text()).toBe(true);
+  }
+}
+
 test('freeform layout supports backgrounds, overlap, selection and containers through apply', async ({ page, context }) => {
   test.setTimeout(120000);
   const original = await (await page.request.get('/api/project')).json();
-  async function save(project, apply = true) {
-    const state = await (await page.request.get('/api/project')).json();
-    const response = await page.request.put('/api/project/draft', { data: { expected_revision: state.draft_revision, project } });
-    expect(response.ok(), await response.text()).toBe(true);
-    if (apply) {
-      const result = await page.request.post('/api/project/apply', { data: { expected_revision: (await response.json()).draft_revision } });
-      expect(result.ok(), await result.text()).toBe(true);
-    }
-  }
   try {
-    await save({ ...original.active, controls: [
+    await save(page, { ...original.active, controls: [
       { kind: 'numeric', id: 'level', label: 'Level fixture', tag: 'TankLevel', unit: '%' },
       { kind: 'indicator', id: 'motor', label: 'Motor fixture', tag: 'MotorRunning' },
       { kind: 'text', id: 'note', label: 'Note fixture', tag: 'OperatorText' },
@@ -204,7 +205,52 @@ test('freeform layout supports backgrounds, overlap, selection and containers th
         .toEqual(['MotorRunning', 'TankLevel', 'OperatorText']);
     }
   } finally {
-    await save(original.active);
-    await save(original.draft, false);
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
+test('marquee selects overlapping objects and groups at editor zoom', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  const box = (x, y, group = '') => ({ x, y, width: 88, height: 55, z: 0, group });
+  try {
+    await save(page, { ...original.active, controls: ['one', 'two', 'three', 'four'].map(id => ({
+      kind: 'indicator', id, label: id, tag: 'MotorRunning',
+    })), layout: { width: 700, height: 480, boxes: {
+      one: box(40, 40), two: box(190, 40, 'pair'), three: box(390, 200, 'pair'), four: box(40, 310),
+    }, decorations: { picture: {
+      ...box(0, 0), kind: 'rectangle', label: 'Locked background', locked: true, width: 680, height: 460,
+    } } } });
+    await page.goto('/');
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    await page.getByRole('combobox', { name: 'Zoom', exact: true }).selectOption('0.75');
+    const surface = await canvas.boundingBox();
+    const move = (x, y) => page.mouse.move(surface.x + x * 0.75, surface.y + y * 0.75, { steps: 5 });
+    async function boxSelect(start, end, modifier, cancel = false) {
+      if (modifier) await page.keyboard.down(modifier);
+      await move(...start);
+      await page.mouse.down();
+      await move(...end);
+      await expect(canvas.locator('.canvas-marquee')).toBeVisible();
+      if (cancel) await page.keyboard.press('Escape');
+      await page.mouse.up();
+      if (modifier) await page.keyboard.up(modifier);
+      await expect(canvas.locator('.canvas-marquee')).toHaveCount(0);
+    }
+    const selected = () => canvas.locator('.canvas-selected').evaluateAll(items =>
+      items.map(item => item.dataset.canvasObject).sort());
+    await boxSelect([12, 12], [220, 72]);
+    expect(await selected()).toEqual(['one', 'three', 'two']);
+    await boxSelect([12, 280], [105, 345], 'Shift');
+    expect(await selected()).toEqual(['four', 'one', 'three', 'two']);
+    await boxSelect([300, 265], [410, 235], undefined, true);
+    expect(await selected()).toEqual(['four', 'one', 'three', 'two']);
+    await move(12, 12);
+    await page.mouse.click(surface.x + 9, surface.y + 9);
+    expect(await selected()).toEqual([]);
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
   }
 });

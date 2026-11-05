@@ -25,8 +25,11 @@ the editing view. The live canvas uses the configured pixel sizes and scrolls
 if the viewer is smaller.
 
 Controls may overlap. Use **Objects** to select a control that is covered.
-**Bring to front** and **Send to back** change the stacking order. Shift-click
-objects to select more than one. Align their edges or centers, or space three
+**Bring to front** and **Send to back** change the stacking order. Drag a
+selection box from empty canvas to select objects it touches. Hold **Shift**
+while dragging to add to the current selection. A group is selected together
+and locked backgrounds are skipped. **Escape** cancels the selection drag.
+You can also Shift-click individual objects. Align their edges or centers, or space three
 or more objects evenly. **Group** makes a selection move together and
 **Ungroup** restores individual selection.
 
