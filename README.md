@@ -183,7 +183,8 @@ Timeout/restart never replay a command. See the [contract and offline example](d
 Use **PLC recipes** for dedicated recipe transfer profiles and complete parameter
 mapping, then **Transfer revision to PLC** in the recipe viewer/editor. Reselect
 the transfer target after a live project revision change. The panel keeps the
-transaction ID visible if the status refresh fails. The PLC
+transaction ID visible if the status refresh fails. Operators with runtime
+operation permission can open that transaction directly. The PLC
 keeps its running copy; test recipes carry production status false. See the
 [recipe transfer contract and workflow](docs/recipe-transfers.md).
 

@@ -123,6 +123,8 @@ and paginated; unresolved target state is checked independently of the page.
 After dispatch returns a transaction ID, the panel keeps that receipt if the
 status read fails. Further transfers wait for a successful status refresh and
 the target's normal unresolved-transfer checks.
+Operators with runtime operation permission can open the exact command
+transaction from the receipt or a transfer history row.
 
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts

@@ -9,29 +9,39 @@ function canInspect(session, permission) {
 export function CommandConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = allowed(session, 'runtime.operate');
+  const identifier = new URLSearchParams(location.search).get('transaction');
+  const exact = identifier !== null;
+  const valid = !exact || /^[1-9]\d{0,18}$/.test(identifier);
   const [data, setData] = useState(null);
   const [before, setBefore] = useState(null);
   const [error, setError] = useState('');
+  const endpoint = exact ? `/api/commands/${identifier}` : `/api/commands?limit=50${before ? `&before_id=${before}` : ''}`;
   useEffect(() => {
-    if (!permitted) return;
+    if (!permitted || !valid) return;
     let stopped = false, timer;
     async function refresh() {
-      try { const result = await api(`/api/commands?limit=50${before ? `&before_id=${before}` : ''}`); if (!stopped) { setData(result); setError(''); } }
+      try {
+        const result = await api(endpoint);
+        if (!stopped) { setData(exact ? { items: [result] } : result); setError(''); }
+      }
       catch (problem) { if (!stopped) setError(problem.message); }
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [permitted, before]);
+  }, [permitted, valid, endpoint, exact]);
   if (!permitted) return <p>Sign in with runtime operation permission to inspect command transactions.</p>;
   return <section className="engineering operations" aria-label="PLC command transactions"><h1>PLC command transactions</h1>
+    {exact && <p><a href="/commands">All command transactions</a></p>}
+    {exact && valid && <h2>Transaction #{identifier}</h2>}
+    {!valid && <p role="alert">Enter a valid command transaction ID.</p>}
     <p>Staging means recipe parameters are being written; commit has not been sent. Requested means request/commit dispatch started. Accepted means the PLC acknowledged this sequence. Completed / failed requires a matching PLC completion and result. Timeout is uncertain; it does not cancel or replay the request.</p>
     {error && <p role="alert">Status unavailable: {error}. Retained rows may be outdated.</p>}
     <table className="activity-table"><thead><tr><th>Transaction / command</th><th>Sequence / state</th><th>Result</th><th>Evidence</th></tr></thead><tbody>{data?.items.map(item => <tr key={item.id}>
-      <td>#{item.id} · {item.command_id}<br /><small>{item.created_at}</small></td><td>{item.sequence} · {item.state}</td><td>{item.result_code ?? 'Not completed'}</td><td>
-        <details><summary>Transaction details</summary><p>Operation {item.operation_id}</p><p>{item.error}</p>{item.events.map((event, i) => <p key={i}>{event.timestamp} · {event.state} · {event.detail}</p>)}<a href={`/activity?search=${encodeURIComponent(item.operation_id)}`}>Operator activity</a></details>
+      <td>{exact ? `#${item.id}` : <a href={`/commands?transaction=${item.id}`}>#{item.id}</a>} · {item.command_id}<br /><small>{item.created_at}</small></td><td>{item.sequence} · {item.state}</td><td>{item.result_code ?? 'Not completed'}</td><td>
+        <details open={exact || undefined}><summary>Transaction details</summary><p>Operation {item.operation_id}</p><p>{item.error}</p>{item.events.map((event, i) => <p key={i}>{event.timestamp} · {event.state} · {event.detail}</p>)}<a href={`/activity?search=${encodeURIComponent(item.operation_id)}`}>Operator activity</a></details>
       </td></tr>)}</tbody></table>
     {data && !data.items.length && <p>No command transactions recorded.</p>}
-    <button onClick={() => setBefore(null)}>Newest commands</button> <button disabled={!data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older commands</button>
+    {!exact && <><button onClick={() => setBefore(null)}>Newest commands</button> <button disabled={!data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older commands</button></>}
   </section>;
 }
 

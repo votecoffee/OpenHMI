@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
+import { SecurityContext, allowed as hasPermission } from './security.jsx';
 
 export function RecipeTransferPanel({ source, session, reason, dirty, busy, setBusy, loadingAllowed, setMessage }) {
+  const { session: hmiSession } = useContext(SecurityContext);
+  const canInspectCommand = hasPermission(hmiSession, 'runtime.operate');
   const [data, setData] = useState(null);
   const [selection, setSelection] = useState(null);
   const [before, setBefore] = useState(null);
   const [error, setError] = useState('');
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [loadedVersion, setLoadedVersion] = useState(0);
+  const [receipt, setReceipt] = useState(null);
   const identity = session.user?.name;
   useEffect(() => {
     if (!identity) { setData(null); return; }
@@ -43,6 +47,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
         revision_id: source.id, expected_revision_version: source.version, expected_project_revision: selection.revision, reason,
       }));
       setMessage(`PLC transfer requested. Transaction ${result.transaction.id}. Completion requires PLC acknowledgement and a verified running copy.${result.audit_status === 'pending' ? ' Activity journal finalization is pending.' : ''}`);
+      setReceipt({ id: result.transaction.id, identity });
       setBefore(null);
       setRefreshVersion(version => version + 1);
     } catch (problem) { setMessage(problem.message); }
@@ -56,12 +61,16 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
       {data.profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
     {!target && <p role="status">Review and select a PLC transfer target for the applied project.</p>}
     <button disabled={!target || !source || dirty || busy || !allowed || !loadingAllowed || unresolved || waitingForStatus || !!error} onClick={dispatch}>Transfer revision to PLC</button>
+    {receipt && receipt.identity === identity && canInspectCommand && <p>
+      <a href={`/commands?transaction=${receipt.id}`}>View command transaction #{receipt.id}</a>
+    </p>}
     {waitingForStatus && !error && <p role="status">Waiting for the latest PLC transfer status.</p>}
     {unresolved && <p role="status">This target has an unresolved transfer. Verify its outcome before another request.</p>}
     {error && <p role="alert">PLC transfer status unavailable: {error}. Retained records may be outdated.</p>}
     {verified && <div className="loaded-recipe"><div>{verified.snapshot.content.image_id && <img className="recipe-image" src={`/api/recipe-images/${verified.snapshot.content.image_id}`} alt={verified.snapshot.content.title} />}</div><div><strong>Verified transfer record: {verified.snapshot.content.title}</strong><p>{verified.snapshot.code} · revision {verified.snapshot.number} · {verified.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}</p><p>Verified at {verified.transaction.updated_at}. This is historical evidence; the PLC may change its running copy independently.</p></div></div>}
     <table className="recipe-history"><thead><tr><th>Recipe / transfer</th><th>Production status</th><th>PLC outcome</th><th>Details</th></tr></thead><tbody>{data.items.filter(item => item.profile_id === target).map(item => <tr key={item.id}>
-      <td>{item.snapshot.content.title} · {item.snapshot.code} r{item.snapshot.number}<br />Transfer #{item.id} · sequence {item.transaction.sequence}</td>
+      <td>{item.snapshot.content.title} · {item.snapshot.code} r{item.snapshot.number}<br />
+        {canInspectCommand ? <a href={`/commands?transaction=${item.id}`}>Transfer #{item.id}</a> : `Transfer #${item.id}`} · sequence {item.transaction.sequence}</td>
       <td>{item.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}<br />{item.snapshot.approved_by && `Approved by ${item.snapshot.approved_by}`}</td>
       <td>{item.transaction.state}{item.transaction.result_code !== null ? ` · result ${item.transaction.result_code}` : ''}</td>
       <td><details><summary>Transfer details</summary><p>Requested by {item.snapshot.transferred_by}: {item.snapshot.transfer_reason}</p><p>{item.transaction.error}</p>{item.transaction.events.map((event, i) => <p key={i}>{event.state}: {event.detail}</p>)}<p>Content hash: {item.snapshot.content_hash}</p><p>Transfer hash: {item.transfer_hash}</p><a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
