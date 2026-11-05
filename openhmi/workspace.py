@@ -235,6 +235,11 @@ class ProjectWorkspace:
             return
         if scope['type'] != 'http':
             return await self.current(scope, receive, send)
+        # The complete CSV works in short database batches and stages an
+        # independent file. A project switch can cancel staging, while a slow
+        # download of the finished file need not delay HMI requests.
+        if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
+            return await self.current(scope, receive, send)
         # A project switch cannot close a database while an HTTP operation is using it.
         async with self.lock:
             if scope['path'].startswith('/api/workspace'):

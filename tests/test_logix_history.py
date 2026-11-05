@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from openhmi.logix import RuntimeDriver
 from openhmi.projects import Project, ProjectStore, default_project
-from openhmi.historian import Historian
+from openhmi.historian import Historian, HistoryChanged
 from openhmi.runtime_models import HistorianSettings
 from openhmi.server import create_app
 from fastapi.testclient import TestClient
@@ -205,6 +205,38 @@ class LogixHistoryTests(unittest.TestCase):
             self.assertEqual(len(rows), 20001)
             self.assertEqual({row['value'] for row in rows if row['tag'] == 'TankLevel'}, {'-2.5'})
             self.assertEqual(rows[-1]['value'], "'=1+1")
+            full = client.get('/api/history/full.csv', params={
+                'tags': 'TankLevel,OperatorText', 'start': end - 6, 'end': end,
+                'project_instance': app.state.project_instance,
+            })
+            self.assertEqual(full.status_code, 200)
+            self.assertEqual(full.headers['Content-Disposition'], 'attachment; filename="tag-history.csv"')
+            complete = list(csv.DictReader(StringIO(full.text)))
+            self.assertEqual(len(complete), 20002)
+            self.assertEqual(complete[0]['value'], '999')
+            self.assertEqual(complete[1:], rows)
+            self.assertEqual(client.get('/api/history/full.csv', params={
+                'tags': 'TankLevel', 'project_instance': 'different-project',
+            }).status_code, 409)
+
+    def test_complete_export_excludes_new_rows_and_rejects_pruned_rows(self):
+        store = ProjectStore()
+        self.addCleanup(store.close)
+        history = Historian(store, None)
+        with store.transaction() as db:
+            db.executemany("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES('TankLevel',100,?,'good')",
+                           [('1',), ('2',), ('3',)])
+        batches = history.export_batches(['TankLevel'], 100, 101, batch_size=1)
+        self.assertEqual(next(batches)[1][0][2], '1')
+        with store.transaction() as db:
+            db.execute("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES('TankLevel',100,'4','good')")
+        self.assertEqual([rows[0][2] for _, rows in batches], ['2', '3'])
+        batches = history.export_batches(['TankLevel'], 100, 101, batch_size=1)
+        next(batches)
+        with store.transaction() as db:
+            db.execute('DELETE FROM tag_history WHERE id=2')
+        with self.assertRaisesRegex(HistoryChanged, 'Retention removed'):
+            list(batches)
 
     def test_on_change_logs_transitions_deadband_and_heartbeat(self):
         store = ProjectStore()

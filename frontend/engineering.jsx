@@ -53,6 +53,7 @@ function HistoryExport({ tags, projectInstance }) {
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [zone, setZone] = useState('local');
+  const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const names = tags.map(item => item.tag).filter(tag => selected.includes(tag));
@@ -73,6 +74,16 @@ function HistoryExport({ tags, projectInstance }) {
         query.set('start', String(begin));
       } else {
         query.set('seconds', range);
+      }
+      if (complete) {
+        query.set('project_instance', projectInstance);
+        const link = document.createElement('a');
+        link.href = '/api/history/full.csv?' + query;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.click();
+        setMessage('Complete CSV requested. The browser will show the download or report an error in a new tab.');
+        return;
       }
       const response = await fetch('/api/history.csv?' + query, { signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error(`History export failed (HTTP ${response.status}).`);
@@ -118,6 +129,8 @@ function HistoryExport({ tags, projectInstance }) {
           onChange={event => setEnd(event.target.value)} /></label>
       </div>
       <p>Leave the end time blank to export through now.</p>
+      <label><input type="checkbox" checked={complete} onChange={event => setComplete(event.target.checked)} />
+        Export all retained rows in this range</label>
       <button type="submit" disabled={!names.length}>{busy ? 'Exporting…' : 'Download history CSV'}</button>
       <p role="status">{message}</p>
     </fieldset>

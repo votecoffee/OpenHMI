@@ -2,16 +2,21 @@
 
 from datetime import datetime, timezone
 import json
-from threading import RLock
+from threading import BoundedSemaphore, RLock
 import time
 
 HEARTBEAT_SECONDS = 60
+
+
+class HistoryChanged(RuntimeError):
+    pass
 
 
 class Historian:
     def __init__(self, store, driver):
         self.store, self.driver = store, driver
         self.lock = RLock()
+        self.export_slot = BoundedSemaphore(1)
         self.deadlines, self.previous = {}, {}
         self.settings = {'tags': [], 'retention_days': 30, 'max_rows': 1000000}
         self.last_prune = 0
@@ -101,3 +106,31 @@ class Historian:
         if trend_context:
             data['change_context'] = context
         return data
+
+    def export_batches(self, tags, start, end, batch_size=1024):
+        # History is append-only apart from pruning. A high-water ID excludes
+        # new inserts. A count check detects rows pruned before they were copied.
+        window = 'tag=? AND timestamp BETWEEN ? AND ? AND id<=?'
+        with self.store._lock:
+            high_water = self.store._db.execute('SELECT COALESCE(MAX(id),0) FROM tag_history').fetchone()[0]
+            expected = sum(self.store._db.execute(
+                f'SELECT COUNT(*) FROM tag_history WHERE {window}', (tag, start, end, high_water)
+            ).fetchone()[0] for tag in tags)
+        exported = 0
+        for tag in tags:
+            cursor = (start, 0)
+            while True:
+                with self.store._lock:
+                    rows = self.store._db.execute(
+                        f'''SELECT timestamp,id,value,quality,source_timestamp FROM tag_history
+                            WHERE {window} AND (timestamp,id) > (?,?)
+                            ORDER BY timestamp,id LIMIT ?''',
+                        (tag, start, end, high_water, *cursor, batch_size),
+                    ).fetchall()
+                if not rows:
+                    break
+                exported += len(rows)
+                cursor = rows[-1][:2]
+                yield tag, rows
+        if exported != expected:
+            raise HistoryChanged('Retention removed records during export. Retry with a shorter range.')

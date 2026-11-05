@@ -86,9 +86,13 @@ and reports truncation. In **History**, select up to 12 configured tags under
 An empty end time uses the current time. Custom ranges can span up to 365 days.
 Choose local browser time or UTC. Use UTC to distinguish the two occurrences of
 an hour repeated when daylight saving time ends. Both range boundaries are inclusive.
-The CSV includes recorded values, quality and UTC timestamps. The History panel
-warns when the export is limited to the newest 20,000 rows per tag. To retrieve
-older rows, set an earlier end time and export a shorter range. Spreadsheet
+The CSV includes recorded values, quality and UTC timestamps. The quick export
+warns when it is limited to the newest 20,000 rows per tag. Select **Export all
+retained rows in this range** to download the complete selection. OpenHMI stages
+that CSV in temporary storage before sending it to the browser. One complete
+export can run per project at a time, with a 1 GiB file limit. If retention
+removes a selected record before it is copied, the export reports an error and
+you can retry with a shorter range. Spreadsheet
 formula-like text values receive a leading apostrophe in the CSV. SQLite keeps
 the original values.
 A **Trend** shares one time axis across up to 12 tags. Each numeric tag has an

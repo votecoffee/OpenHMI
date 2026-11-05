@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 import json
 import time
@@ -6,10 +7,26 @@ from tempfile import TemporaryDirectory
 import unittest
 import zipfile
 from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
 from openhmi.workspace import ProjectWorkspace
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_complete_history_download_does_not_wait_for_workspace_lock(self):
+        async def download(workspace):
+            async with AsyncClient(transport=ASGITransport(app=workspace), base_url='http://test') as client:
+                async with workspace.lock:
+                    response = await asyncio.wait_for(client.get('/api/history/full.csv?tags=TankLevel'), timeout=5)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn('tag,timestamp,value,quality,source_timestamp', response.text)
+
+        with TemporaryDirectory() as directory:
+            workspace = ProjectWorkspace(Path(directory) / 'Original.openhmi.sqlite3')
+            try:
+                asyncio.run(download(workspace))
+            finally:
+                workspace.current.state.store.close()
+
     def test_complete_backup_create_open_import_and_connection_hold(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / 'Original.openhmi.sqlite3'

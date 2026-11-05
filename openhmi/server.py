@@ -16,9 +16,10 @@ from .application import Application
 from .activity import ActivityJournal
 from .commands import CommandService, add_command_routes, validate_commands
 from .recipe_transfers import validate_transfers
-from .operations_routes import add_operations_routes, csv_text
+from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .historian import Historian
+from .history_export import CSV_COLUMNS, complete_history_csv, csv_row
 from .trend_recording import TrendRecorder, add_trend_routes
 from .screens import expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
@@ -531,7 +532,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(404, 'Apply and enable the connection first')
         return {'tags': list(connection.metadata.values()), 'error': connection.error}
 
-    def query_history(tags, seconds, limit, end, trend_context=False, start=None):
+    def history_window(tags, seconds, end, start=None):
         import time
         import math
         names = list(dict.fromkeys(tags.split(',')))
@@ -542,26 +543,32 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(422, 'Invalid history end timestamp')
         if start is not None and (not math.isfinite(start) or not 0 <= start < finish or finish - start > 31536000):
             raise HTTPException(422, 'History start must be before the end and within 365 days')
-        return historian.query(names, finish - seconds if start is None else start, finish, limit, trend_context)
+        return names, finish - seconds if start is None else start, finish
 
     @app.get('/api/history')
     def history(tags: str, seconds: int = Query(default=300, ge=1, le=31536000), limit: int = Query(default=2000, ge=1, le=20000), end: float | None = None, trend_context: bool = False):
-        return query_history(tags, seconds, limit, end, trend_context)
+        return historian.query(*history_window(tags, seconds, end), limit, trend_context)
 
     @app.get('/api/history.csv')
     def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
                     end: float | None = None, start: float | None = None):
         import csv
         from io import StringIO
-        data = query_history(tags, seconds, 20000, end, start=start)
+        data = historian.query(*history_window(tags, seconds, end, start), 20000)
         output = StringIO()
         writer = csv.writer(output)
-        writer.writerow(['tag', 'timestamp', 'value', 'quality', 'source_timestamp'])
+        writer.writerow(CSV_COLUMNS)
         for row in data['samples']:
-            value = row['value']
-            writer.writerow([row['tag'], row['timestamp'], csv_text(value) if isinstance(value, str) else value,
-                             row['quality'], row['source_timestamp']])
+            writer.writerow(csv_row(row['tag'], row['timestamp'], row['value'], row['quality'], row['source_timestamp']))
         return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="tag-history.csv"', 'X-OpenHMI-Truncated': str(data['truncated']).lower()})
+
+    @app.get('/api/history/full.csv')
+    def history_full_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
+                         end: float | None = None, start: float | None = None,
+                         project_instance: str | None = Query(default=None, max_length=32)):
+        if project_instance is not None and project_instance != instance:
+            raise HTTPException(409, 'A different project was opened. Reload before exporting history.')
+        return complete_history_csv(historian, *history_window(tags, seconds, end, start))
 
     @app.get("/", include_in_schema=False)
     @app.get("/runtime", include_in_schema=False)

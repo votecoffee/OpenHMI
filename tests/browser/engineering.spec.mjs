@@ -55,6 +55,10 @@ test('History panel exports recorded tags without a trend control', async ({ pag
     expect(Number(bounds.get('start'))).toBe(Math.floor(start.getTime() / 1000));
     expect(Number(bounds.get('end'))).toBe(Math.floor(end.getTime() / 1000));
     expect(await readFile(await exactFile.path(), 'utf8')).toContain('TankLevel,');
+    await panel.getByLabel('Export all retained rows in this range', { exact: true }).check();
+    const [completeFile] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), button.click()]);
+    expect(completeFile.suggestedFilename()).toBe('tag-history.csv');
+    expect(await readFile(await completeFile.path(), 'utf8')).toContain('TankLevel,');
     const logging = page.getByRole('combobox', { name: 'MotorRunning logging mode', exact: true });
     await expect(logging).toHaveValue('periodic');
     await logging.selectOption('change');
