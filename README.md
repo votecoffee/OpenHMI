@@ -230,7 +230,7 @@ The service samples the active configuration every 250 ms with no browser requir
 Bit positions are one-based: position 1 represents PLC bit 0 in a 32-bit word.
 
 Open [Alarms](http://127.0.0.1:8000/alarms) for searchable, filtered alarm lists,
-selected/individual/all acknowledgement, captured cause/response guidance,
+selected/individual/all acknowledgement, captured possible causes and recovery steps,
 related-screen navigation, attributed operator notes and event CSV export.
 Acknowledgement records the first user and never clears the source tag.
 Returned but unacknowledged occurrences remain visible. The project database

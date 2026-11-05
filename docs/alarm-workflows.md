@@ -5,10 +5,11 @@ need to build an alarm graphic or write Python for these workflows.
 
 ## Configure guidance
 
-In **Alarm setup**, enter a possible cause, an operator response and an optional
-related screen. Related screens must exist and cannot be popups. **Languages**
-exposes `alarm.<id>.cause` and `alarm.<id>.response` translation entries alongside
-the message. Apply the draft to publish these settings.
+In **Alarm setup**, enter a **Possible cause**, **Recovery steps** and an optional
+**Related screen** for each alarm. Write each recovery step on its own line.
+Related screens must exist and cannot be popups. **Languages** exposes
+`alarm.<id>.cause` and `alarm.<id>.response` translation entries alongside the
+message. Apply the draft to publish these settings.
 
 An occurrence captures its message, priority, guidance, configured translations
 and related-screen identifier when raised. Editing guidance does not rewrite
@@ -38,7 +39,7 @@ records are labelled as legacy rather than assigned an invented user.
 
 ## Details, notes and history
 
-**Alarm details** shows the captured cause/response, related-screen navigation,
+**Alarm details** shows the captured cause and recovery steps, related-screen navigation,
 first acknowledgement and append-only operator notes. Trigger quality/time comes
 from the cached driver sample; opening details creates no additional PLC scan
 lease. Notes record the authenticated user/provider and an activity operation ID.

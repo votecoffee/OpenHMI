@@ -48,6 +48,8 @@ test('project-wide alarms work without an alarm graphic and acknowledge independ
   await page.getByRole('button', { name: 'Alarm setup', exact: true }).click();
   const definition = page.getByRole('group', { name: 'process_alarm', exact: true });
   await definition.getByLabel('Alarm message', { exact: true }).fill('Drive fault');
+  const steps = '1. Review the drive fault code.\n2. Follow the drive recovery procedure.';
+  await definition.getByLabel('process_alarm recovery steps', { exact: true }).fill(steps);
   await definition.getByRole('combobox', { name: 'Priority', exact: true }).selectOption('1');
   await page.getByRole('button', { name: 'Apply live', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
@@ -69,6 +71,13 @@ test('project-wide alarms work without an alarm graphic and acknowledge independ
   await expect(page.getByLabel('Screen alarm status')).toContainText('P1 Drive fault');
   await page.goto('/alarms');
   await expect(page.getByRole('cell', { name: 'Drive fault', exact: true })).not.toHaveCount(0);
+  const alarm = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'Acknowledge Drive fault', exact: true }) });
+  await alarm.getByRole('button', { name: /^Details / }).click();
+  const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
+  await expect(detail.getByRole('heading', { name: 'Recovery steps', exact: true })).toBeVisible();
+  const guidance = detail.locator('.alarm-guidance').nth(1);
+  await expect.poll(() => guidance.textContent()).toBe(steps);
+  await expect(guidance).toHaveCSS('white-space', 'pre-wrap');
   await page.getByRole('button', { name: 'Acknowledge Drive fault', exact: true }).click();
   await expect(page.getByText('1 active / 0 unacknowledged', { exact: true })).toBeVisible();
   if (process.env.OPENHMI_ALARM_CONSOLE) await page.screenshot({ path: process.env.OPENHMI_ALARM_CONSOLE, fullPage: true });
