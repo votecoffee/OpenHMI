@@ -41,6 +41,11 @@ members cannot overlap. Existing overlapping PLC aliases are rejected.
    buttons: the validated recipe transfer workflow must supply the full payload.
 4. In **Recipes** or **Recipe editor**, choose a saved revision, enter a reason,
    select the transfer target and click **Transfer revision to PLC**.
+   A live apply that changes the project revision requires a fresh target
+   selection. The server rejects a request from the previous revision before
+   reserving a sequence or staging parameters. API clients can pass
+   `expected_project_revision` alongside `expected_revision_version` to use
+   the same check.
 
 The recipe's parameter set must exactly match the profile: no missing or extra
 parameters. Types must match, with recipe `text` mapping to string. Integers and

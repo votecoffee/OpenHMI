@@ -181,7 +181,8 @@ an action button and select the contract. Runtime feedback and the **Commands**
 page distinguish dispatch, acceptance, completion, failure and uncertainty.
 Timeout/restart never replay a command. See the [contract and offline example](docs/command-transactions.md).
 Use **PLC recipes** for dedicated recipe transfer profiles and complete parameter
-mapping, then **Transfer revision to PLC** in the recipe viewer/editor. The PLC
+mapping, then **Transfer revision to PLC** in the recipe viewer/editor. Reselect
+the transfer target after a live project revision change. The PLC
 keeps its running copy; test recipes carry production status false. See the
 [recipe transfer contract and workflow](docs/recipe-transfers.md).
 

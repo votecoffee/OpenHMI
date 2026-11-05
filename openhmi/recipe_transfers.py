@@ -84,13 +84,15 @@ class RecipeTransfers:
         return {**record, 'transaction': self.commands.get(identifier)}
 
     def recent(self, limit=25, before_id=None):
+        state = self.store.snapshot()
         with self.store._lock:
             ids = [row[0] for row in self.store._db.execute('SELECT id FROM recipe_transfer WHERE id < ? ORDER BY id DESC LIMIT ?',
                                                         (before_id or 9223372036854775807, limit + 1))]
             unresolved = [row[0] for row in self.store._db.execute("SELECT DISTINCT r.profile_id FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id WHERE c.state IN ('prepared','staging','requested','accepted','uncertain')")]
         return {'items': [self.get(identifier) for identifier in ids[:limit]], 'has_more': len(ids) > limit,
                 'next_before_id': ids[limit - 1] if len(ids) > limit else None,
-                'profiles': self.application.driver.project.get('recipe_transfers', []), 'unresolved_profiles': unresolved}
+                'profiles': state['active'].get('recipe_transfers', []), 'active_revision': state['active_revision'],
+                'unresolved_profiles': unresolved}
 
     @staticmethod
     def expected(record):
@@ -115,6 +117,8 @@ class RecipeTransfers:
     def submit(self, profile_id, request, user, ticket, authorize):
         driver = self.application.driver
         with self.commands.lock, self.application.lock, driver.io_lock:
+            if request.expected_project_revision is not None and request.expected_project_revision != self.store.snapshot()['active_revision']:
+                raise HTTPException(409, 'The applied project changed. Review and reselect the PLC transfer target.')
             project = driver.project
             profile = next((item for item in project.get('recipe_transfers', []) if item['id'] == profile_id), None)
             if not profile:

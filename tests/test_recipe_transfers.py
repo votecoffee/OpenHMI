@@ -88,6 +88,27 @@ class RecipeTransferTests(unittest.TestCase):
         driver = app.state.driver
         return driver.connections['bench'].client.values['Cycle'] if 'bench' in driver.connections else driver._tags['CycleCommand']
 
+    def test_stale_project_revision_rejects_transfer_before_staging(self):
+        app, client = self.setup_app()
+        recipe = self.create(client)
+        displayed = client.get('/api/recipe-transfers').json()
+        project = client.get('/api/project').json()['active']
+        project['recipe_transfers'][0]['name'] = 'Updated target'
+        install(client, project)
+        current = client.get('/api/recipe-transfers').json()
+        self.assertGreater(current['active_revision'], displayed['active_revision'])
+        self.assertEqual(current['profiles'][0]['name'], 'Updated target')
+        with patch.object(app.state.driver, 'write_recipe_member') as stage:
+            rejected = client.post('/api/recipe-transfers/product/dispatch', json={
+                'revision_id': recipe['id'], 'expected_revision_version': recipe['version'],
+                'expected_project_revision': displayed['active_revision'], 'reason': 'Old target fixture',
+            })
+            self.assertEqual(rejected.status_code, 409, rejected.text)
+            self.assertEqual(rejected.headers['X-OpenHMI-Audit-Status'], 'rejected')
+            stage.assert_not_called()
+        self.assertEqual(client.get('/api/recipe-transfers').json()['items'], [])
+        self.assertEqual(self.values(app)['RequestSequence'], 0)
+
     def publish(self, app, code=0, copy=True):
         value = self.values(app)
         value['AcceptedSequence'] = value['RequestSequence']

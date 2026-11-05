@@ -122,7 +122,8 @@ def add_recipe_routes(app, store, application, users=None, security=None, comman
                     security.require(request, 'runtime.operate', definition['security_groups'])
             return invoke(transfers.submit, profile_id, body, current, ticket, authorize)
         return activity.run(request, 'recipe_transfer', profile_id,
-                            {'revision_id': body.revision_id, 'reason': body.reason}, execute)
+                            {'revision_id': body.revision_id, 'reason': body.reason,
+                             'expected_project_revision': body.expected_project_revision}, execute)
 
     @app.post('/api/recipes')
     def create(body: RecipeCreate, request: Request):
