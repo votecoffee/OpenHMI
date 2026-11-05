@@ -67,7 +67,7 @@ def main():
             if '.dist-info' in str(file) and any(part.lower().startswith(('license', 'licence', 'copying', 'notice')) for part in file.parts):
                 source = Path(distribution.locate_file(file))
                 if source.is_file():
-                    notices.append(source.read_text(encoding='utf-8', errors='replace'))
+                    notices.append(source.read_text(encoding='utf-8'))
     (bundle / 'PYTHON-DEPENDENCY-NOTICES.txt').write_bytes('\n'.join(notices).encode('utf-8'))
     (bundle / 'PYTHON-LICENSE.txt').write_bytes((Path(sys.base_prefix) / 'LICENSE.txt').read_bytes())
     assets = ROOT / 'openhmi/web'
