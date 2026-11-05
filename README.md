@@ -432,8 +432,9 @@ PLC data quality, and Windows runtime resilience. The no-code
 or PLC STRING selection and an optional PLC refresh trigger. See the
 [runtime readiness roadmap](docs/runtime-readiness-roadmap.md) for the driver
 assessment, product references, and acceptance gates. The
-[offline fault rehearsal](docs/runtime-soak.md) exercises recovery and checks
-that pending commands reconcile without replay.
+[offline reliability drills](docs/runtime-soak.md) exercise recovery under
+load and check that pending commands reconcile without replay after a forced
+runtime process exit.
 
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).

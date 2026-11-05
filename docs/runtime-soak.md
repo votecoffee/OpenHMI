@@ -41,6 +41,26 @@ Retain the following evidence from the new folder:
   activity, history and command records.
 
 The phase timeout bounds the runner's recovery checks between ASGI calls.
-Process watchdog behavior, hard shutdown, actual network and controller
-load, native memory, and operator-station validation are separate acceptance
-work. Run the [pilot matrix](pilot-acceptance.md) on the target Windows station.
+
+## Forced process restart drill
+
+Run from the same source checkout with a new evidence folder:
+
+    python scripts/verify-runtime-restart.py --work .local/restart-drill
+
+The parent starts an isolated OpenHMI process on an ephemeral loopback port
+and applies a new revision. It dispatches one synthetic command, holds the
+HTTP response before delivery, then terminates the process. A second process
+opens the same project database. The drill checks that the applied revision
+and audit entry survived, the command is uncertain, a duplicate is rejected,
+and PLC-owned completion reconciles the command. The synthetic PLC write
+receipt lives outside the project database and must contain exactly one write.
+The restarted process must also exit normally on request.
+
+Keep **report.json**, **before.log**, **after.log**,
+**synthetic-plc-writes.jsonl**, and **Crash.openhmi.sqlite3**. The runner sets
+timeouts and cleans up its own child processes. This is a controlled process
+kill after dispatch and before HTTP response delivery. Managed Windows
+startup, watchdog behavior, power loss, and actual network/controller and
+operator-station acceptance remain separate work. Run the
+[pilot matrix](pilot-acceptance.md) on the target Windows station.
