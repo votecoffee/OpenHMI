@@ -6,6 +6,10 @@ controller load limits, disconnect method and evidence owner before starting.
 Keep actual routes, addresses, diagnostics and controller exports in private
 evidence storage.
 
+The [driver readiness roadmap](runtime-readiness-roadmap.md#m2--controllogix-acquisition-and-recovery)
+defines the fault profile, supported tag checks and measurements. Agree the
+scan, acquisition age, recovery and controller load limits for this bench.
+
 ## Prepare the read-only project
 
 From a source checkout, create a bench project and backup using the reviewed

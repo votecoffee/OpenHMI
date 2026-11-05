@@ -23,11 +23,11 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | --- | --- | --- | --- |
 | M0 — Verified software baseline | Complete software checkpoint | Existing visual/runtime/project foundations verified at `8a2deb5`: 34 Python tests, 9 browser tests and package checks. No hardware/domain acceptance implied. | [M0](https://github.com/votecoffee/OpenHMI/milestone/1) |
 | M1 — Operational traceability and diagnostics | Complete software checkpoint | Durable journal and readable diagnostics delivered; 44 Python tests and 10 browser tests passed. Hardware/domain acceptance remains separate. | [M1](https://github.com/votecoffee/OpenHMI/milestone/2), [#5](https://github.com/votecoffee/OpenHMI/issues/5), [#6](https://github.com/votecoffee/OpenHMI/issues/6) |
-| M2 — ControlLogix bench acceptance | Awaiting identified bench inputs | Measured reads, data types, scan/load and reconnect behavior; subsequently controlled write acceptance with evidence. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
-| M3 — PLC transactions and recipe deployment | Software checkpoints delivered; hardware acceptance pending | Configurable command handshakes and versioned recipe staging/commit/copy verification delivered offline. Named PLC logic and bench acceptance remain open. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
+| M2 — ControlLogix driver readiness and bench acceptance | Driver hardening and bench acceptance open | Isolate routes, improve scheduling and quality propagation, and measure supported types, scan/load and reconnect. Start hardware acceptance with an identified read-only bench. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#12](https://github.com/votecoffee/OpenHMI/issues/12), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
+| M3 — PLC transactions and recipe deployment | Offline software delivered; hardware acceptance open | Guarded command handshakes, versioned recipe staging and PLC copy verification, durable lifecycle/history and evidence exports are available. Validate the named PLC contracts after M2. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Complete software checkpoint | Applied history, identity-aware diff/merge, staged rollback and browser/server recovery with validated migration/restore; 81 Python and 14 browser tests passed. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
-| M5 — Operator workflows and equipment library | Alarm operator software delivered; equipment selection remains open | Filtered alarm review, captured guidance, selected acknowledgement, attributed notes, CSV, timed shelving, bounded touch edits, login/lock legends opt-in PLC identity status and independent-scale analog/Boolean trends with saved captures, PLC triggers and cursor inspection, plus live tank, bar and radar controls delivered. Equipment faceplates, PLC acknowledgement and target-display/operator review remain open. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
-| M6 — Packaged pilot release | Portable Windows software checkpoint delivered; acceptance open | Bundled Python/browser preview, pinned dependencies, local launcher/ownership/logs, verified side-by-side install/activation/rollback and preservation instructions delivered. Clean-machine installation, local/Windows identity and pilot/recovery acceptance remain open. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
+| M5 — Operator workflows and equipment library | Operator baseline delivered; quality, camera and equipment acceptance open | Alarm review/recovery, trends, chart controls, localization, touch entry and generic UDT faceplates are available. Add per-route/binding quality and a PLC-bound browser/camera control. Select equipment faceplates and review workflows on the target display. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#13](https://github.com/votecoffee/OpenHMI/issues/13), [#14](https://github.com/votecoffee/OpenHMI/issues/14), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
+| M6 — Packaged pilot release | Portable Windows preview delivered; resilience and pilot acceptance open | Complete fault isolation, recovery and endurance qualification, clean installation, identity and target-station acceptance. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#15](https://github.com/votecoffee/OpenHMI/issues/15), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
 | M7 — Python IDE and deliberate reload | Deferred by owner | Integrated Python editing, event templates, autocomplete, diagnostics and a defined reload lifecycle. | [M7](https://github.com/votecoffee/OpenHMI/milestone/8), [#2](https://github.com/votecoffee/OpenHMI/issues/2) |
 
 M0 is a source/test checkpoint, not a production release. GitHub issues are the
@@ -73,6 +73,11 @@ checks for protected journal/diagnostic workflows; complete backup restore check
 
 ## M2 and M3 acceptance boundaries
 
+The [runtime readiness roadmap](runtime-readiness-roadmap.md) defines the
+driver hardening, supported tag matrix, and scan/load measurements. Run
+isolated software faults and multi-controller benchmarks before recording
+the live bench results.
+
 M2 starts with an identified non-production PLC, route and read-only tags. Record
 controller/firmware, pycomm3/runtime versions, representative tag/UDT/indexed-array
 coverage and requested-versus-observed acquisition behavior. Check communication
@@ -104,6 +109,10 @@ visible comparison and deliberate rollback into a new revision. Preserve current
 protection. Add migration checks and restore drills without overwriting originals
 or replaying commands. Screen rollback does not roll back PLC memory.
 
+M5 adds [operator data quality and the PLC-bound camera control](runtime-readiness-roadmap.md#m5--operator-quality-and-camera-control).
+The camera prototype can proceed with local fixtures while driver readiness
+work is underway. Validate the approved camera on the operator station.
+
 M5 delivers [alarm operator workflows](alarm-workflows.md) with filtered review,
 first-user acknowledgement, guidance, notes, event export and timed shelving. It still selects
 equipment faceplates with the owner, then validates normal/abnormal/
@@ -124,6 +133,10 @@ project restore and preservation of data/security. Test actual local/Windows
 credentials and intended group membership in the target environment. Automatic
 browser SSO is optional future scope, not a pilot prerequisite.
 
+The [resilience gate](runtime-readiness-roadmap.md#m6--resilience-and-pilot-gate)
+covers background worker isolation, bounded shutdown and restart, and an
+offline fault/load soak before the target-station trial.
+
 The [pilot acceptance matrix](pilot-acceptance.md) covers operation, permissions, commands/recipes,
 alarms/history, live engineering, language/display behavior and recovery. Record
 results, limitations and owner acceptance. Passing software tests alone does not
@@ -131,14 +144,15 @@ close a bench, domain or pilot acceptance gate.
 
 ## Execution order and inputs
 
-M1's operator journal and runtime diagnostics are delivered; see
-[behavior and validation](activity-and-diagnostics.md). M2 read-only bench
-preparation can proceed when hardware details are supplied. M3 command contracts
-and recipe staging/copy verification are delivered offline. M4 revision/recovery
-software is delivered too. Hardware-dependent parts of M3 wait for M2. M5
-equipment choices/operator workflows and M6 packaging are the next tracks.
-M6 closes only after the relevant preceding acceptance gates. M7 stays deferred
-and is not a dependency of the no-code/runtime milestones.
+1. Start M2 route isolation and measurement. Define and test the M5 data
+   quality contract alongside it.
+2. Prototype the M5 browser/camera control with controlled fixtures in parallel.
+   Continue operator workflow review and select equipment faceplates with the owner.
+3. Complete the read-only M2 bench gate, then validate approved M3 command and
+   recipe contracts on the nominated controller.
+4. Run the M6 resilience qualification and complete the Windows station pilot
+   after its relevant driver, PLC contract and operator gates.
+5. Use pilot feedback to rank the post-pilot candidates. M7 stays deferred.
 
 The owner will supply the bench controller/route/read-only tags, intended PLC
 transaction/recipe structure, equipment choices, Windows/group environment and

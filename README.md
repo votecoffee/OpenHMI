@@ -418,6 +418,12 @@ and [equipment controls/operator validation](https://github.com/votecoffee/OpenH
 
 ## Development plan
 
+The next work focuses on ControlLogix scan performance and recovery, visible
+PLC data quality, and Windows runtime resilience. A no-code Web Browser and
+Camera View is planned with a PLC tag for the address and an optional refresh
+trigger. See the [runtime readiness roadmap](docs/runtime-readiness-roadmap.md)
+for the driver assessment, product references, and acceptance gates.
+
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).
 The verified software baseline and M1 operator activity/diagnostic workflows are
