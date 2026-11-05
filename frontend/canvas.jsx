@@ -155,6 +155,7 @@ function Properties({ item, component, onChange }) {
 export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCopy }) {
   const { layout } = data.root.props;
   const [selected, select] = useState([]);
+  const [objectQuery, setObjectQuery] = useState('');
   const [sizeReference, setSizeReference] = useState('');
   const [palette, setPalette] = useState(Object.keys(config.components)[0]);
   const [view, setView] = useState({ zoom: 1, center: null });
@@ -197,6 +198,15 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     return lookup(layout.decorations, key)?.label || data.content.find(block => block.props.id === key)?.props.label
       || (objects[key]?.mode === 'grid' ? 'Grid container' : 'Scrollable stack');
   }
+
+  const query = objectQuery.trim().toLowerCase();
+  const matchesObject = key => key.toLowerCase().includes(query) || objectLabel(key).toLowerCase().includes(query);
+  const outline = top.flatMap(([key, box]) => {
+    const matches = matchesObject(key);
+    const children = (box.members ?? []).filter(member => matches || matchesObject(member));
+    return matches || children.length ? [{ key, children }] : [];
+  });
+  const lockedOutline = decorationEntries(layout).filter(([key, box]) => box.locked && matchesObject(key));
 
   function matchSizeOptions() {
     if (freeSelection.length < 2) return [];
@@ -695,14 +705,24 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
           <button type="button" onClick={() => addDecoration('ellipse', 'Ellipse')}>Add ellipse</button>
         </fieldset>
         <fieldset><legend>Objects</legend>
-          {top.map(([key, box]) => <React.Fragment key={key}>
+          <label>Search objects<input type="search" value={objectQuery} placeholder="Name or ID"
+            onChange={event => setObjectQuery(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Escape' && objectQuery) {
+                event.preventDefault();
+                event.stopPropagation();
+                setObjectQuery('');
+              }
+            }} /></label>
+          {query && !outline.length && !lockedOutline.length && <small role="status">No matching objects.</small>}
+          {outline.map(({ key, children }) => <React.Fragment key={key}>
             <button type="button" aria-pressed={selected.includes(key)} onClick={event => select(selectionFor(key, event.shiftKey))}>
               {objectLabel(key)}
             </button>
-            {box.members?.map(member => <button type="button" className="canvas-outline-member" key={member}
-              aria-pressed={selected.includes(member)} onClick={() => select([member])}>{data.content.find(block => block.props.id === member)?.props.label}</button>)}
+            {children.map(member => <button type="button" className="canvas-outline-member" key={member}
+              aria-pressed={selected.includes(member)} onClick={() => select([member])}>{objectLabel(member)}</button>)}
           </React.Fragment>)}
-          {decorationEntries(layout).filter(([, entry]) => entry.locked).map(([key, entry]) => <div key={key} className="canvas-locked-outline">
+          {lockedOutline.map(([key, entry]) => <div key={key} className="canvas-locked-outline">
             <span>{entry.label} (background)</span>
             <button type="button" disabled={!canEdit} aria-label={'Unlock ' + entry.label} onClick={() => {
               change(boxesChanged({ [key]: { locked: false } }));

@@ -116,7 +116,7 @@ Select **Enable freeform layout** on the screen you want to design. Set the
 canvas size, upload a machine image, then drag and resize controls over it.
 The designer supports layer ordering, snapping, grouping, alignment, equal spacing,
 matching object sizes, pan and fit-to-view zoom,
-drag-box selection, copy and paste, keyboard nudging, undo and redo,
+object search, drag-box selection, copy and paste, keyboard nudging, undo and redo,
 grid containers and scrollable stacks. Lock image and shape objects behind
 interactive controls. Freeform positions and backgrounds
 are included in project backups. See [screen layout](docs/screen-layout.md).

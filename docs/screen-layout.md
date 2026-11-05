@@ -29,6 +29,9 @@ Toggle **Pan canvas** and drag to scroll around the editing view at the current
 zoom. Middle-button drag pans directly. Press **Escape** to exit Pan mode.
 
 Controls may overlap. Use **Objects** to select a control that is covered.
+**Search objects** filters the list by name or ID. A matching container member
+appears under its container. Locked backgrounds also appear in search, with
+their **Unlock** action. Press **Escape** in the search field to clear it.
 **Bring to front** and **Send to back** move the selection to either end of
 the control stack. **Bring forward** and **Send backward** move each run of
 selected objects past one neighboring object, preserving their relative order.

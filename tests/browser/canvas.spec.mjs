@@ -275,6 +275,18 @@ test('copy and paste moves a reusable selection between freeform screens', async
     });
     await page.goto('/');
     const outline = page.getByRole('group', { name: 'Objects', exact: true });
+    const search = outline.getByRole('searchbox', { name: 'Search objects', exact: true });
+    await search.fill('  MoToR  ');
+    await expect(outline.getByRole('button', { name: 'Grid container', exact: true })).toBeVisible();
+    await expect(outline.getByRole('button', { name: 'Motor fixture', exact: true })).toBeVisible();
+    await expect(outline.getByRole('button', { name: 'Level fixture', exact: true })).toHaveCount(0);
+    await outline.getByRole('button', { name: 'Motor fixture', exact: true }).click();
+    await expect(page.getByRole('group', { name: 'Control properties' })).toBeVisible();
+    await search.fill('missing object');
+    await expect(outline.getByRole('status')).toHaveText('No matching objects.');
+    await search.press('Escape');
+    await expect(search).toHaveValue('');
+    await expect(outline.getByRole('button', { name: 'Motor fixture', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await outline.getByRole('button', { name: 'Grid container', exact: true }).click();
     await outline.getByRole('button', { name: 'Station picture', exact: true }).click({ modifiers: ['Shift'] });
     await page.keyboard.press('Control+c');
@@ -437,6 +449,11 @@ test('step selected objects one layer at a time while preserving the background'
     const forward = page.getByRole('button', { name: 'Bring forward', exact: true });
     const backward = page.getByRole('button', { name: 'Send backward', exact: true });
 
+    const search = outline.getByRole('searchbox', { name: 'Search objects', exact: true });
+    await search.fill('machine');
+    await expect(outline.getByRole('button', { name: 'Unlock Machine', exact: true })).toBeVisible();
+    await expect(outline.getByRole('button', { name: 'one', exact: true })).toHaveCount(0);
+    await search.press('Escape');
     await select('one');
     await expect(backward).toBeDisabled();
     await select('two', ['Shift']);
