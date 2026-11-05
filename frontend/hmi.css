@@ -46,6 +46,7 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .hmi-control { min-width: 0; min-height: 82px; padding: 8px; display: flex; flex-direction: column; gap: 7px; align-items: flex-start; background: transparent; border: 0; border-bottom: 1px solid #bbb; border-radius: 0; box-shadow: none; font: 13.37px "OpenHMI Noto", Arial, sans-serif; }
 .hmi-label { color: #333; font-size: 12.41px; font-weight: normal; overflow-wrap: anywhere; }
 .hmi-value { color: var(--hmi-live); font: 24.83px "OpenHMI Noto", Arial, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.hmi-text-value { color: var(--hmi-live); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .hmi-value small { color: #666; font-size: 12.41px; font-weight: normal; }
 .hmi-source { color: #555; font: 9.55px "OpenHMI Noto", Arial, sans-serif; overflow-wrap: anywhere; }
 .hmi-state { display: flex; align-items: center; gap: 8px; padding: 0; color: #333; background: transparent; border-radius: 0; font: 14.32px "OpenHMI Noto", Arial, sans-serif; }

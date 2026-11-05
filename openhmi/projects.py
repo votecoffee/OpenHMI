@@ -38,6 +38,11 @@ class NumericControl(ControlBase):
     decimals: int = Field(default=1, ge=0, le=4)
 
 
+class TextDisplayControl(ControlBase):
+    kind: Literal['text']
+    tag: str = Field(min_length=1, max_length=200)
+
+
 class IndicatorControl(ControlBase):
     kind: Literal["indicator"]
     tag: str = Field(min_length=1, max_length=200)
@@ -238,7 +243,7 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

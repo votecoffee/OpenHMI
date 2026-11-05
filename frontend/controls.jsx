@@ -56,6 +56,16 @@ function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   </article>;
 }
 
+function TextDisplay({ id, label, tag, puck }) {
+  const { value, valid, problem } = useValue(tag, 'string');
+  const { text } = useLocalization();
+  return <article className="hmi-control" data-control="text">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {valid ? <strong className="hmi-text-value">{value}</strong> : <Quality text={problem} />}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
 function Indicator({ id, label, tag, on_text = 'ON', off_text = 'OFF', puck }) {
   const { value, valid, problem } = useValue(tag, 'boolean');
   const { text } = useLocalization();
@@ -249,6 +259,8 @@ export function createConfig(catalog) {
       NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, minimum_tag: limitTag('Minimum from tag'), maximum_tag: limitTag('Maximum from tag'), security_groups: groupsField },
         defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
+      TextDisplay: { label: 'Text display', fields: { label: labelField, tag: tagField('string') },
+        defaultProps: { label: 'Status text', tag: 'OperatorText' }, render: TextDisplay },
       TextInput: { label: 'Text input', fields: { label: labelField, tag: tagField('string'), min_length: { type: 'number', label: 'Minimum length' }, max_length: { type: 'number', label: 'Maximum length' }, min_length_tag: limitTag('Minimum length from tag'), max_length_tag: limitTag('Maximum length from tag'), security_groups: groupsField }, defaultProps: { label: 'Operator text', tag: 'OperatorText', min_length: 0, max_length: 82, security_groups: [] }, render: TextInput },
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },

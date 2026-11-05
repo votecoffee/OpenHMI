@@ -109,6 +109,21 @@ Source installs retain the cross-version dependency ranges in `pyproject.toml`.
 
 ## Usage
 
+### Sample project
+
+Build a self-contained simulation project with preloaded recipes, history and a
+saved trend capture. Run these commands from the repository root after the
+contributor installation steps.
+
+```powershell
+.\.venv\Scripts\python.exe -m examples.build_demo .local/OpenHMI-Demo
+.\.venv\Scripts\openhmi.exe --project .local/OpenHMI-Demo/OpenHMI-Demo.openhmi.sqlite3 --open-browser
+```
+
+The generator also creates a complete backup ZIP. See the
+[demo walkthrough](docs/demo-project.md) for the featured screens and the
+optional read-only PLC preview.
+
 Start the local simulation builder:
 
 ```powershell

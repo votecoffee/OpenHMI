@@ -4,7 +4,7 @@ export const controlTypes = {
   recipe: 'SelectedRecipe',
   input: 'NumericInput',
   text_input: 'TextInput', current_user: 'CurrentUser',
-  faceplate: 'Faceplate', trend: 'Trend',
+  faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay',
 };
 const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type]) => [type, kind]));
 
@@ -34,6 +34,7 @@ export function toProject(data, settings = {}) {
       if (type === 'BarGraph') return { ...base, series: props.series, unit: props.unit,
         minimum: Number(props.minimum), maximum: Number(props.maximum) };
       if (type === 'SelectedRecipe' || type === 'CurrentUser') return base;
+      if (type === 'TextDisplay') return { ...base, tag: props.tag };
       if (type === 'TextInput') return { ...base, tag: props.tag, min_length: Number(props.min_length ?? 0), max_length: Number(props.max_length ?? 82), min_length_tag: props.min_length_tag || '', max_length_tag: props.max_length_tag || '', security_groups: props.security_groups || [] };
       if (type === 'ActionButton') return { ...base, action: props.action || '', mode: props.mode || 'python', command: props.command || '', target: props.target || '', value: props.value ?? false, screen: props.screen || 'overview', security_groups: props.security_groups || [] };
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
