@@ -224,13 +224,18 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} radar={radar} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
+  const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
   const config = {
     root: {
       fields: { title: { type: 'text', label: 'Screen name' }, columns: { type: 'select', label: 'Columns',
         options: [1, 2, 3].map(value => ({ label: String(value), value })) } },
       defaultProps: { title: 'Station overview', columns: 2 }, render: ScreenFrame,
     },
-    categories: { hmi: { title: 'High performance HMI', components: Object.values(controlTypes).filter(type => type !== 'Faceplate' || catalog.faceplates?.length) } },
+    categories: {
+      hmi: { title: 'High performance HMI', components: Object.values(controlTypes)
+        .filter(type => !chartTypes.includes(type) && (type !== 'Faceplate' || catalog.faceplates?.length)) },
+      charts: { title: 'Live charts', components: chartTypes },
+    },
     components: {
       Trend: { label: 'Trend', fields: {
         label: labelField, seconds: { type: 'number', label: 'Time window (seconds)', min: 10, max: 604800 },
