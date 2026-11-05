@@ -44,7 +44,7 @@ export const uiText = {
   filterAlarms: 'Apply alarm filters', alarmStart: 'Start time', alarmEnd: 'End time', selectAlarm: 'Select occurrence {id}',
   selectAlarmPage: 'Select unacknowledged on this page', acknowledgeSelected: 'Acknowledge selected', selectedCount: '{count} selected',
   acknowledgementComment: 'Acknowledgement comment', acknowledgedCount: '{count} alarms acknowledged', acknowledgedBy: 'Acknowledged by',
-  alarmDetails: 'Alarm details', inspectAlarm: 'Details {id}', triggerQuality: 'Current trigger quality', possibleCause: 'Possible cause', operatorResponse: 'Recovery steps',
+  alarmDetails: 'Alarm details', openAlarmDetails: 'Alarm details: {message}', inspectAlarm: 'Details {id}', triggerQuality: 'Current trigger quality', possibleCause: 'Possible cause', operatorResponse: 'Recovery steps',
   noGuidance: 'No guidance configured for this occurrence', openRelatedScreen: 'Open related screen', relatedScreenUnavailable: 'Related screen unavailable in the active project',
   operatorNotes: 'Operator notes', operatorNote: 'Operator note', saveOperatorNote: 'Save operator note', noteSaved: 'Operator note recorded', operator_note: 'Operator note',
   olderAlarms: 'Older alarms', newestAlarms: 'Newest alarms', olderEvents: 'Older events', newestEvents: 'Newest events', olderNotes: 'Older notes', newestNotes: 'Newest notes',

@@ -177,14 +177,19 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
   const plcConfigured = live.project?.connections?.some(connection => connection.enabled);
   const monitor = live.alarms;
   const active = [...(monitor?.annunciated_outstanding || monitor?.outstanding || [])].sort((a, b) => a.priority - b.priority);
+  const headline = active[0];
+  const headlineMessage = headline && `P${headline.priority} ${alarmMessage(headline, language)}`;
   const unknown = !live.alarmConnected || monitor?.error;
   const badQuality = Object.values(monitor?.states || {}).some(state => state.quality === 'bad');
   return <section className="hmi-screen">
     <header className="station-header">
       <div className="station-identity"><strong>OpenHMI</strong><span>{ui('localStation')}</span></div>
       <div className="station-title"><div className={`screen-alarm-banner ${!unknown && active.length ? 'has-alarm' : ''}`} aria-label="Screen alarm status">
-        {unknown ? <Quality text={ui('alarmUnavailable')} /> : active.length ? <><PrioritySymbol priority={active[0].priority} />
-          <strong>P{active[0].priority} {alarmMessage(active[0], language)} · {ui('activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
+        {unknown ? <Quality text={ui('alarmUnavailable')} /> : headline ? <><PrioritySymbol priority={headline.priority} />
+          <strong>{!puck?.isEditing && headline.occurrence_id
+            ? <a className="alarm-headline-link" href={`/alarms?occurrence=${headline.occurrence_id}`}
+              aria-label={ui('openAlarmDetails', { message: headlineMessage })}>{headlineMessage}</a>
+            : headlineMessage} · {ui('activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
           {badQuality && <Quality text={ui('badData')} />}</> : badQuality ? <Quality text={ui('badData')} />
           : monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms')}
           {!!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}

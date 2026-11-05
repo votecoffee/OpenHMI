@@ -31,7 +31,11 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await install(project);
     await page.request.post('/api/controls/alarm_fixture/activate', { data: {} });
     raised = true;
-    await page.goto('/alarms');
+    await page.reload();
+    await page.getByLabel('Screen alarm status').getByRole('link', { name: 'Alarm details: P1 Supply fault' }).press('Enter');
+    const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
+    await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
+    await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
     await page.getByLabel('Priority', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Apply alarm filters', exact: true }).click();
@@ -42,7 +46,6 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(page.getByText('2 active / 1 unacknowledged', { exact: true })).toBeVisible();
     const primary = (await (await page.request.get('/api/alarms/occurrences?search=workflow_primary')).json()).items[0];
     await page.getByRole('button', { name: `Details ${primary.occurrence_id}`, exact: true }).click();
-    const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
     await expect(detail.getByText('Supply pressure low', { exact: true })).toBeVisible();
     await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
     await expect(detail.getByRole('link')).toHaveAttribute('href', '/runtime?screen=overview');
@@ -64,6 +67,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     const viewer = await page.context().newPage();
     await viewer.goto('/runtime');
     await expect(viewer.getByLabel('Screen alarm status')).toContainText('P3 Secondary fault');
+    await expect(viewer.getByRole('link', { name: 'Alarm details: P3 Secondary fault' })).toBeVisible();
     await viewer.getByRole('link', { name: 'Shelved alarm definitions: 1', exact: true }).click();
     await expect(viewer.getByLabel('Shelving filter', { exact: true })).toHaveValue('shelved');
     await expect(viewer.locator('.alarm-occurrences tbody tr')).toHaveCount(1);

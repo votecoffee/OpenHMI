@@ -31,6 +31,7 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .station-title h1 { font: bold 18.14px "OpenHMI Noto", Arial, sans-serif; text-transform: uppercase; text-align: center; letter-spacing: 0; margin: 5px 0 0; overflow-wrap: anywhere; }
 .screen-alarm-banner { min-height: 26px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 3px; background: #d4d4d4; color: #333; font-size: 10.50px; }
 .screen-alarm-banner.has-alarm { background: #f0f0f0; outline: 1px solid #666; }
+.alarm-headline-link { color: inherit; }
 .screen-alarm-banner .priority-symbol { width: 23px; height: 23px; }
 .station-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 75px; flex: 1; }
 .station-workspace .hmi-grid { padding: 15px 10px; display: grid; gap: 12px; align-content: start; align-items: stretch; min-width: 0; }

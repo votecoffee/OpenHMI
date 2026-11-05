@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Live, PrioritySymbol } from './controls.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
@@ -7,6 +7,11 @@ import './alarm-workflows.css';
 import { AlarmShelving } from './alarm-shelving.jsx';
 
 const blankFilters = { priority: '0', search: '', state: 'outstanding', start: '', end: '', shelving: new URLSearchParams(location.search).get('shelving') === 'shelved' ? 'shelved' : 'unshelved' };
+function linkedOccurrence() {
+  const value = new URLSearchParams(location.search).get('occurrence');
+  const id = Number(value);
+  return /^[1-9]\d*$/.test(value ?? '') && Number.isSafeInteger(id) ? id : null;
+}
 function parameters(filters, before, history = false, event = '') {
   const query = new URLSearchParams({ priority: filters.priority, search: filters.search, state: history ? 'all' : filters.state });
   if (!history) query.set('shelving', filters.shelving);
@@ -29,7 +34,9 @@ export function AlarmConsole() {
   const [before, setBefore] = useState(null), [eventBefore, setEventBefore] = useState(null), [eventFilter, setEventFilter] = useState('');
   const [rows, setRows] = useState(null), [history, setHistory] = useState(null), [error, setError] = useState('');
   const [selected, setSelected] = useState([]), [comment, setComment] = useState('');
-  const [identifier, setIdentifier] = useState(null), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState('');
+  const [identifier, setIdentifier] = useState(linkedOccurrence), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState('');
+  const detailHeading = useRef(null);
+  const detailReady = Boolean(detail || detailError);
   const [note, setNote] = useState(''), [notesBefore, setNotesBefore] = useState(null), [notes, setNotes] = useState(null);
   const [generation, setGeneration] = useState(0);
   const alarms = live.alarms || {};
@@ -54,6 +61,9 @@ export function AlarmConsole() {
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
   }, [identifier, notesBefore, generation]);
+  useEffect(() => {
+    if (detailReady) detailHeading.current?.focus();
+  }, [identifier, detailReady]);
   async function acknowledge(id, batch = false) {
     setBusy(true);
     try {
@@ -114,7 +124,7 @@ export function AlarmConsole() {
     {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end && applied.shelving === 'unshelved' ? ui(alarms.shelved_occurrence_count ? 'noUnshelvedAlarms' : 'noOutstanding') : ui('alarmFilteredEmpty')}</p>}
     <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
     <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />
-    {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
+    {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2 ref={detailHeading} tabIndex={-1}>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
       {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {detail.trigger.quality} · {timestamp(detail.trigger.timestamp)} {detail.trigger.error}</p>
         <p>{detail.occurrence.shelf ? `${ui('shelved')} · ${timestamp(detail.occurrence.shelf.expires_at)}` : ui('unshelved')}</p><button disabled={!canShelve || busy || !!detailError || !!detail.occurrence.shelf || !!detail.occurrence.retired_at || (!detail.occurrence.active && !!detail.occurrence.acknowledged_at) || !shelfReason.trim()} onClick={() => changeShelf()}>{ui('shelveAlarm')}</button>
         <h3>{ui('possibleCause')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'cause')}</p><h3>{ui('operatorResponse')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'response')}</p>
