@@ -82,6 +82,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
     {waitingForStatus && !error && <p role="status">Waiting for the latest PLC transfer status.</p>}
     {unresolved && <p role="status">This target has an unresolved transfer. Verify its outcome before another request.</p>}
     {error && <p role="alert">PLC transfer status unavailable: {error}. Retained records may be outdated.</p>}
+    {target && !error && data.verified_profile === target && !verified && <p>No verified transfer for the applied target configuration.</p>}
     {verified && <div className="loaded-recipe"><div>{verified.snapshot.content.image_id && <img className="recipe-image" src={`/api/recipe-images/${verified.snapshot.content.image_id}`} alt={verified.snapshot.content.title} />}</div><div><strong>Verified transfer record: {verified.snapshot.content.title}</strong><p>{verified.snapshot.code} · revision {verified.snapshot.number} · {verified.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}</p><p>Verified at {verified.transaction.updated_at}. This is historical evidence; the PLC may change its running copy independently.</p></div></div>}
     <h3>Transfer history</h3>
     <form className="operations-filters" onSubmit={event => {

@@ -197,6 +197,12 @@ class RecipeTransferTests(unittest.TestCase):
         missing = client.get('/api/recipe-transfers', params={'profile_id': 'missing'}).json()
         self.assertTrue(missing['has_history'])
         self.assertEqual(missing['items'], [])
+        project = client.get('/api/project').json()['active']
+        project['recipe_transfers'][0]['max_string_length'] = 80
+        install(client, project)
+        remapped = client.get('/api/recipe-transfers', params={'verified_profile': 'product'}).json()
+        self.assertIsNone(remapped['verified'])
+        self.assertEqual([item['id'] for item in remapped['items']], [second['id'], first['id']])
 
     def test_matching_ack_with_wrong_running_payload_stays_uncertain_until_verified(self):
         app, client = self.setup_app()

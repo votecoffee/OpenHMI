@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from .alarms import utc_now
 from .commands import contract
 from .logix import member_value
+from .projects import Project
 from .recipes import canonical, content_hash, RecipeError
 
 META_TYPES = {'RecipeCode': 'string', 'RevisionId': 'integer', 'RevisionNumber': 'integer',
@@ -86,6 +87,14 @@ class RecipeTransfers:
 
     def recent(self, limit=25, before_id=None, profile_id='', production_approved=None, verified_profile=''):
         state = self.store.snapshot()
+        profiles = state['active'].get('recipe_transfers', [])
+        selected = next((profile for profile in profiles if profile['id'] == verified_profile), None)
+        channel, signature = None, None
+        if selected:
+            project = Project.model_validate(state['active']).model_dump()
+            definition = next((command for command in project['commands'] if command['id'] == selected['command_id']), None)
+            if definition:
+                _, channel, signature = contract(project, definition)
         conditions, values = [], []
         if before_id is not None:
             conditions.append('id < ?')
@@ -102,16 +111,19 @@ class RecipeTransfers:
             ids = [row[0] for row in db.execute(
                 'SELECT id FROM recipe_transfer' + where + ' ORDER BY id DESC LIMIT ?', (*values, limit + 1))]
             unresolved = [row[0] for row in self.store._db.execute("SELECT DISTINCT r.profile_id FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id WHERE c.state IN ('prepared','staging','requested','accepted','uncertain')")]
-            verified = db.execute("""SELECT r.id FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id
-                                     WHERE r.profile_id=? AND c.state='completed' ORDER BY r.id DESC LIMIT 1""",
-                                  (verified_profile,)).fetchone() if verified_profile else None
+            verified = db.execute("""SELECT r.id,c.signature FROM recipe_transfer r JOIN command_transaction c ON c.id=r.id
+                                     WHERE c.channel=? AND c.state='completed' ORDER BY r.id DESC LIMIT 1""",
+                                  (channel,)).fetchone() if channel else None
+            if verified and verified[1] != signature:
+                verified = None
             items = [self.get(identifier) for identifier in ids[:limit]]
             latest = next((item for item in items if verified and item['id'] == verified[0]), None)
             return {'items': items, 'has_more': len(ids) > limit,
                     'has_history': bool(ids) or bool(db.execute('SELECT 1 FROM recipe_transfer LIMIT 1').fetchone()),
                     'next_before_id': ids[limit - 1] if len(ids) > limit else None,
-                    'profiles': state['active'].get('recipe_transfers', []), 'active_revision': state['active_revision'],
-                    'unresolved_profiles': unresolved, 'verified': latest or (self.get(verified[0]) if verified else None)}
+                    'profiles': profiles, 'active_revision': state['active_revision'],
+                    'unresolved_profiles': unresolved, 'verified_profile': verified_profile,
+                    'verified': latest or (self.get(verified[0]) if verified else None)}
 
     @staticmethod
     def expected(record):

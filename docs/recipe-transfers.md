@@ -137,6 +137,9 @@ remain available even if the project has no configured transfer targets.
 Filter by the exact captured target ID or by production approval at dispatch.
 Filters apply before pagination. The selected dispatch target's verification
 card and unresolved-transfer checks stay independent of the history filters.
+The card uses the latest completed transfer on the PLC channel only when its
+saved contract matches the applied target. After a mapping change, older
+verification remains in history and the card waits for matching evidence.
 
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts

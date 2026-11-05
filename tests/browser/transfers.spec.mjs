@@ -138,11 +138,26 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(page.locator('.activity-table tbody tr').filter({ hasText: 'recipe_cycle' })).toHaveCount(2);
   await page.goto('/recipes');
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.Running.RecipeProductionApproved']).toBe(false);
-  const replacement = (await (await page.request.get('/api/project')).json()).active;
+  const verifiedCard = viewer.getByText('Verified transfer record: Transfer fixture', { exact: true });
+  await expect(verifiedCard).toBeVisible();
+  const remapped = (await (await page.request.get('/api/project')).json()).active;
+  const root = remapped.tags.find(tag => tag.name === 'CycleCommand');
+  root.initial.Remapped = structuredClone(root.initial.Running);
+  for (const [path, kind] of Object.entries(root.members)) {
+    if (path.startsWith('Running.')) root.members[path.replace('Running.', 'Remapped.')] = kind;
+  }
+  remapped.recipe_transfers[0].running_prefix = 'Remapped';
+  await apply(remapped);
+  const replacementTarget = viewer.getByLabel('PLC transfer target', { exact: true });
+  await expect(replacementTarget).toHaveValue('');
+  await replacementTarget.selectOption('product');
+  await expect(viewer.getByText('No verified transfer for the applied target configuration.')).toBeVisible();
+  await expect(verifiedCard).toHaveCount(0);
+  await expect(viewer.locator('tbody tr')).toHaveCount(2);
+  const replacement = structuredClone(remapped);
   replacement.recipe_transfers[0].id = 'replacement';
   replacement.recipe_transfers[0].name = 'Replacement target';
   await apply(replacement);
-  const replacementTarget = viewer.getByLabel('PLC transfer target', { exact: true });
   await expect(replacementTarget.getByRole('option', { name: 'Replacement target' })).toHaveCount(1);
   await replacementTarget.selectOption('replacement');
   await expect(viewer.getByRole('cell', { name: /Updated product transfer.*Retired target/ })).toHaveCount(2);
