@@ -1,4 +1,44 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+
+test('History panel exports recorded tags without a trend control', async ({ page }) => {
+  test.setTimeout(120000);
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply) {
+    const state = await (await page.request.get('/api/project')).json();
+    const draft = await page.request.put('/api/project/draft', { data: { project, expected_revision: state.draft_revision } });
+    expect(draft.ok(), await draft.text()).toBe(true);
+    if (apply) expect((await page.request.post('/api/project/apply', {
+      data: { expected_revision: (await draft.json()).draft_revision },
+    })).ok()).toBe(true);
+  }
+  try {
+    const project = structuredClone(original.active);
+    project.historian.tags = ['TankLevel', 'MotorRunning'].map(tag => ({ tag, sample_ms: 100, deadband: 0 }));
+    await save(project, true);
+    await expect.poll(async () => {
+      const response = await page.request.get('/api/history?tags=TankLevel&seconds=60');
+      return (await response.json()).samples.length;
+    }).toBeGreaterThan(0);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+    const panel = page.getByRole('group', { name: 'Export recorded data' });
+    const button = panel.getByRole('button', { name: 'Download history CSV' });
+    await expect(button).toBeDisabled();
+    await panel.getByLabel('Include TankLevel', { exact: true }).check();
+    await panel.getByRole('combobox', { name: 'Export time range', exact: true }).selectOption('60', { timeout: 10000 });
+    const [file] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), button.click()]);
+    expect(file.suggestedFilename()).toBe('tag-history.csv');
+    const csv = await readFile(await file.path(), 'utf8');
+    expect(csv).toContain('tag,timestamp,value,quality,source_timestamp');
+    expect(csv).toContain('TankLevel,');
+    expect(csv).not.toContain('MotorRunning,');
+    await expect(panel.getByRole('status')).toHaveText('CSV download started.');
+  } finally {
+    await save(original.active, true);
+    await save(original.draft, false);
+  }
+});
 
 test('UDT definition designer, multiple screens, popup actions and recorded trend', async ({ page, context }) => {
   test.setTimeout(180000);

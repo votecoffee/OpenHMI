@@ -16,7 +16,7 @@ from .application import Application
 from .activity import ActivityJournal
 from .commands import CommandService, add_command_routes, validate_commands
 from .recipe_transfers import validate_transfers
-from .operations_routes import add_operations_routes
+from .operations_routes import add_operations_routes, csv_text
 from .logix import RuntimeDriver
 from .historian import Historian
 from .trend_recording import TrendRecorder, add_trend_routes
@@ -552,7 +552,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         writer = csv.writer(output)
         writer.writerow(['tag', 'timestamp', 'value', 'quality', 'source_timestamp'])
         for row in data['samples']:
-            writer.writerow([row['tag'], row['timestamp'], row['value'], row['quality'], row['source_timestamp']])
+            value = row['value']
+            writer.writerow([row['tag'], row['timestamp'], csv_text(value) if isinstance(value, str) else value,
+                             row['quality'], row['source_timestamp']])
         return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="tag-history.csv"', 'X-OpenHMI-Truncated': str(data['truncated']).lower()})
 
     @app.get("/", include_in_schema=False)

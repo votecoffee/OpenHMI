@@ -206,7 +206,7 @@ function Builder({ initial, catalog }) {
     {tab === 'identity' && <IdentitySettings settings={settings} onChange={settingsChanged} catalog={dynamicCatalog} />}
     {['languages', 'alarms'].includes(tab) && <ProjectSettings tab={tab} settings={settings} controls={previewControls} title={previewProject.title} catalog={dynamicCatalog} onChange={settingsChanged} />}
     {tab === 'recipe_transfers' && <RecipeTransferSettings settings={settings} onChange={settingsChanged} />}
-    {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} />}
+    {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} projectInstance={initial.project_instance} />}
     <div hidden={tab !== 'screen'}>
       {canvasData.root.props.layout
         ? <CanvasEditor key={`${scope}:${generation}`} data={canvasData} config={config} onChange={changed}

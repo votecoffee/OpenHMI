@@ -33,7 +33,70 @@ function Members({ value, change }) {
   </fieldset>;
 }
 
-export function EngineeringSettings({ tab, settings, onChange, editScope, catalog }) {
+function HistoryExport({ tags, projectInstance }) {
+  const [selected, setSelected] = useState([]);
+  const [seconds, setSeconds] = useState('3600');
+  const [end, setEnd] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const names = tags.map(item => item.tag).filter(tag => selected.includes(tag));
+
+  async function exportHistory(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage('');
+    try {
+      const query = new URLSearchParams({ tags: names.join(','), seconds });
+      if (end) {
+        const epoch = Date.parse(end) / 1000;
+        if (!Number.isFinite(epoch) || epoch < 0) throw new Error('Choose a valid end time.');
+        query.set('end', String(epoch));
+      }
+      const response = await fetch('/api/history.csv?' + query, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error(`History export failed (HTTP ${response.status}).`);
+      if (response.headers.get('X-OpenHMI-Project') !== projectInstance) {
+        throw new Error('A different project was opened. Reload before exporting history.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'tag-history.csv';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage(response.headers.get('X-OpenHMI-Truncated') === 'true'
+        ? 'CSV contains only the newest 20,000 rows per tag. Choose a shorter range to export older rows.'
+        : 'CSV download started.');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <form onSubmit={exportHistory}>
+    <fieldset disabled={busy}><legend>Export recorded data</legend>
+      <p>Choose up to 12 tags. The CSV includes values, quality, and timestamps from the project database.</p>
+      {!tags.length && <p>Add history tags and apply the draft to begin recording.</p>}
+      {tags.map(({ tag }) => <label key={tag}><input type="checkbox" checked={names.includes(tag)}
+        disabled={names.length >= 12 && !names.includes(tag)}
+        onChange={event => setSelected(event.target.checked ? [...names, tag] : names.filter(name => name !== tag))} />
+        Include {tag}</label>)}
+      <div>
+        <label>Export time range<select value={seconds} onChange={event => setSeconds(event.target.value)}>
+          <option value="60">1 minute</option><option value="3600">1 hour</option>
+          <option value="86400">24 hours</option><option value="604800">7 days</option>
+        </select></label>
+        <label>Export end time (local)<input type="datetime-local" step="1" value={end}
+          onChange={event => setEnd(event.target.value)} /></label>
+      </div>
+      <p>Leave the end time blank to export through now.</p>
+      <button type="submit" disabled={!names.length}>{busy ? 'Exporting…' : 'Download history CSV'}</button>
+      <p role="status">{message}</p>
+    </fieldset>
+  </form>;
+}
+
+export function EngineeringSettings({ tab, settings, onChange, editScope, catalog, projectInstance }) {
   const [message, setMessage] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
@@ -104,6 +167,7 @@ export function EngineeringSettings({ tab, settings, onChange, editScope, catalo
     <table><thead><tr><th>Tag</th><th>Sample ms</th><th>Deadband</th><th /></tr></thead><tbody>{settings.historian.tags.map((item, i) => <tr key={item.tag}><td>{item.tag}</td><td>{item.sample_ms}</td><td>{item.deadband}</td><td><button onClick={() => onChange({ ...settings, historian: { ...settings.historian, tags: settings.historian.tags.filter((_, index) => index !== i) } })}>Remove {item.tag}</button></td></tr>)}</tbody></table>
     <label>History tag<input value={historyTag} onChange={event => setHistoryTag(event.target.value)} /></label><label>Sample interval (ms)<input type="number" min="100" value={sample} onChange={event => setSample(Number(event.target.value))} /></label><label>Deadband<input type="number" min="0" step="any" value={deadband} onChange={event => setDeadband(Number(event.target.value))} /></label>
     <button onClick={() => { if (historyTag && !settings.historian.tags.some(item => item.tag === historyTag)) onChange({ ...settings, historian: { ...settings.historian, tags: [...settings.historian.tags, { tag: historyTag, sample_ms: sample, deadband }] } }); }}>Add history tag</button>
+    <HistoryExport tags={settings.historian.tags} projectInstance={projectInstance} />
   </section>;
   return <section className="engineering" aria-label="Tag manager"><h2>Tag manager</h2><p>Logical names keep screens independent of PLC addresses. Built-in simulation tags remain available.</p>
     <label>Browse connection<select value={connection} onChange={event => setConnection(event.target.value)}><option value="">Local HMI tags</option>{settings.connections.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

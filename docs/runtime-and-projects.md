@@ -74,7 +74,13 @@ History records logical tag values, quality, acquisition time and record time in
 the project SQLite database. Configure sampling, numeric deadband, retention days
 and a maximum row count. Quality changes are always retained; unchanged deadband
 values receive at least a one-minute heartbeat. The query API bounds result size
-and reports truncation. CSV export includes quality and timestamps.
+and reports truncation. In **History**, select up to 12 configured tags under
+**Export recorded data**, choose the range and optionally set a local end time.
+The CSV includes recorded values, quality and UTC timestamps. The History panel
+warns when the export is limited to the newest 20,000 rows per tag. To retrieve
+older rows, set an earlier end time and export a shorter range. Spreadsheet
+formula-like text values receive a leading apostrophe in the CSV. SQLite keeps
+the original values.
 A **Trend** shares one time axis across up to 12 tags. Each numeric tag has an
 independent scale, shown in the legend. **Observed min/max** uses the returned
 good samples for that tag in the selected window and centers a constant value.

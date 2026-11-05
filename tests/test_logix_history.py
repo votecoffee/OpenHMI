@@ -1,5 +1,8 @@
 """No-network Logix packet grouping, UDT resolution, write and SQL history checks."""
 
+import csv
+from io import StringIO
+import time
 from types import SimpleNamespace
 import unittest
 from openhmi.logix import RuntimeDriver
@@ -180,6 +183,27 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertTrue(history.query(['LevelA'], 0, 200, 1)['truncated'])
         driver.close()
         store.close()
+
+    def test_history_csv_preserves_numeric_cells_and_reports_truncation(self):
+        app = create_app()
+        end = int(time.time())
+        with TestClient(app) as client:
+            with app.state.store.transaction() as db:
+                db.executemany(
+                    'INSERT INTO tag_history(tag,timestamp,value,quality,source_timestamp) VALUES(?,?,?,?,?)',
+                    [('TankLevel', end - 6, '999', 'good', None)]
+                    + [('TankLevel', end - 5, '-2.5', 'good', None)] * 20000
+                    + [('OperatorText', end - 5, '"=1+1"', 'good', None)],
+                )
+            response = client.get('/api/history.csv', params={
+                'tags': 'TankLevel,OperatorText', 'seconds': 10, 'end': end,
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.headers['X-OpenHMI-Truncated'], 'true')
+            rows = list(csv.DictReader(StringIO(response.text)))
+            self.assertEqual(len(rows), 20001)
+            self.assertEqual({row['value'] for row in rows if row['tag'] == 'TankLevel'}, {'-2.5'})
+            self.assertEqual(rows[-1]['value'], "'=1+1")
 
     def test_faceplate_relative_members_and_no_code_actions_server_gates(self):
         app = create_app()
