@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.use({ baseURL: 'http://127.0.0.1:8766' });
+test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true });
 
 test('runtime language applies to login, keypad, and Unicode text entry', async ({ page }) => {
   const password = 'SecurityTestOnly-2026!';
@@ -43,23 +43,41 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
     const keyboard = page.getByRole('dialog', { name: 'Teclado de contraseña', exact: true });
     const secret = keyboard.getByLabel('Contraseña', { exact: true });
     await expect(secret).toHaveAttribute('type', 'password');
-    await secret.fill(password);
+    await secret.fill(password.slice(1));
+    await secret.press('Home');
+    await keyboard.getByRole('button', { name: 'Shift', exact: true }).tap();
+    await keyboard.getByRole('button', { name: 'S', exact: true }).tap();
+    await expect(secret).toBeFocused();
     await keyboard.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
     await login.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
     await expect(login).not.toBeVisible();
 
     await page.getByRole('button', { name: 'Abrir teclado numérico para Nivel', exact: true }).click();
     const numeric = page.getByRole('dialog', { name: 'Entrada numérica: Nivel', exact: true });
-    await numeric.getByLabel('Entrada', { exact: true }).fill('55');
+    const numberEntry = numeric.getByLabel('Entrada', { exact: true });
+    await numberEntry.fill('55');
     await numeric.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
     await expect(numeric.getByRole('alert')).toHaveText('Rango permitido: 0 a 50');
+    await numberEntry.press('Home');
+    await numberEntry.press('Shift+ArrowRight');
+    await numeric.getByRole('button', { name: '4', exact: true }).tap();
+    await expect(numberEntry).toHaveValue('45');
     await numeric.press('Escape');
     await page.getByRole('button', { name: 'Abrir teclado para Mensaje', exact: true }).click();
     const text = page.getByRole('dialog', { name: 'Entrada de texto: Mensaje', exact: true });
     await expect(text.getByRole('group', { name: 'Teclado de texto' })).toBeVisible();
     const entry = text.getByLabel('Entrada', { exact: true });
-    await entry.fill('设备');
-    await text.getByRole('button', { name: 'a', exact: true }).click();
+    await entry.fill('设备🛠x');
+    await entry.press('End');
+    await entry.press('ArrowLeft');
+    await text.getByRole('button', { name: 'Backspace', exact: true }).tap();
+    await expect(entry).toHaveValue('设备x');
+    await entry.press('Shift+ArrowRight');
+    const aKey = text.getByRole('button', { name: 'a', exact: true });
+    await aKey.focus();
+    await aKey.press('Enter');
+    await expect(aKey).toBeFocused();
+    await expect(entry).toHaveValue('设备a');
     await text.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
     await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.LocalizedEntry).toBe('设备a');
   } finally {
