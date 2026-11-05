@@ -128,12 +128,18 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [failed, setFailed] = useState(false);
-  const [transaction, setTransaction] = useState(null);
+  const [latest, setTransaction] = useState(null);
+  const transaction = latest?.command_id === command ? latest : null;
   useEffect(() => {
     if (mode !== 'command' || puck?.isEditing || !permitted) return;
     let stopped = false, timer;
     async function refresh() {
-      try { const data = await api(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`); if (!stopped) setTransaction(data.items[0] || null); }
+      try {
+        const data = await api(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`);
+        const next = data.items[0] || null;
+        if (!stopped) setTransaction(previous => previous?.command_id === command && (!next || previous.id > next.id)
+          ? previous : next);
+      }
       catch { if (!stopped) setTransaction(previous => previous ? { ...previous, unavailable: true } : null); }
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
@@ -159,7 +165,10 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
       {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : !permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
     {!permitted && !puck?.isEditing && <SecurityLock label={label} permission="runtime.operate" groups={security_groups} additionalGroups={definition?.security_groups || []} />}
-    {mode === 'command' && transaction && <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>}
+    {mode === 'command' && permitted && !puck?.isEditing && transaction && <>
+      <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>
+      <a className="command-transaction-link" href={`/commands?transaction=${transaction.id}`}>{ui('viewCommandTransaction', { id: transaction.id })}</a>
+    </>}
   </article>;
 }
 

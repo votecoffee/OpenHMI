@@ -44,6 +44,8 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await request.click();
   const command = page.locator('[data-control="button"]').filter({ has: request });
   await expect(command).toContainText('PLC command: requested');
+  const firstLink = command.getByRole('link', { name: /^View command transaction #/ });
+  const firstHref = await firstLink.getAttribute('href');
   await expect(request).toBeDisabled();
   await page.getByRole('button', { name: 'Simulate acceptance', exact: true }).click();
   await expect(command).toContainText('PLC command: accepted');
@@ -51,12 +53,12 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await page.getByRole('button', { name: 'Simulate completion', exact: true }).click();
   await expect(command).toContainText('PLC command: completed');
   await expect(request).toBeEnabled();
-  await page.getByRole('link', { name: 'Commands', exact: true }).click();
+  await firstLink.click();
+  await expect(page).toHaveURL(url => url.pathname + url.search === firstHref);
   await expect(page.getByRole('region', { name: 'PLC command transactions', exact: true })).toBeVisible();
   const row = page.locator('.activity-table tbody tr').first();
   await expect(row).toContainText('completed');
-  await row.getByText('Transaction details', { exact: true }).click();
-  await expect(row).toContainText('PLC accepted this sequence');
+  await expect(row.getByText(/PLC accepted this sequence/)).toBeVisible();
   await row.getByRole('link', { name: 'Operator activity', exact: true }).click();
   await expect(page.locator('.activity-table tbody tr')).toHaveCount(1);
   await page.locator('.activity-table tbody tr').getByText('Operation details', { exact: true }).click();
@@ -70,8 +72,15 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await expect(page.getByText(/PLC command: uncertain/)).toBeVisible();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Request demo cycle', exact: true })).toBeDisabled();
+  const uncertainLink = page.getByRole('link', { name: /^View command transaction #/ });
+  await expect(uncertainLink).not.toHaveAttribute('href', firstHref);
+  const statusPage = await page.context().newPage();
+  await statusPage.goto(await uncertainLink.getAttribute('href'));
+  await expect(statusPage.locator('.activity-table tbody tr')).toContainText('uncertain');
   await page.getByRole('button', { name: 'Simulate completion', exact: true }).click();
   await expect(page.getByText(/PLC command: completed/)).toBeVisible();
+  await expect(statusPage.locator('.activity-table tbody tr')).toContainText('completed');
+  await statusPage.close();
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.RequestSequence']).toBe(2);
   if (process.env.OPENHMI_COMMAND_SCREENSHOT) { await page.goto('/commands'); await expect(page.locator('.activity-table tbody tr')).toHaveCount(2); await page.screenshot({ path: process.env.OPENHMI_COMMAND_SCREENSHOT, fullPage: true }); }
   expect(errors).toEqual([]);

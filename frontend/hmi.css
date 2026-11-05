@@ -59,6 +59,7 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .hmi-action { color: white; background: var(--hmi-command); border: 1px solid #333; border-radius: 0; padding: 10px 12px; min-height: 44px; font: bold 12.41px "OpenHMI Noto", Arial, sans-serif; cursor: pointer; }
 .hmi-action:disabled { color: #666; background: #c6c6c6; border-color: #999; opacity: 1; cursor: default; }
 .command-feedback { min-height: 13px; color: #555; font-size: 10.50px; }
+.command-transaction-link { color: var(--hmi-command); font-size: 12px; overflow-wrap: anywhere; }
 .analog-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; flex-wrap: wrap; }
 .hmi-analog { min-height: 125px; }
 .analog-track { width: 100%; height: 19px; margin-top: 7px; border-bottom: 1px solid #666; border-left: 1px solid #666; border-right: 1px solid #666; position: relative; }
