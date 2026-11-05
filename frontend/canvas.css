@@ -16,7 +16,7 @@
 .canvas-tools .canvas-properties { border: none; padding: 0; }
 .canvas-outline-member { margin-inline-start: 12px; }
 .canvas-scroll { overflow: auto; min-width: 0; }
-.canvas-workbench > .canvas-scroll { max-height: 72vh; background: #bbb; }
+.canvas-workbench > .canvas-scroll { max-height: 72vh; background: #bbb; scrollbar-gutter: stable; }
 .hmi-canvas { position: relative; isolation: isolate; overflow: hidden; background: #ddd; }
 .hmi-canvas.canvas-grid { background-image: radial-gradient(#999 0.65px, transparent 0.8px); background-size: var(--canvas-grid) var(--canvas-grid); }
 .canvas-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }

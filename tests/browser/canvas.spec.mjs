@@ -352,3 +352,46 @@ test('match object dimensions to a selected reference without moving objects', a
     await save(page, original.draft, false);
   }
 });
+
+test('fit canvas and fit selection adjust only the designer view', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    await save(page, { ...original.active, controls: [
+      { kind: 'indicator', id: 'far', label: 'Far indicator', tag: 'MotorRunning' },
+    ], layout: { width: 1800, height: 1200, boxes: {
+      far: { x: 1400, y: 900, width: 140, height: 70 },
+    } } });
+    await page.goto('/');
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    const zoom = page.getByRole('combobox', { name: 'Zoom', exact: true });
+    const fitSelection = page.getByRole('button', { name: 'Fit selection', exact: true });
+    await expect(fitSelection).toBeDisabled();
+    await page.getByRole('button', { name: 'Fit canvas', exact: true }).click();
+    expect(Number(await zoom.inputValue())).toBeLessThan(1);
+    const viewport = page.locator('.canvas-workbench > .canvas-scroll');
+    expect(await viewport.evaluate(element => element.scrollWidth <= element.clientWidth
+      && element.scrollHeight <= element.clientHeight)).toBe(true);
+
+    await page.getByRole('group', { name: 'Objects', exact: true })
+      .getByRole('button', { name: 'Far indicator', exact: true }).click();
+    await fitSelection.click();
+    await expect(zoom).toHaveValue('2');
+    const object = canvas.locator('[data-canvas-object="far"]');
+    const position = await object.evaluate(element => {
+      const item = element.getBoundingClientRect(), scroll = element.closest('.canvas-scroll');
+      const frame = scroll.getBoundingClientRect();
+      return { x: item.left + item.width / 2 - frame.left - scroll.clientWidth / 2,
+        y: item.top + item.height / 2 - frame.top - scroll.clientHeight / 2 };
+    });
+    expect(Math.abs(position.x)).toBeLessThan(2);
+    expect(Math.abs(position.y)).toBeLessThan(2);
+    await zoom.selectOption('1.5');
+    await expect(zoom).toHaveValue('1.5');
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    const draft = (await (await page.request.get('/api/project')).json()).draft;
+    expect(draft.layout.boxes.far).toMatchObject({ x: 1400, y: 900, width: 140, height: 70 });
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});

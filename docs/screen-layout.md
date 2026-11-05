@@ -20,9 +20,10 @@ Choose a control in **Control palette** and drag **Add or drag control** to the
 canvas. Clicking the button also adds it. Move controls by dragging their
 borders or bodies. Select a control to use the corner resize handle or enter
 exact **X**, **Y**, **Width** and **Height** values. **Snap to grid** applies to
-dragging and resizing. The position fields accept exact pixels. **Zoom** changes
-the editing view. The live canvas uses the configured pixel sizes and scrolls
-if the viewer is smaller.
+dragging and resizing. The position fields accept exact pixels. **Zoom**, **Fit canvas**, and
+**Fit selection** change the editing view. Fit selection centers the selected
+objects as the canvas bounds allow, up to 200% zoom. The live canvas uses the
+configured pixel sizes and scrolls if the viewer is smaller.
 
 Controls may overlap. Use **Objects** to select a control that is covered.
 **Bring to front** and **Send to back** change the stacking order. Drag a

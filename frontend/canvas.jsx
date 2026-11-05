@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api } from './api.mjs';
 import './canvas.css';
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const id = () => 'canvas-' + crypto.randomUUID();
 const HISTORY_LIMIT = 60;
+const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 const NUDGE = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 const maxX = box => box.x + box.width;
 const maxY = box => box.y + box.height;
@@ -66,7 +67,7 @@ export function CanvasSurface({ data, config, editor }) {
   const { layout } = data.root.props;
   const content = new Map(data.content.map(item => [item.props.id, item]));
   const editing = !!editor;
-  return <div className="canvas-scroll">
+  return <div ref={editor?.viewport} className="canvas-scroll" dir="ltr">
     <div ref={editor?.surface} className={`hmi-canvas${editing && layout.snap ? ' canvas-grid' : ''}`} dir="ltr"
       aria-label={editing ? 'Freeform canvas' : 'Freeform screen'}
       style={{ width: layout.width, height: layout.height, '--canvas-grid': layout.grid + 'px', zoom: editor?.zoom || 1 }}
@@ -149,11 +150,13 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   const [selected, select] = useState([]);
   const [sizeReference, setSizeReference] = useState('');
   const [palette, setPalette] = useState(Object.keys(config.components)[0]);
-  const [zoom, setZoom] = useState(1);
+  const [view, setView] = useState({ zoom: 1, center: null });
+  const { zoom } = view;
   const [preview, setPreview] = useState(null);
   const [marquee, setMarquee] = useState(null);
   const [message, setMessage] = useState('');
   const surface = useRef(null);
+  const viewport = useRef(null);
   const editorRegion = useRef(null);
   const pendingImage = useRef(0);
   const latest = useRef({ data, onChange, canEdit, selected });
@@ -162,6 +165,13 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   const dragging = useRef(false);
   const marqueeDrag = useRef(null);
   useEffect(() => () => { pendingImage.current += 1; }, []);
+  useLayoutEffect(() => {
+    if (!view.center || !viewport.current) return;
+    const element = viewport.current;
+    element.scrollLeft = view.center.x * view.zoom - element.clientWidth / 2;
+    element.scrollTop = view.center.y * view.zoom - element.clientHeight / 2;
+  }, [view]);
+
   const members = memberIDs(layout);
   const item = selected.length === 1 ? data.content.find(entry => entry.props.id === selected[0]) : null;
   const selectedContainer = selected.length === 1 ? lookup(layout.containers, selected[0]) : null;
@@ -494,6 +504,25 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     } catch (error) { if (request === pendingImage.current) setMessage(error.message); }
   }
 
+  function changeZoom(next) {
+    const element = viewport.current;
+    if (!element) return;
+    setView({ zoom: next, center: {
+      x: (element.scrollLeft + element.clientWidth / 2) / zoom,
+      y: (element.scrollTop + element.clientHeight / 2) / zoom,
+    } });
+  }
+
+  function fitView(area) {
+    const element = viewport.current;
+    if (!element || element.clientWidth <= 24) return;
+    const height = Number.parseFloat(getComputedStyle(element).maxHeight) || element.clientHeight;
+    const factor = Math.min((element.clientWidth - 24) / area.width, (height - 24) / area.height);
+    setView({ zoom: clamp(Math.floor(factor * 100) / 100, 0.01, 2), center: {
+      x: area.x + area.width / 2, y: area.y + area.height / 2,
+    } });
+  }
+
   function canvasPoint(event) {
     const rect = surface.current.getBoundingClientRect();
     return {
@@ -570,9 +599,13 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
       <NumberField label="Canvas height" value={layout.height} min={minHeight} max={4096} change={value => change(settings(layout, 'height', value))} />
       <label><input type="checkbox" checked={layout.snap} onChange={event => change(settings(layout, 'snap', event.target.checked))} />Snap to grid</label>
       <NumberField label="Grid spacing" value={layout.grid} min={2} max={100} change={value => change(settings(layout, 'grid', value))} />
-      <label>Zoom<select value={zoom} onChange={event => setZoom(Number(event.target.value))}>
-        {[0.5, 0.75, 1, 1.25].map(value => <option key={value} value={value}>{value * 100}%</option>)}
+      <label>Zoom<select value={zoom} onChange={event => changeZoom(Number(event.target.value))}>
+        {[...new Set([...ZOOM_LEVELS, zoom])].sort((a, b) => a - b)
+          .map(value => <option key={value} value={value}>{Math.round(value * 100)}%</option>)}
       </select></label>
+      <button type="button" onClick={() => fitView({ x: 0, y: 0, width: layout.width, height: layout.height })}>Fit canvas</button>
+      <button type="button" disabled={!freeSelection.length}
+        onClick={() => fitView(bounds(freeSelection.map(key => objects[key])))}>Fit selection</button>
       <label>Background image<input type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { background(event.target.files[0]); event.target.value = ''; }} /></label>
       {layout.background && <button type="button" onClick={() => change(settings(layout, 'background', ''))}>Clear background</button>}
@@ -611,7 +644,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
         </fieldset>
       </aside>
       <CanvasSurface data={canvasData} config={config}
-        editor={{ selected, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, zoom,
+        editor={{ selected, selectObject: (key, extend) => select(selectionFor(key, extend)), begin, drop, surface, viewport, zoom,
           marquee, startMarquee, moveMarquee, finishMarquee, cancelMarquee, clearSelection: () => select([]) }} />
       <aside className="canvas-tools">
         <fieldset disabled={!canEdit}><legend>Selection</legend>
