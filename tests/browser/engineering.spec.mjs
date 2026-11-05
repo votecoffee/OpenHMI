@@ -156,6 +156,10 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     const latest = (await (await page.request.get('/api/project')).json()).active;
     expect(latest.screens[0].update_ms).toBe(200);
     latest.screens.push({ id: 'details', title: 'Details', popup: true, update_ms: 1000, columns: 1, controls: [{ id: 'trend', kind: 'trend', label: 'Speed history', tags: ['UnitA.Speed', 'PLCLevel', 'MotorRunning'], seconds: 60 }] });
+    latest.screens.at(-1).controls.push({ id: 'more', kind: 'button', label: 'More details', mode: 'popup', screen: 'more' });
+    latest.screens.push({ id: 'more', title: 'More', popup: true, update_ms: 500, columns: 1, controls: [
+      { id: 'return', kind: 'button', label: 'Return to details', mode: 'close_popup' },
+    ] });
     latest.screens[0].controls.push({ id: 'detailsButton', kind: 'button', label: 'Open details', mode: 'popup', screen: 'details' });
     await saveProject(latest);
     const viewer = await context.newPage();
@@ -163,14 +167,35 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await viewer.goto('/runtime');
     await viewer.getByRole('button', { name: 'Equipment', exact: true }).click();
     await expect(viewer.locator('[data-control="faceplate"]')).toContainText('12.5');
-    await viewer.getByRole('button', { name: 'Open details', exact: true }).click();
-    await expect(viewer.getByRole('dialog', { name: 'Details', exact: true })).toBeVisible();
+    const open = viewer.getByRole('button', { name: 'Open details', exact: true });
+    await open.press('Enter');
+    const details = viewer.getByRole('dialog', { name: 'Details', exact: true });
+    await expect(details.getByRole('button', { name: 'Close popup', exact: true })).toBeFocused();
     await expect(viewer.locator('[data-control="trend"] svg polyline').first()).toHaveAttribute('points', /[0-9]/);
     await expect(viewer.locator('[data-trend-lane="MotorRunning"] polyline')).toHaveAttribute('points', /[0-9]/);
     expect((await (await page.request.get('/api/tags')).json()).values.PLCLevel).toBe(65);
     if (process.env.OPENHMI_ENGINEERING_RUNTIME) await viewer.screenshot({ path: process.env.OPENHMI_ENGINEERING_RUNTIME, fullPage: true });
-    await viewer.getByRole('button', { name: 'Close popup', exact: true }).click();
+    const more = details.getByRole('button', { name: 'More details', exact: true });
+    const subscribed = screens => viewer.waitForRequest(request => request.url().endsWith('/api/subscriptions')
+      && request.method() === 'POST' && request.postDataJSON().screens.join(',') === screens);
+    await Promise.all([subscribed('equipment,details,more'), more.press('Enter')]);
+    const nested = viewer.getByRole('dialog', { name: 'More', exact: true });
+    await expect(nested.getByRole('button', { name: 'Close popup', exact: true })).toBeFocused();
+    for (let index = 0; index < 5; index++) {
+      await viewer.keyboard.press('Tab');
+      expect(await viewer.evaluate(() => document.activeElement === document.body
+        || document.activeElement.closest('dialog')?.getAttribute('aria-label') === 'More')).toBe(true);
+    }
+    await Promise.all([subscribed('equipment,details'),
+      nested.getByRole('button', { name: 'Return to details', exact: true }).press('Enter')]);
+    await expect(nested).toHaveCount(0);
+    await expect(more).toBeFocused();
+    await Promise.all([subscribed('equipment'), viewer.keyboard.press('Escape')]);
     await expect(viewer.getByRole('dialog')).toHaveCount(0);
+    await expect(open).toBeFocused();
+    await open.press('Enter');
+    await details.getByRole('button', { name: 'Close popup', exact: true }).click();
+    await expect(open).toBeFocused();
     await viewer.reload();
     await expect(viewer.locator('[data-control="faceplate"]')).toContainText('Unit speed');
     expect(errors).toEqual([]);

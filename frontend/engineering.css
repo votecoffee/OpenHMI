@@ -15,7 +15,6 @@
 .screen-navigation { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .screen-navigation button { border: 1px solid #888; background: #ddd; color: #333; padding: 7px 12px; cursor: pointer; font: inherit; }
 .screen-navigation button[aria-pressed="true"] { border: 2px solid #002878; }
-.hmi-popup-shade { position: fixed; inset: 0; background: #0005; display: grid; place-items: center; z-index: 10000; }
 .hmi-popup { max-height: 90vh; overflow: auto; background: #ddd; border: 2px solid #555; width: min(1000px,95vw); padding: 12px; }
 .hmi-popup > header { display: flex; justify-content: space-between; padding: 8px; }
 .hmi-popup > header button { font: inherit; padding: 6px 12px; }

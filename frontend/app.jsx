@@ -19,12 +19,13 @@ import { ProjectHistory, MergeReview, exportCandidate } from './project-history.
 import { readCandidate, retainCandidate, editorIdentity, recoveryPrefix } from './recovery-cache.mjs';
 import { WorkspacePage } from './workspace.jsx';
 import { api, json } from './api.mjs';
-import { Localization } from './localization.jsx';
+import { Localization, useUi } from './localization.jsx';
 import { IdentitySettings } from './identity-settings.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
 import { AlarmConsole } from './alarm-console.jsx';
 import { RecipeWorkspace } from './recipes.jsx';
 import { SecurityContext, SecurityBar, SecurityAdmin, allowed } from './security.jsx';
+import { Popup } from './touch-entry.jsx';
 
 const editorOverrides = { headerActions: () => null };
 
@@ -34,6 +35,13 @@ function ScreenView({ screen, config }) {
     {screen.layout ? <ScreenFrame {...data.root.props} canvas={<CanvasSurface data={data} config={config} />} />
       : <Render config={config} data={data} />}
   </ScreenControls.Provider>;
+}
+
+function ScreenPopup({ screen, config, opener, close }) {
+  const ui = useUi();
+  return <Popup title={screen.title} close={close} closeLabel={ui('closePopup')} opener={opener}>
+    <ScreenView screen={screen} config={config} />
+  </Popup>;
 }
 
 function Builder({ initial, catalog }) {
@@ -233,7 +241,7 @@ function App({ initial, catalog }) {
   const runtimeCatalog = useMemo(() => engineeringCatalog(catalog, getSettings(active.project)), [catalog, active.project]);
   const config = useMemo(() => createConfig(runtimeCatalog), [runtimeCatalog]);
   const updateRate = useRef(500);
-  updateRate.current = runtime ? Math.min(currentScreen.update_ms || 500, ...popups.map(id => projectScreens(active.project).find(item => item.id === id)?.update_ms || 500)) : 500;
+  updateRate.current = runtime ? Math.min(currentScreen.update_ms || 500, ...popups.map(({ id }) => projectScreens(active.project).find(item => item.id === id)?.update_ms || 500)) : 500;
   const [screenConnected, setScreenConnected] = useState(true);
   const [session, setSession] = useState(null);
   const [identityAvailable, setIdentityAvailable] = useState(true);
@@ -242,9 +250,10 @@ function App({ initial, catalog }) {
   async function refreshSession() { try { setSession(await api('/api/security/session')); } catch { setSession(null); } }
   useEffect(() => {
     function navigate(event) {
-      const { mode, screen } = event.detail;
+      const { mode, screen, opener } = event.detail;
       if (mode === 'navigate') { setScreenId(screen); setPopups([]); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen)}`); }
-      if (mode === 'popup') setPopups(previous => [...new Set([...previous, screen])].slice(-5));
+      if (mode === 'popup') setPopups(previous => previous.some(item => item.id === screen)
+        ? previous : [...previous, { id: screen, opener }].slice(-5));
       if (mode === 'close_popup') setPopups(previous => previous.slice(0, -1));
     }
     window.addEventListener('openhmi-navigate', navigate);
@@ -252,7 +261,7 @@ function App({ initial, catalog }) {
     window.addEventListener('openhmi-editor-scope', editor);
     return () => { window.removeEventListener('openhmi-navigate', navigate); window.removeEventListener('openhmi-editor-scope', editor); };
   }, []);
-  const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...popups].join(',') : '' : editorSubscription.screen;
+  const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...popups.map(({ id }) => id)].join(',') : '' : editorSubscription.screen;
   useEffect(() => {
     let stopped = false, timer;
     async function heartbeat() { try { await api('/api/subscriptions', json('POST', { client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [], preview_root: runtime ? '' : editorSubscription.root })); } catch {} if (!stopped) timer = setTimeout(heartbeat, 5000); }
@@ -302,7 +311,8 @@ function App({ initial, catalog }) {
       {location.pathname === '/revisions' ? <ProjectHistory /> : location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
         <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
         <ScreenView screen={currentScreen} config={config} />
-        {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenView screen={screen} config={config} /></section></div>; })}
+        {popups.map(({ id, opener }) => <ScreenPopup key={id} screen={scopedScreen(active.project, id)} config={config}
+          opener={opener} close={() => setPopups(previous => previous.filter(item => item.id !== id))} />)}
       </>}</main> : editorStarted.current ? <MemoBuilder initial={initial} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
   </Live.Provider></SecurityContext.Provider>;
   return runtime ? <Localization project={active.project}>{station}</Localization> : station;

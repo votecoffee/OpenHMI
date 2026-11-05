@@ -139,13 +139,14 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
   }, [command, mode, permitted, puck?.isEditing]);
-  async function invoke() {
+  async function invoke(event) {
+    const opener = event.currentTarget;
     setBusy(true);
     setFailed(false);
     try {
       const result = await api(`/api/controls/${encodeURIComponent(id)}/activate`, json('POST', {}));
       if (result.transaction) setTransaction(result.transaction);
-      if (result.mode) window.dispatchEvent(new CustomEvent('openhmi-navigate', { detail: result }));
+      if (result.mode) window.dispatchEvent(new CustomEvent('openhmi-navigate', { detail: { ...result, opener } }));
       setFeedback(result.transaction ? `Request dispatched. Transaction ${result.transaction.id}${result.audit_status === 'pending' ? `; activity finalization pending. Operation ${result.operation_id}` : ''}` : result.audit_status === 'pending' ? `Completed; activity finalization pending. Operation ${result.operation_id}` : ui('completed'));
     } catch (error) { setFeedback(error.message); setFailed(true); }
     finally { setBusy(false); }

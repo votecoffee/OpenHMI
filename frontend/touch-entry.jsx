@@ -1,13 +1,20 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUi } from './localization.jsx';
 import './touch-entry.css';
 
-export function Popup({ title, close, children }) {
+export function Popup({ title, close, closeLabel, opener, children }) {
   const ui = useUi();
   const dialog = useRef();
-  useEffect(() => { dialog.current.showModal(); return () => dialog.current?.close(); }, []);
-  return createPortal(<dialog ref={dialog} aria-label={title} className="hmi-popup" onCancel={event => { event.preventDefault(); close(); }}><header><h2>{title}</h2><button type="button" onClick={close} aria-label={ui('closeDialog', { title })}>×</button></header>{children}</dialog>, document.body);
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    element.showModal();
+    return () => {
+      element.close();
+      opener?.focus({ preventScroll: true });
+    };
+  }, [opener]);
+  return createPortal(<dialog ref={dialog} aria-label={title} className="hmi-popup" onCancel={event => { event.preventDefault(); close(); }}><header><h2>{title}</h2><button type="button" onClick={close} aria-label={closeLabel || ui('closeDialog', { title })}>{closeLabel || '×'}</button></header>{children}</dialog>, document.body);
 }
 
 export function TouchEntry({ title, initial = '', numeric = false, secret = false, limits, close, accept }) {

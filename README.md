@@ -45,7 +45,8 @@ protected Activity and Diagnostics pages expose traceability and cached runtime 
 Configurable no-code PLC command buttons track requested, accepted and completed
 sequences with durable outcomes, timeout uncertainty and no automatic replay.
 The runtime includes a pycomm3 ControlLogix adapter, shared screen-rate polling,
-multiple screens/popups, UDT-bound faceplate definitions, conditional bindings,
+multiple screens with keyboard-accessible popups, UDT-bound faceplate definitions,
+conditional bindings,
 no-code tag/navigation actions and SQL history/trends. A project library supports
 create/open and complete database backup export/import.
 
