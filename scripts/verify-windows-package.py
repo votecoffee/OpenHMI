@@ -91,10 +91,21 @@ def main():
             # Forced-stop drill of this exact owned process. No PID enumeration or shared process cleanup.
             child.kill(); child.wait(timeout=10)
         # Synthetic project-local administrator, never a Windows account or production credential.
-        account = subprocess.run([str(executable), '--project', str(project), '--create-admin', 'package_operator'],
-                                 cwd=work, env=env, input='PackageSmokeOnly-2026!\nPackageSmokeOnly-2026!\n', capture_output=True,
-                                 text=True, timeout=20, creationflags=hidden)
-        assert account.returncode == 0, 'Packaged synthetic administrator setup failed'
+        # Windows getpass reads the console, not redirected stdin. Seed only this
+        # owned offline fixture through the source security API, then authenticate
+        # through the executable. Interactive CLI prompting is a separate drill.
+        from openhmi.projects import ProjectStore
+        from openhmi.security import Security
+        from openhmi.security_routes import SecurityChange
+        fixture = ProjectStore(project)
+        try:
+            security = Security(fixture)
+            security.change(SecurityChange(operation='user', name='package_operator', groups=['Administrators'],
+                            password='PackageSmokeOnly-2026!', expected_version=security.snapshot()['version'],
+                            reason='Synthetic offline package fixture'), 'package-smoke-fixture')
+        finally:
+            fixture.close()
+        report['synthetic_account_fixture'] = 'Source API seed while packaged process is stopped; executable login verified below'
         child = start(log)
         try:
             request('/api/security/login', {'name': 'package_operator', 'password': 'PackageSmokeOnly-2026!'}, 'POST')
