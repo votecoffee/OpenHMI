@@ -176,7 +176,7 @@ function ScreenFrame({ children, title, columns, puck, screen_id = 'overview' })
   const live = useContext(Live);
   const { text, ui, language } = useLocalization();
   const monitor = live.alarms;
-  const active = [...(monitor?.outstanding || [])].sort((a, b) => a.priority - b.priority);
+  const active = [...(monitor?.annunciated_outstanding || monitor?.outstanding || [])].sort((a, b) => a.priority - b.priority);
   const unknown = !live.alarmConnected || monitor?.error;
   const badQuality = Object.values(monitor?.states || {}).some(state => state.quality === 'bad');
   return <section className="hmi-screen">
@@ -184,9 +184,10 @@ function ScreenFrame({ children, title, columns, puck, screen_id = 'overview' })
       <div className="station-identity"><strong>OpenHMI</strong><span>{ui('localStation')}</span></div>
       <div className="station-title"><div className={`screen-alarm-banner ${!unknown && active.length ? 'has-alarm' : ''}`} aria-label="Screen alarm status">
         {unknown ? <Quality text={ui('alarmUnavailable')} /> : active.length ? <><PrioritySymbol priority={active[0].priority} />
-          <strong>P{active[0].priority} {alarmMessage(active[0], language)} · {ui('activeAlarms', { active: monitor.active_count, unack: monitor.unacknowledged_count })}</strong>
+          <strong>P{active[0].priority} {alarmMessage(active[0], language)} · {ui('activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
           {badQuality && <Quality text={ui('badData')} />}</> : badQuality ? <Quality text={ui('badData')} />
-          : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms')}
+          : monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms')}
+          {!!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}
       </div><h1>{text(screen_id === 'overview' ? 'screen.title' : `screen.${screen_id}.title`, title)}</h1></div>
       <div className="station-mode"><LanguageSelector /><strong>{live.driver === 'logix' ? 'PLC' : ui('simulation')}</strong><span>{live.connected ? ui('dataConnected') : ui('commLoss')}</span></div>
     </header>

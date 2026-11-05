@@ -86,7 +86,8 @@ The configured history limit bounds events and completed occurrences; unresolved
 occurrences are retained beyond that limit. After restart, the service reconciles
 retained state with newly observed values. The simulator's tags reset on restart.
 
-Remote PLC acknowledgement handshakes, audible/silence behavior, shelving,
-controller downloads and multi-process runtime ownership remain unimplemented.
+Timed [alarm shelving](alarm-workflows.md#timed-shelving) is available without
+changing monitoring or PLC values. Remote PLC acknowledgement handshakes,
+audible/silence behavior, controller downloads and multi-process runtime ownership remain unimplemented.
 HMI security protects acknowledgement and notes through separate permissions;
 real-controller and local/Windows identity commissioning remain separate work.

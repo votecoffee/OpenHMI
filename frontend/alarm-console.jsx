@@ -4,10 +4,12 @@ import { useLocalization, LanguageSelector, alarmMessage } from './localization.
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import './alarm-workflows.css';
+import { AlarmShelving } from './alarm-shelving.jsx';
 
-const blankFilters = { priority: '0', search: '', state: 'outstanding', start: '', end: '' };
+const blankFilters = { priority: '0', search: '', state: 'outstanding', start: '', end: '', shelving: new URLSearchParams(location.search).get('shelving') === 'shelved' ? 'shelved' : 'unshelved' };
 function parameters(filters, before, history = false, event = '') {
   const query = new URLSearchParams({ priority: filters.priority, search: filters.search, state: history ? 'all' : filters.state });
+  if (!history) query.set('shelving', filters.shelving);
   for (const field of ['start', 'end']) if (filters[field]) query.set(field, new Date(filters[field]).toISOString());
   if (before) query.set('before_id', before);
   if (event) query.set('event', event);
@@ -19,6 +21,8 @@ export function AlarmConsole() {
   const { session } = useContext(SecurityContext) || {};
   const canAcknowledge = allowed(session, 'alarms.acknowledge');
   const canComment = allowed(session, 'alarms.comment');
+  const canShelve = allowed(session, 'alarms.shelve');
+  const [shelfReason, setShelfReason] = useState(''), [shelfDuration, setShelfDuration] = useState('900');
   const { language, ui } = useLocalization();
   const [feedback, setFeedback] = useState(''), [busy, setBusy] = useState(false);
   const [filters, setFilters] = useState(blankFilters), [applied, setApplied] = useState(blankFilters);
@@ -70,16 +74,28 @@ export function AlarmConsole() {
     if (!value) return '—';
     try { return new Date(value).toLocaleString(language.code); } catch { return value; }
   }
+  async function changeShelf(item = null) {
+    setBusy(true);
+    try {
+      const result = item ? await api(`/api/alarms/shelves/${encodeURIComponent(item.alarm_id)}/restore`, json('POST', { expected_operation_id: item.operation_id, reason: shelfReason }))
+        : await api(`/api/alarms/occurrences/${identifier}/shelve`, json('POST', { duration_seconds: Number(shelfDuration), reason: shelfReason }));
+      setFeedback(result.audit_status === 'pending' ? ui('shelfPending', { id: result.operation_id }) : ui(item ? 'shelfRestored' : 'shelfSaved'));
+      setSelected([]); setGeneration(value => value + 1);
+    } catch (problem) { setFeedback(problem.message); }
+    finally { setBusy(false); }
+  }
   function guidance(alarm, field) { return alarm[field + 's']?.[language.code] || alarm[field] || ui('noGuidance'); }
   function inspect(id) { setIdentifier(id); setDetail(null); setNotes(null); setNotesBefore(null); setDetailError(''); setNote(''); }
   return <section className="alarm-console" aria-label="Alarm console">
     <div className="alarm-console-heading"><h1>{ui('alarmStatus')}</h1><LanguageSelector /></div>
     {!live.alarmConnected || alarms.error ? <p role="alert">{ui('alarmUnavailable')}</p> : <p>{ui('activeAlarms', { active: alarms.active_count, unack: alarms.unacknowledged_count })}</p>}
     <p>{ui('alarmCountsHint')}</p>
+    {!!alarms.shelved_count && <p>{ui('shelvedSummary', { count: alarms.shelved_count })}</p>}
     <form className="alarm-filters" onSubmit={event => { event.preventDefault(); setApplied({ ...filters }); setBefore(null); setEventBefore(null); setSelected([]); }}>
       <label>{ui('alarmSearch')}<input aria-label={ui('alarmSearch')} value={filters.search} maxLength={200} onChange={event => setFilters({ ...filters, search: event.target.value })} /></label>
       <label>{ui('priority')}<select aria-label={ui('priority')} value={filters.priority} onChange={event => setFilters({ ...filters, priority: event.target.value })}><option value="0">{ui('allPriorities')}</option>{[1, 2, 3, 4].map(value => <option key={value} value={value}>P{value}</option>)}</select></label>
       <label>{ui('alarmStateFilter')}<select aria-label={ui('alarmStateFilter')} value={filters.state} onChange={event => setFilters({ ...filters, state: event.target.value })}>{['outstanding', 'active', 'unacknowledged', 'returned', 'acknowledged', 'retired', 'all'].map(value => <option key={value} value={value}>{value === 'all' ? ui('allStates') : ui(value)}</option>)}</select></label>
+      <label>{ui('shelfFilter')}<select aria-label={ui('shelfFilter')} value={filters.shelving} onChange={event => setFilters({ ...filters, shelving: event.target.value })}>{['unshelved', 'shelved', 'all'].map(value => <option key={value} value={value}>{ui(value === 'all' ? 'allShelving' : value)}</option>)}</select></label>
       {['start', 'end'].map(field => <label key={field}>{ui(field === 'start' ? 'alarmStart' : 'alarmEnd')}<input aria-label={ui(field === 'start' ? 'alarmStart' : 'alarmEnd')} type="datetime-local" value={filters[field]} onChange={event => setFilters({ ...filters, [field]: event.target.value })} /></label>)}
       <button>{ui('filterAlarms')}</button>
     </form>
@@ -93,12 +109,14 @@ export function AlarmConsole() {
       <tbody>{rows?.items.map(alarm => <tr key={alarm.occurrence_id}><td><input type="checkbox" aria-label={ui('selectAlarm', { id: alarm.occurrence_id })} disabled={busy || !!error || !canAcknowledge || !!alarm.acknowledged_at} checked={selected.includes(alarm.occurrence_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, alarm.occurrence_id] : previous.filter(id => id !== alarm.occurrence_id))} /></td>
         <td><PrioritySymbol priority={alarm.priority} />P{alarm.priority}</td><td>{alarmMessage(alarm, language)}</td>
         <td>{alarm.retired_at ? ui('retired') : alarm.active ? ui('active') : ui('returned')} / {alarm.acknowledged_at ? ui('acknowledged') : ui('unacknowledged')}{alarm.quality === 'bad' && <> / {ui('badData')}</>}
-          {alarm.acknowledged_at && <small>{ui('acknowledgedBy')}: {alarm.acknowledged_by || ui('legacyIdentity')}</small>}</td><td>{timestamp(alarm.raised_at)}</td>
+          {alarm.acknowledged_at && <small>{ui('acknowledgedBy')}: {alarm.acknowledged_by || ui('legacyIdentity')}</small>}{alarm.shelf && <small>{ui('shelved')} · {timestamp(alarm.shelf.expires_at)}</small>}</td><td>{timestamp(alarm.raised_at)}</td>
         <td><button disabled={busy || !!error || !canAcknowledge || !!alarm.acknowledged_at} onClick={() => acknowledge(alarm.occurrence_id)} aria-label={`${ui('acknowledge')} ${alarmMessage(alarm, language)}`}>{ui('acknowledge')}</button><button aria-label={ui('inspectAlarm', { id: alarm.occurrence_id })} onClick={() => inspect(alarm.occurrence_id)}>{ui('alarmDetails')}</button></td></tr>)}</tbody></table>
-    {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end ? ui('noOutstanding') : ui('alarmFilteredEmpty')}</p>}
+    {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end && applied.shelving === 'unshelved' ? ui(alarms.shelved_occurrence_count ? 'noUnshelvedAlarms' : 'noOutstanding') : ui('alarmFilteredEmpty')}</p>}
     <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
+    <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />
     {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
       {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {detail.trigger.quality} · {timestamp(detail.trigger.timestamp)} {detail.trigger.error}</p>
+        <p>{detail.occurrence.shelf ? `${ui('shelved')} · ${timestamp(detail.occurrence.shelf.expires_at)}` : ui('unshelved')}</p><button disabled={!canShelve || busy || !!detailError || !!detail.occurrence.shelf || !!detail.occurrence.retired_at || (!detail.occurrence.active && !!detail.occurrence.acknowledged_at) || !shelfReason.trim()} onClick={() => changeShelf()}>{ui('shelveAlarm')}</button>
         <h3>{ui('possibleCause')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'cause')}</p><h3>{ui('operatorResponse')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'response')}</p>
         {detail.related_screen && <a href={`/runtime?screen=${encodeURIComponent(detail.related_screen.id)}`}>{ui('openRelatedScreen')}: {detail.related_screen.title}</a>}{!detail.related_screen && detail.occurrence.related_screen && <p>{ui('relatedScreenUnavailable')}</p>}
         <p>{ui('acknowledgedBy')}: {detail.occurrence.acknowledged_by || (detail.occurrence.acknowledged_at ? ui('legacyIdentity') : ui('unacknowledged'))} {detail.occurrence.acknowledged_provider} · {timestamp(detail.occurrence.acknowledged_at)}</p><p>{detail.occurrence.acknowledgement_comment}</p>
@@ -107,7 +125,7 @@ export function AlarmConsole() {
         <button onClick={() => setNotesBefore(null)}>{ui('newestNotes')}</button><button disabled={!notes?.has_more} onClick={() => setNotesBefore(notes.next_before_id)}>{ui('olderNotes')}</button>
       </>}
     </section>}
-    <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{['active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note'].map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={`/api/alarms/events.csv?${parameters(applied, null, true, eventFilter)}`}>{ui('exportAlarmCsv')}</a></div>
+    <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{['active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note', 'shelved', 'shelf_restored', 'shelf_expired', 'shelf_invalidated'].map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={`/api/alarms/events.csv?${parameters(applied, null, true, eventFilter)}`}>{ui('exportAlarmCsv')}</a></div>
     <table className="alarm-events"><thead><tr><th>{ui('time')}</th><th>{ui('event')}</th><th>{ui('message')}</th><th>{ui('recordedUser')}</th></tr></thead><tbody>{history?.items.map(item => <tr key={item.id}>
       <td>{timestamp(item.timestamp)}</td><td>{ui(item.event)}</td><td>{item.definition ? alarmMessage(item.definition, language) : item.alarm_id}{item.comment && <p className="alarm-guidance">{item.comment}</p>}</td><td>{item.actor || ui('legacyIdentity')} {item.provider}</td>
     </tr>)}</tbody></table>{history && !history.items.length && <p>{ui('noHistory')}</p>}

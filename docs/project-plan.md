@@ -26,7 +26,7 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | M2 — ControlLogix bench acceptance | Awaiting identified bench inputs | Measured reads, data types, scan/load and reconnect behavior; subsequently controlled write acceptance with evidence. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
 | M3 — PLC transactions and recipe deployment | Software checkpoints delivered; hardware acceptance pending | Configurable command handshakes and versioned recipe staging/commit/copy verification delivered offline. Named PLC logic and bench acceptance remain open. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Complete software checkpoint | Applied history, identity-aware diff/merge, staged rollback and browser/server recovery with validated migration/restore; 81 Python and 14 browser tests passed. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
-| M5 — Operator workflows and equipment library | Alarm operator software delivered; equipment selection remains open | Filtered alarm review, captured guidance, selected acknowledgement, attributed notes and CSV delivered. Equipment faceplates, shelving/PLC acknowledgement and target-display/operator review remain open. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
+| M5 — Operator workflows and equipment library | Alarm operator software delivered; equipment selection remains open | Filtered alarm review, captured guidance, selected acknowledgement, attributed notes, CSV and timed shelving delivered. Equipment faceplates, PLC acknowledgement and target-display/operator review remain open. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
 | M6 — Packaged pilot release | Portable Windows software checkpoint delivered; acceptance open | Bundled Python/browser preview, pinned dependencies, local launcher/ownership/logs and preservation instructions delivered. Clean-machine installation, local/Windows identity and pilot/recovery acceptance remain open. | [M6](https://github.com/votecoffee/OpenHMI/milestone/7), [#9](https://github.com/votecoffee/OpenHMI/issues/9), [#10](https://github.com/votecoffee/OpenHMI/issues/10), [#11](https://github.com/votecoffee/OpenHMI/issues/11) |
 | M7 — Python IDE and deliberate reload | Deferred by owner | Integrated Python editing, event templates, autocomplete, diagnostics and a defined reload lifecycle. | [M7](https://github.com/votecoffee/OpenHMI/milestone/8), [#2](https://github.com/votecoffee/OpenHMI/issues/2) |
 
@@ -103,7 +103,7 @@ protection. Add migration checks and restore drills without overwriting original
 or replaying commands. Screen rollback does not roll back PLC memory.
 
 M5 delivers [alarm operator workflows](alarm-workflows.md) with filtered review,
-first-user acknowledgement, guidance, notes and event export. It still selects
+first-user acknowledgement, guidance, notes, event export and timed shelving. It still selects
 equipment faceplates with the owner, then validates normal/abnormal/
 disconnected presentation, permissive/interlock explanations and alarm workflows.
 Review font coverage, translation expansion, keyboard focus and touch targets on

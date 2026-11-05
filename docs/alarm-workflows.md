@@ -58,6 +58,48 @@ permissions: explicitly grant `alarms.comment` in **Security** where needed.
 Mutations use the durable activity journal and same-origin protection. An
 uncertain receipt requires checking the recorded outcome before retrying.
 
+## Timed shelving
+
+Enter a **Reason for shelving or restoring** and a duration, inspect an outstanding
+occurrence, then choose **Shelve this alarm**. The browser offers 15 minutes through
+24 hours; the API accepts 60–86,400 seconds. There is no indefinite shelf. The
+separate `alarms.shelve` permission grants both shelving and early restoration.
+New Administrators receive it; other groups and all existing saved groups require
+an explicit grant in **Security**.
+
+A shelf applies to one alarm definition and its matching retriggers, not its PLC
+tag or other alarm definitions using that tag. Monitoring, bad-quality handling,
+new occurrences, return-to-normal and history continue. Shelving neither
+acknowledges nor writes a PLC tag. Changing/disabling/removing the trigger,
+acknowledgement policy or priority invalidates the shelf. Text/guidance edits do
+not extend or rewrite it.
+
+The default console list hides shelved occurrences. Choose **Shelving filter** to
+show shelved or all occurrences. Global counts and **Acknowledge all** still
+include shelved occurrences. The runtime banner annunciates unshelved alarms and
+always provides a separate count/link when definitions are shelved. Legacy
+Boolean alarm graphics remain direct tag indicators. Existing clients of
+`/api/alarms` retain the full `outstanding` list and totals; the updated runtime
+uses the additive `annunciated_*` fields.
+
+The shelf registry is independent of alarm list filters and shows the initiating
+user/provider, reason and absolute expiry. Enter a restoration reason and choose
+**Restore alarm** to return it early. Repeated shelving cannot extend an existing
+interval. Restoration requires the current shelf operation ID so an old browser
+cannot restore a replacement interval accidentally. These operations use the
+durable activity journal; events/CSV record shelving, restoration, expiry and
+configuration invalidation. Registry reads share the alarm monitor's public
+read-only visibility, including recorded users and reasons.
+
+Expiry uses server UTC and becomes effective on reads even if the monitor has not
+sampled again. The next monitor pass records the expiry event. Keep the server
+clock synchronized. Restart and complete backup/restore retain the original
+expiry without extending it. Review the registry when restoring a project; an
+unexpired shelf remains active in the restored copy. Alarm events follow the
+existing history cap; active shelves retain their captured definition separately
+if their starting occurrence is pruned. An event whose occurrence was pruned
+falls back to the alarm identifier in history/CSV.
+
 ## Persistence and boundaries
 
 Notes and first acknowledgements are stored in companion SQLite tables, preserving
@@ -71,7 +113,7 @@ The new query routes bound occurrence/event pages to 200 rows and note pages to
 100. The legacy `/api/alarms` payload remains compatible and still includes its
 complete retained snapshot for existing clients/header polling.
 
-Shelving, audible/silence behavior and PLC acknowledgement handshakes remain
-future work. Specific equipment faceplates, target-display touch/keyboard review,
+Audible/silence behavior and PLC acknowledgement handshakes remain future work.
+Specific equipment faceplates, target-display touch/keyboard review,
 translated text expansion and real-controller commissioning remain M5 acceptance
 items. These local software checks do not establish those acceptance results.

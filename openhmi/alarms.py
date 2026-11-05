@@ -40,6 +40,8 @@ class AlarmMonitor:
             db.execute('CREATE TABLE IF NOT EXISTS alarm_note(id INTEGER PRIMARY KEY AUTOINCREMENT,occurrence_id INTEGER NOT NULL,timestamp TEXT NOT NULL,actor TEXT NOT NULL,provider TEXT NOT NULL,operation_id TEXT,comment TEXT NOT NULL)')
             db.execute('CREATE INDEX IF NOT EXISTS alarm_note_occurrence ON alarm_note(occurrence_id,id)')
             db.execute('CREATE INDEX IF NOT EXISTS alarm_event_occurrence ON alarm_event(occurrence_id,id)')
+        from .alarm_shelves import AlarmShelves
+        self.shelves = AlarmShelves(self)
 
     @staticmethod
     def _event(db, alarm_id, occurrence, event, now, identity=('system', 'monitor'), operation_id=None, comment=''):
@@ -55,6 +57,7 @@ class AlarmMonitor:
                 project = Project.model_validate(self.store._read()["active"])
                 definitions = {definition.id: definition for definition in project.alarms if definition.enabled}
                 now = utc_now()
+                self.shelves.reconcile(db, definitions, now)
                 states = {row[0]: row for row in db.execute("SELECT * FROM alarm_state")}
                 for alarm_id, state in states.items():
                     definition = definitions.get(alarm_id)
@@ -149,8 +152,16 @@ class AlarmMonitor:
                                     "returned_at": returned, "acknowledged_at": acknowledged, "retired_at": retired,
                                     "active": returned is None and retired is None, "quality": "retired" if retired else states.get(alarm_id, {}).get("quality", "retired")})
             outstanding = [row for row in occurrences if row["active"] or row["acknowledged_at"] is None]
+            shelves = self.shelves.active()
+            for row in occurrences:
+                row['shelf'] = self.shelves.for_occurrence(row, shelves)
+            annunciated = [row for row in outstanding if not row['shelf']]
             history = [{"id": row[0], "occurrence_id": row[1], "alarm_id": row[2], "event": row[3], "timestamp": row[4]} for row in db.execute("SELECT * FROM alarm_event ORDER BY id DESC")]
             return {"last_sample_at": self.last_sample_at, "error": self.error, "states": states,
                     "active_count": sum(row["active"] for row in outstanding),
                     "unacknowledged_count": sum(row["acknowledged_at"] is None for row in outstanding),
+                    'shelved_count': len(shelves), 'shelved_occurrence_count': len(outstanding) - len(annunciated),
+                    'annunciated_outstanding': annunciated,
+                    'annunciated_active_count': sum(row['active'] for row in annunciated),
+                    'annunciated_unacknowledged_count': sum(row['acknowledged_at'] is None for row in annunciated),
                     "outstanding": outstanding, "occurrences": occurrences, "history": history}

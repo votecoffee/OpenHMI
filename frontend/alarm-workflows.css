@@ -5,6 +5,7 @@
 .alarm-console input[type="checkbox"] { width: 22px; height: 22px; }
 .alarm-console td { vertical-align: top; }
 .alarm-console td small { display: block; }
+.shelved-summary { margin-inline-start: 12px; color: #002878; }
 .alarm-console .alarm-detail { border: 1px solid #999; padding: 16px; margin: 18px 0; }
 .alarm-console .alarm-detail textarea { width: 100%; min-height: 70px; }
 .alarm-console .alarm-guidance { white-space: pre-wrap; overflow-wrap: anywhere; }

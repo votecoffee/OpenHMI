@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import json
 
 STATES = {'outstanding', 'active', 'returned', 'retired', 'unacknowledged', 'acknowledged', 'all'}
-EVENTS = {'active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note'}
+EVENTS = {'active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note', 'shelved', 'shelf_restored', 'shelf_expired', 'shelf_invalidated'}
 JOIN = ''' FROM alarm_occurrence o LEFT JOIN alarm_state s ON s.alarm_id=o.alarm_id
            LEFT JOIN alarm_acknowledgement a ON a.occurrence_id=o.id'''
 SELECT = '''SELECT o.id,o.alarm_id,o.definition,o.raised_at,o.returned_at,o.acknowledged_at,o.retired_at,
@@ -59,14 +59,29 @@ class AlarmQueries:
     def __init__(self, monitor):
         self.monitor, self.store = monitor, monitor.store
 
-    def occurrences(self, limit=50, before_id=None, priority=0, search='', state='outstanding', start=None, end=None):
+    def occurrences(self, limit=50, before_id=None, priority=0, search='', state='outstanding', start=None, end=None, shelving='all'):
+        if shelving not in ('all', 'unshelved', 'shelved'):
+            raise ValueError('Unknown shelving filter')
         clauses, arguments = filters(priority, search, state, start, end)
         if before_id is not None:
             clauses.append('o.id < ?'); arguments.append(before_id)
-        where = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
         with self.store._lock:
+            shelves = self.monitor.shelves.active()
+            if shelving != 'all':
+                keys = list(shelves)
+                fields = ('tag', 'trigger_type', 'trigger_value', 'ack_required', 'priority')
+                matches = ' AND '.join(f"json_extract(h.signature,'$[{index}]')=json_extract(o.definition,'$.{field}')" for index, field in enumerate(fields))
+                placeholders = ','.join('?' for _ in keys)
+                condition = f'''EXISTS(SELECT 1 FROM alarm_shelf h WHERE h.alarm_id=o.alarm_id
+                    AND o.retired_at IS NULL AND h.alarm_id IN ({placeholders}) AND {matches})''' if keys else '0'
+                clauses.append(('NOT ' if shelving == 'unshelved' else '') + condition)
+                arguments.extend(keys)
+            where = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
             rows = self.store._db.execute(SELECT + JOIN + where + ' ORDER BY o.id DESC LIMIT ?', (*arguments, limit + 1)).fetchall()
-        return {'items': [occurrence(row) for row in rows[:limit]], 'has_more': len(rows) > limit,
+            items = [occurrence(row) for row in rows[:limit]]
+            for item in items:
+                item['shelf'] = self.monitor.shelves.for_occurrence(item, shelves)
+        return {'items': items, 'has_more': len(rows) > limit,
                 'next_before_id': rows[limit - 1][0] if len(rows) > limit else None}
 
     def notes(self, identifier, limit=50, before_id=None):
@@ -85,6 +100,7 @@ class AlarmQueries:
             if not row:
                 raise KeyError('Alarm occurrence not found')
             item = occurrence(row)
+            item['shelf'] = self.monitor.shelves.for_occurrence(item, self.monitor.shelves.active())
             notes = self.notes(identifier)
         return {'occurrence': item, 'notes': notes}
 

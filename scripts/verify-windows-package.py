@@ -58,8 +58,16 @@ def main():
                 assert request(path), f'Missing HTTP asset: {path}'
             state = json.loads(request('/api/project'))
             state['draft']['title'] = 'Packaged restart fixture'
+            alarm_button = next(control for control in state['draft']['controls'] if control['kind'] == 'button')
+            alarm_button['action'] = 'toggle_alarm'
             saved = json.loads(request('/api/project/draft', {'expected_revision': state['draft_revision'], 'project': state['draft']}, 'PUT'))
             request('/api/project/apply', {'expected_revision': saved['draft_revision']}, 'POST')
+            request(f'/api/controls/{alarm_button["id"]}/activate', {}, 'POST')
+            alarm = json.loads(request('/api/alarms/occurrences'))['items'][0]
+            shelved = json.loads(request(f'/api/alarms/occurrences/{alarm["occurrence_id"]}/shelve', {'duration_seconds': 3600, 'reason': 'Packaged shelf fixture'}, 'POST'))
+            assert json.loads(request('/api/alarms'))['annunciated_outstanding'] == []
+            report['timed_shelving_does_not_clear_alarm'] = json.loads(request('/api/alarms'))['active_count'] == 1
+            assert report['timed_shelving_does_not_clear_alarm']
             backup = request('/api/workspace/backup')
             (work / 'fixture-backup.zip').write_bytes(backup)
             denied = subprocess.run([str(executable), '--project', str(project), '--port', str(port + 1 if port < 65535 else port - 1)],
@@ -72,6 +80,7 @@ def main():
         child = start(log)
         try:
             assert json.loads(request('/api/project'))['active']['title'] == 'Packaged restart fixture'
+            assert json.loads(request('/api/alarms/shelves'))['items'][0]['expires_at'] == shelved['expires_at']
             report['forced_restart_preserved_project'] = True
             target = base + '/api/workspace/import?name=Restored'
             with urllib.request.urlopen(urllib.request.Request(target, backup, method='POST'), timeout=10) as response:
@@ -79,6 +88,12 @@ def main():
             request('/api/workspace/open', {'file': 'Restored.openhmi.sqlite3'}, 'POST')
             assert json.loads(request('/api/project'))['active']['title'] == 'Packaged restart fixture'
             assert json.loads(request('/api/tags'))['plc_hold'] is True
+            shelf = json.loads(request('/api/alarms/shelves'))['items'][0]
+            assert shelf['expires_at'] == shelved['expires_at']
+            request(f'/api/alarms/shelves/{shelf["alarm_id"]}/restore', {'expected_operation_id': shelf['operation_id'], 'reason': 'Packaged restore fixture'}, 'POST')
+            assert json.loads(request('/api/alarms/shelves'))['items'] == []
+            assert json.loads(request('/api/alarms'))['unacknowledged_count'] == 1
+            report['shelf_restart_backup_expiry_and_early_restore'] = True
             report['backup_restore_preserved_project_and_hold'] = True
         finally:
             child.kill(); child.wait(timeout=10)

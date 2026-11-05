@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 export const uiText = {
+  alarmShelving: 'Alarm shelving', shelfExplanation: 'Shelving applies to this alarm and its retriggers until expiry. Monitoring and history continue. Global counts and Acknowledge all include shelved alarms. This registry is independent of list filters.',
+  shelfReason: 'Reason for shelving or restoring', shelfDuration: 'Shelf duration', shelfMinutes: '{count} minutes', shelfExpiry: 'Shelved until',
+  shelfFilter: 'Shelving filter', unshelved: 'Unshelved', shelved: 'Shelved', allShelving: 'All shelving states',
+  noShelves: 'No active shelves on this page', firstShelves: 'First shelves', moreShelves: 'More shelves', shelveAlarm: 'Shelve this alarm',
+  restoreAlarm: 'Restore alarm', restoreAlarmNamed: 'Restore {name}', shelfSaved: 'Alarm shelved', shelfRestored: 'Alarm restored',
+  shelf_restored: 'Shelf restored', shelf_expired: 'Shelf expired', shelf_invalidated: 'Shelf invalidated by configuration',
+  shelvedSummary: 'Shelved alarm definitions: {count}', noUnshelvedAlarms: 'No unshelved outstanding alarms', shelfPending: 'Shelf operation completed; activity finalization pending. Operation {id}',
   simulation: 'SIMULATION', localStation: 'LOCAL STATION', dataConnected: 'Data connected', commLoss: 'COMM LOSS',
   badData: 'BAD DATA', badRange: 'BAD RANGE', on: 'ON', off: 'OFF', state: 'STATE', textShape: 'Text + shape',
   inactive: 'INACTIVE', active: 'ACTIVE', normal: 'Normal', outOfScale: 'OUT OF SCALE', outsideBand: 'OUTSIDE NORMAL BAND',

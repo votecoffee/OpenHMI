@@ -220,9 +220,11 @@ Acknowledgement records the first user and never clears the source tag.
 Returned but unacknowledged occurrences remain visible. The project database
 retains alarm state/history across restarts; simulator tag values themselves reset.
 The built-in **Toggle simulated process alarm** action can be assigned to a button
-for testing. Polling can miss short pulses. Remote PLC handshakes, audible/silence
-behavior and shelving are not implemented. HMI security can require group
-permission for acknowledgement; production commissioning remains separate work.
+for testing. Timed shelving supports required reasons, automatic expiry and early
+restoration through a separate group permission. Monitoring/history continue;
+global totals still include shelved alarms and the runtime banner shows their count.
+Polling can miss short pulses. Remote PLC handshakes and audible/silence behavior
+remain open; production commissioning remains separate work.
 
 See [operator alarm workflows](docs/alarm-workflows.md) for filters, permissions,
 export and retention, and [language and alarm semantics](docs/languages-and-alarms.md) for trigger,

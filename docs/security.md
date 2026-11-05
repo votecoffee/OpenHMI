@@ -55,6 +55,7 @@ editable defaults, not fixed Windows roles. Supported permissions:
 | `runtime.write` | Write a value through an active numeric input |
 | `alarms.acknowledge` | Acknowledge selected/individual/all monitored alarms |
 | `alarms.comment` | Append attributed operator notes to alarm occurrences |
+| `alarms.shelve` | Start timed alarm shelves and restore them early, with a reason |
 | `security.manage` | Manage security; override control-specific group membership |
 | `activity.view` | Inspect/export the runtime operator activity journal |
 | `diagnostics.view` | Inspect/export cached runtime connection and tag diagnostics |
@@ -71,6 +72,9 @@ loading. Approvers receive recipe review. Add the groups needed for a user's job
 Existing groups retain their saved permissions; grant `alarms.comment` explicitly
 when upgrading an existing project. Alarm lists/details/history remain public
 read-only views, consistent with the existing alarm monitor.
+Only new Administrators initially receive `alarms.shelve`; explicitly grant it
+to authorized groups, including existing Administrators, as appropriate. A shelf
+does not grant acknowledgement, runtime operation or value-write permission.
 
 New Engineers groups also receive activity/diagnostics viewing. Existing group
 definitions are preserved; grant new permissions through Security as needed.

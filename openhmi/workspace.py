@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse, Response
 from .projects import Project, ProjectStore, default_project
 
 MAX_BACKUP = 256 * 1024 * 1024
-TABLES = {'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
+TABLES = {'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
           'security_settings', 'security_group', 'security_user', 'security_windows', 'security_audit', 'tag_history',
           'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'alarm_acknowledgement', 'alarm_event_context', 'alarm_note', 'operator_activity', 'command_transaction', 'command_event', 'recipe_transfer', 'project_storage', 'project_revision', 'project_recovery', 'sqlite_sequence'}
 

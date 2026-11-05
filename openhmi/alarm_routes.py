@@ -6,6 +6,7 @@ from fastapi import HTTPException, Path, Query, Request, Response
 from pydantic import Field
 from .projects import StrictModel
 from .alarm_queries import AlarmQueries
+from .alarm_shelves import ShelfConflict
 from .operations_routes import csv_text
 from .screens import screen_map
 
@@ -14,12 +15,24 @@ class OperatorNote(StrictModel):
     comment: str = Field(min_length=1, max_length=1000, pattern=r'\S')
 
 
+class ShelveAlarm(StrictModel):
+    duration_seconds: int = Field(ge=60, le=86400)
+    reason: str = Field(min_length=1, max_length=1000, pattern=r'\S')
+
+
+class RestoreAlarm(StrictModel):
+    expected_operation_id: str = Field(pattern=r'^[a-f0-9]{32}$')
+    reason: str = Field(min_length=1, max_length=1000, pattern=r'\S')
+
+
 def add_alarm_routes(app, monitor, security, activity, driver, store):
     queries = app.state.alarm_queries = AlarmQueries(monitor)
 
     def invoke(callback):
         try:
             return callback()
+        except ShelfConflict as error:
+            raise HTTPException(409, str(error)) from error
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         except KeyError as error:
@@ -28,8 +41,39 @@ def add_alarm_routes(app, monitor, security, activity, driver, store):
     @app.get('/api/alarms/occurrences')
     def occurrences(limit: int = Query(default=50, ge=1, le=200), before_id: int | None = Query(default=None, ge=1, le=9223372036854775807),
                     priority: int = Query(default=0, ge=0, le=4), search: str = Query(default='', max_length=200), state: str = Query(default='outstanding', max_length=30),
-                    start: str | None = Query(default=None, max_length=50), end: str | None = Query(default=None, max_length=50)):
-        return invoke(lambda: queries.occurrences(limit, before_id, priority, search, state, start, end))
+                    start: str | None = Query(default=None, max_length=50), end: str | None = Query(default=None, max_length=50), shelving: str = Query(default='all', max_length=20)):
+        return invoke(lambda: queries.occurrences(limit, before_id, priority, search, state, start, end, shelving))
+
+    @app.get('/api/alarms/shelves')
+    def shelves(limit: int = Query(default=50, ge=1, le=200), after_id: str = Query(default='', max_length=60)):
+        items = [item for key, item in monitor.shelves.active().items() if key > after_id]
+        return {'items': items[:limit], 'has_more': len(items) > limit, 'next_after_id': items[limit - 1]['alarm_id'] if len(items) > limit else None}
+
+    @app.post('/api/alarms/occurrences/{identifier}/shelve')
+    def shelve(body: ShelveAlarm, request: Request, identifier: int = Path(ge=1, le=9223372036854775807)):
+        def execute(ticket):
+            principal = security.require(request, 'alarms.shelve')
+            identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
+            with monitor.lock:
+                invoke(lambda: monitor.shelves.check(identifier))
+                ticket.dispatch()
+                result = invoke(lambda: monitor.shelves.begin(identifier, body.duration_seconds, body.reason, identity, ticket.id))
+                ticket.confirm(verification='alarm_shelved', **result)
+                return result
+        return activity.run(request, 'alarm_shelve', str(identifier), body.model_dump(), execute)
+
+    @app.post('/api/alarms/shelves/{alarm_id}/restore')
+    def restore(body: RestoreAlarm, request: Request, alarm_id: str = Path(min_length=1, max_length=60)):
+        def execute(ticket):
+            principal = security.require(request, 'alarms.shelve')
+            identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
+            with monitor.lock:
+                invoke(lambda: monitor.shelves.check_restore(alarm_id, body.expected_operation_id))
+                ticket.dispatch()
+                result = invoke(lambda: monitor.shelves.restore(alarm_id, body.expected_operation_id, body.reason, identity, ticket.id))
+                ticket.confirm(verification='alarm_shelf_restored', **result)
+                return result
+        return activity.run(request, 'alarm_restore', alarm_id, body.model_dump(), execute)
 
     @app.get('/api/alarms/events')
     def events(limit: int = Query(default=50, ge=1, le=200), before_id: int | None = Query(default=None, ge=1, le=9223372036854775807),
