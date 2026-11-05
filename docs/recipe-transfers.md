@@ -130,6 +130,10 @@ captured recipe, mapped values, hashes and recorded command events. The export
 includes the project ID and export time. It reads stored evidence and includes
 recipe parameters and an image reference, so keep it with private commissioning
 records.
+Transfer history lists all targets independently of the selected dispatch
+target. Rows show the target name captured at dispatch and mark profiles that
+are absent from the applied project as retired. Their records and downloads
+remain available even if the project has no configured transfer targets.
 
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts

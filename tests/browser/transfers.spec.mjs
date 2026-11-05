@@ -138,6 +138,18 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(page.locator('.activity-table tbody tr').filter({ hasText: 'recipe_cycle' })).toHaveCount(2);
   await page.goto('/recipes');
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.Running.RecipeProductionApproved']).toBe(false);
+  const replacement = (await (await page.request.get('/api/project')).json()).active;
+  replacement.recipe_transfers[0].id = 'replacement';
+  replacement.recipe_transfers[0].name = 'Replacement target';
+  await apply(replacement);
+  const replacementTarget = viewer.getByLabel('PLC transfer target', { exact: true });
+  await expect(replacementTarget.getByRole('option', { name: 'Replacement target' })).toHaveCount(1);
+  await replacementTarget.selectOption('replacement');
+  await expect(viewer.getByRole('cell', { name: /Updated product transfer.*Retired target/ })).toHaveCount(2);
+  await apply(original);
+  await expect(viewer.getByText('No PLC transfer targets are configured. Recorded transfers are available below.')).toBeVisible();
+  await expect(viewer.getByRole('button', { name: 'Transfer revision to PLC' })).toHaveCount(0);
+  await expect(viewer.locator('tbody tr')).toHaveCount(2);
   await viewer.locator('tbody tr').first().getByText('Transfer details', { exact: true }).click();
   await expect(viewer.locator('tbody tr').first()).toContainText('production BOOL verified');
   const [download] = await Promise.all([page.waitForEvent('download'),
@@ -149,5 +161,4 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   expect(evidence.transfer.transaction).toMatchObject({ command_id: 'recipe_cycle', state: 'completed' });
   if (process.env.OPENHMI_RECIPE_TRANSFER_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_RECIPE_TRANSFER_SCREENSHOT, fullPage: true });
   expect(errors).toEqual([]);
-  await apply(original);
 });
