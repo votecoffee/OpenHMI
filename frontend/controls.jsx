@@ -144,7 +144,8 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
     setBusy(true);
     setFailed(false);
     try {
-      const result = await api(`/api/controls/${encodeURIComponent(id)}/activate`, json('POST', {}));
+      const result = await api(`/api/controls/${encodeURIComponent(id)}/activate`,
+        json('POST', { expected_revision: live.activeRevision }));
       if (result.transaction) setTransaction(result.transaction);
       if (result.mode) window.dispatchEvent(new CustomEvent('openhmi-navigate', { detail: { ...result, opener } }));
       setFeedback(result.transaction ? `Request dispatched. Transaction ${result.transaction.id}${result.audit_status === 'pending' ? `; activity finalization pending. Operation ${result.operation_id}` : ''}` : result.audit_status === 'pending' ? `Completed; activity finalization pending. Operation ${result.operation_id}` : ui('completed'));

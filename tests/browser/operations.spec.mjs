@@ -1,6 +1,55 @@
 import { test, expect } from '@playwright/test';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
+
+test('a stale operator button cannot dispatch a replacement action', async ({ page }) => {
+  const login = await page.request.post('/api/security/login', {
+    data: { name: 'admin', password: 'SecurityTestOnly-2026!' },
+  });
+  expect(login.ok()).toBe(true);
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply = true) {
+    const state = await (await page.request.get('/api/project')).json();
+    const draft = await page.request.put('/api/project/draft', { data: { project, expected_revision: state.draft_revision } });
+    expect(draft.ok(), await draft.text()).toBe(true);
+    if (apply) expect((await page.request.post('/api/project/apply', {
+      data: { expected_revision: (await draft.json()).draft_revision },
+    })).ok()).toBe(true);
+  }
+
+  try {
+    await page.goto('/runtime');
+    const stale = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
+    await expect(stale).toBeEnabled();
+    const oldMotor = (await (await page.request.get('/api/tags')).json()).values.MotorRunning;
+    const displayed = await (await page.request.get('/api/project/active')).json();
+    const activeEndpoint = '**/api/project/active';
+    await page.route(activeEndpoint, route => route.fulfill({ json: displayed }));
+    const project = structuredClone(original.active);
+    project.tags.push({ name: 'ButtonTarget', type: 'boolean', initial: false, writable: true });
+    Object.assign(project.controls.find(control => control.id === 'toggle'),
+      { label: 'Set replacement target', mode: 'set', target: 'ButtonTarget', value: true });
+    await save(project);
+    const [result] = await Promise.all([
+      page.waitForResponse(response => response.url().endsWith('/api/controls/toggle/activate')),
+      stale.click(),
+    ]);
+    expect(result.status()).toBe(409);
+    expect(result.headers()['x-openhmi-audit-status']).toBe('rejected');
+    await expect(page.getByText('The applied project changed. Review the updated button before trying again.')).toBeVisible();
+    const values = (await (await page.request.get('/api/tags')).json()).values;
+    expect(values.MotorRunning).toBe(oldMotor);
+    expect(values.ButtonTarget).toBe(false);
+
+    await page.unroute(activeEndpoint);
+    await page.getByRole('button', { name: 'Set replacement target', exact: true }).click();
+    await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.ButtonTarget).toBe(true);
+  } finally {
+    await save(original.active);
+    await save(original.draft, false);
+  }
+});
+
 test('protected operator journal, denial attribution, filters, export and diagnostics', async ({ page }) => {
   test.setTimeout(120000);
   const errors = [];

@@ -80,6 +80,28 @@ class ActivityTests(unittest.TestCase):
         windows = self.rows()[0]
         self.assertEqual((windows['actor'], windows['provider'], windows['groups']), ('EXAMPLE\\person', 'windows', ['Engineers']))
 
+    def test_stale_button_revision_is_journaled_before_python_dispatch(self):
+        state = self.client.get('/api/project').json()
+        button = next(control for control in state['draft']['controls'] if control['id'] == 'toggle')
+        button['label'] = 'Updated motor button'
+        saved = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': state['draft']})
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        active_revision = applied.json()['active_revision']
+        self.assertGreater(active_revision, state['active_revision'])
+        path = '/api/controls/toggle/activate'
+        with patch.object(self.app.state.application, 'invoke') as invoke:
+            result = self.client.post(path, json={'expected_revision': state['active_revision']})
+            self.assertEqual(result.status_code, 409, result.text)
+            invoke.assert_not_called()
+        record, = self.rows()
+        self.assertEqual((record['status'], record['phase']), ('rejected', 'prepared'))
+        self.assertEqual(record['context']['expected_revision'], state['active_revision'])
+        self.assertEqual(record['context']['active_revision'], active_revision)
+        self.client.post(path, json={'expected_revision': active_revision}).raise_for_status()
+        self.assertEqual(self.rows()[0]['outcome']['verification'], 'callback_returned')
+
     def test_dispatch_failure_is_uncertain_and_never_replayed(self):
         def partial_write(address, values):
             self.app.state.driver._tags[address] = values[0]

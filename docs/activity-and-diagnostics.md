@@ -15,6 +15,12 @@ callbacks may have arbitrary effects, so their individual tag effects are not
 inferred. Context text is bounded to 1,000 characters, lists/maps to 100 entries
 and nested structures to six levels.
 
+The runtime sends the displayed revision with each button click. If a live
+apply changed the revision, the server records a rejected attempt with the
+displayed and active revisions and skips dispatch. Review the updated button
+before clicking again. API clients can include `expected_revision` in the
+button activation request to use the same check.
+
 A dispatch marker is committed before entering a driver write, callback or alarm
 acknowledgement. The phases describe the HMI path, not proof that an EtherNet/IP
 packet reached the controller. Outcomes are:

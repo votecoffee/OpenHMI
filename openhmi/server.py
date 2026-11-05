@@ -39,6 +39,10 @@ class ActionRequest(BaseModel):
     control_id: str | None = None
 
 
+class ButtonRequest(ActionRequest):
+    expected_revision: int | None = Field(default=None, strict=True, ge=1, le=9223372036854775807)
+
+
 class SubscriptionRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     client: str
@@ -466,26 +470,33 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             return {'ok': True, 'value': value}
 
     @app.post('/api/controls/{control_id}/activate')
-    def activate(control_id: str, request: ActionRequest, http: Request):
+    def activate(control_id: str, request: ButtonRequest, http: Request):
         # Hold the active contract stable through authorization, reservation and dispatch.
         with commands.lock:
             return activate_locked(control_id, request, http)
 
     def activate_locked(control_id, request, http):
-        control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] == 'button'), None)
+        state = store.snapshot()
+        stale = request.expected_revision is not None and request.expected_revision != state['active_revision']
+        control = None if stale else next((item for item in expanded_controls(state['active'])
+                                           if item['id'] == control_id and item['kind'] == 'button'), None)
         if control and control.get('mode', 'python') == 'python':
             return action(control['action'], ActionRequest(control_id=control_id), http)
         context = {field: control.get(field) for field in ('mode', 'command', 'target', 'value', 'screen', '_screen')} if control else {}
+        if request.expected_revision is not None:
+            context.update(expected_revision=request.expected_revision, active_revision=state['active_revision'])
         if control and control.get('target'):
             context['before'] = application.driver.sample_snapshot().get(control['target'])
-        return activity.run(http, 'button_action', control_id, context, lambda ticket: activate_runtime(control, http, ticket))
+        return activity.run(http, 'button_action', control_id, context, lambda ticket: activate_runtime(control, http, ticket, stale))
 
     def write_verification(tag):
         root, _ = application.driver.sources.get(tag, (None, ''))
         definition = application.driver.definitions.get(root)
         return 'tag_readback' if definition and definition['connection'] else 'local_write'
 
-    def activate_runtime(control, http, ticket):
+    def activate_runtime(control, http, ticket, stale):
+        if stale:
+            raise HTTPException(409, 'The applied project changed. Review the updated button before trying again.')
         if not control:
             raise HTTPException(404, 'Active button not found')
         security.require(http, 'runtime.operate', control.get('security_groups', []))
