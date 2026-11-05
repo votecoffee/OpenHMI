@@ -8,6 +8,38 @@ evidence storage.
 
 ## Prepare the read-only project
 
+From a source checkout, create a bench project and backup using the reviewed
+route, screen intervals and logical bindings. The generator works offline.
+This example uses a placeholder route and tag names:
+
+```json
+{
+  "route": "192.0.2.10/0",
+  "overview_update_ms": 2000,
+  "comparison_update_ms": 1000,
+  "comparison_tags": ["BenchRunning"],
+  "tags": [
+    {"name": "BenchRunning", "address": "Motor.Status.Running", "type": "boolean"},
+    {"name": "BenchLevel", "address": "LevelSamples[3]", "type": "number"}
+  ]
+}
+```
+
+```powershell
+python -m examples.build_bench bench-input.json .local/bench-run
+```
+
+The output directory must be new. The database has a `.hold` sidecar and the
+backup is held when imported. Keep the sidecar beside the database when opening
+it directly. The generator creates display controls for up to 100 scalar
+bindings, including UDT members and individual indexed elements. Supported types
+are `boolean`, `integer`, `number` and `string`. Labels, scale and offset are
+optional. Omit both comparison fields for an overview-only project. Set
+`program_tags` to `true` when the approved addresses include program-scoped
+tags. Once acquisition is enabled, pycomm3 still discovers controller metadata
+and may read the underlying word for a bit binding. Review that traffic within
+the approved controller limits.
+
 1. Record the controller identity and firmware, OpenHMI source commit or package
    SHA-256, and the driver/runtime versions from `openhmi --self-check`.
 2. Use a dedicated project with the agreed read-only bindings. Verify tag write
@@ -21,6 +53,10 @@ evidence storage.
 4. Start with one approved slow-rate screen. Record which viewers, alarms and
    historian settings contribute demand. Apply the reviewed configuration to
    start acquisition.
+
+For the overlap check, leave the overview open in one viewer and open
+`/runtime?screen=comparison` in another. The comparison screen requests only
+the approved subset at its configured interval.
 
 ## Record read-only results
 
