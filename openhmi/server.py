@@ -49,6 +49,7 @@ class SubscriptionRequest(BaseModel):
 class ValueRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
     value: float | int | str
+    expected_revision: int | None = Field(default=None, ge=1, le=9223372036854775807)
 
 
 class AcknowledgeRequest(ActionRequest):
@@ -423,15 +424,23 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     @app.put('/api/controls/{control_id}/value')
     def write_value(control_id: str, body: ValueRequest, http: Request):
-        control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] in ('input', 'text_input')), {})
-        context = {'requested_value': body.value, 'control_id': control_id, 'tag': control.get('tag'), 'screen': control.get('_screen')}
-        if control.get('tag'):
-            context['before'] = application.driver.sample_snapshot().get(control['tag'])
-        return activity.run(http, 'value_write', control_id, context, lambda ticket: write_runtime(control_id, body, http, ticket))
+        # Live apply uses the same lock through driver configuration.
+        with commands.lock:
+            state = store.snapshot()
+            stale = body.expected_revision is not None and body.expected_revision != state['active_revision']
+            control = None if stale else next((item for item in expanded_controls(state['active'])
+                                               if item['id'] == control_id and item['kind'] in ('input', 'text_input')), None)
+            context = {'requested_value': body.value, 'control_id': control_id,
+                       'expected_revision': body.expected_revision, 'active_revision': state['active_revision'],
+                       'tag': control.get('tag') if control else None, 'screen': control.get('_screen') if control else None}
+            if control:
+                context['before'] = application.driver.sample_snapshot().get(control['tag'])
+            return activity.run(http, 'value_write', control_id, context, lambda ticket: write_runtime(control, body, http, ticket, stale))
 
-    def write_runtime(control_id, body, http, ticket):
+    def write_runtime(control, body, http, ticket, stale):
         with application.lock:
-            control = next((control for control in expanded_controls(store.snapshot()['active']) if control['id'] == control_id and control['kind'] in ('input', 'text_input')), None)
+            if stale:
+                raise HTTPException(409, 'The applied project changed. Reopen the keypad or clear and re-enter the value.')
             if not control:
                 raise HTTPException(404, 'Active edit control not found')
             security.require(http, 'runtime.write', control.get('security_groups', []))

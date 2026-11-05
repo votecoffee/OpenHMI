@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true });
 
 test('runtime language applies to login, keypad, and Unicode text entry', async ({ page }) => {
+  test.setTimeout(60000);
   const password = 'SecurityTestOnly-2026!';
   const admin = await page.request.post('/api/security/login', { data: { name: 'admin', password } });
   expect(admin.ok()).toBe(true);
@@ -99,6 +100,38 @@ test('runtime language applies to login, keypad, and Unicode text entry', async 
     await expect(entry).toHaveValue('设备a');
     await text.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
     await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.LocalizedEntry).toBe('设备a');
+    const inline = page.getByLabel('Mensaje new value', { exact: true });
+    await inline.fill('old');
+    await page.getByRole('button', { name: 'Abrir teclado para Mensaje', exact: true }).click();
+    await expect(entry).toHaveValue('old');
+    const rebound = structuredClone(project);
+    rebound.tags.push({ name: 'NewEntry', type: 'string', initial: 'new', writable: true });
+    rebound.controls.find(control => control.id === 'localized_text').tag = 'NewEntry';
+    const displayed = await (await page.request.get('/api/project/active')).json();
+    const activeEndpoint = '**/api/project/active';
+    await page.route(activeEndpoint, route => route.fulfill({ json: displayed }));
+    await save(rebound, true);
+    const rejection = 'The applied project changed. Reopen the keypad or clear and re-enter the value.';
+    const rejectedWrite = () => page.waitForResponse(response =>
+      response.url().endsWith('/api/controls/localized_text/value') && response.request().method() === 'PUT',
+    { timeout: 5000 });
+    const [touchResult] = await Promise.all([rejectedWrite(),
+      text.getByRole('button', { name: 'Aceptar entrada', exact: true }).click()]);
+    expect(touchResult.status()).toBe(409);
+    await expect(text.getByRole('alert')).toHaveText(rejection);
+    await text.press('Escape');
+    const [inlineResult] = await Promise.all([rejectedWrite(), inline.press('Enter')]);
+    expect(inlineResult.status()).toBe(409);
+    await expect(page.getByText(rejection, { exact: true })).toBeVisible();
+    await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.NewEntry).toBe('new');
+    await page.unroute(activeEndpoint);
+    const active = await (await page.request.get('/api/project/active')).json();
+    await expect(page.getByText(`Live screen / revision ${active.revision}`)).toBeVisible();
+    await page.getByRole('button', { name: 'Abrir teclado para Mensaje', exact: true }).click();
+    await expect(entry).toHaveValue('new');
+    await entry.fill('fresh');
+    await text.getByRole('button', { name: 'Aceptar entrada', exact: true }).click();
+    await expect.poll(async () => (await (await page.request.get('/api/tags')).json()).values.NewEntry).toBe('fresh');
   } finally {
     await page.request.post('/api/security/login', { data: { name: 'admin', password } });
     await save(original.active, true);

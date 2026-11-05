@@ -325,7 +325,7 @@ function App({ initial, catalog }) {
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
   const plcConnected = live.connected && live.connections?.some(connection => connection.connected);
   const plcStatus = live.plcHold ? 'PLC acquisition held' : plcConnected ? 'PLC data available' : 'PLC disconnected';
-  const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project }}>
+  const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
       <span className={`connection ${(plcConfigured ? plcConnected : live.connected) ? 'connected' : ''}`}>{plcConfigured ? plcStatus : live.connected ? 'Simulator connected' : 'Simulator disconnected'}</span></header>
     <SecurityBar session={session} refresh={refreshSession} plcConfigured={plcConfigured} />

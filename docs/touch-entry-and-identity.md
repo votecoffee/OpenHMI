@@ -28,6 +28,11 @@ a US Latin layout with Shift, punctuation and Space. Password keyboard fields
 are masked. Acceptance validates the latest limits and keeps the dialog open on
 failure; cancel performs no write. Manual typed entry remains available too.
 
+If the applied project changes while an entry is in progress, OpenHMI requires
+a fresh entry against the new revision. Reopen the keypad or clear and re-enter
+the inline value. The server checks the applied revision before dispatch.
+API clients can pass `expected_revision` with the value to use the same check.
+
 Use **Languages** to translate the runtime keypad, edit messages and login
 dialogs. Templates such as `ui.openNumericKeypad` use `{label}` for the
 translated control label. Missing strings use English. Translation changes the

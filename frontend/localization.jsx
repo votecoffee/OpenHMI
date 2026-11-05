@@ -33,6 +33,7 @@ export const uiText = {
   allowedNumericRange: 'Allowed range: {low} to {high}', allowedTextLength: 'Allowed length: {low} to {high}',
   numericRange: 'Range: {low} – {high}', textLength: 'Length: {low} – {high}', editLimitsUnavailable: 'Edit limits unavailable',
   editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',
+  editRevisionChanged: 'The applied project changed. Reopen the keypad or clear and re-enter the value.',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',
   valueWritePending: 'Value written; activity finalization pending. Operation {id}',
   openTextKeyboard: 'Open keyboard for {label}', openNumericKeypad: 'Open numeric keypad for {label}',

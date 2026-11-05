@@ -328,6 +328,7 @@ checks the same permissions and active binding on every action or value write.
 Project editing, alarm acknowledgement and recipe operations also use HMI permissions.
 New projects show **Unsecured simulation** until the first administrator exists.
 Numeric/text edits support HMI limits or limit-tag bindings and touch entry.
+A live apply requires fresh input for any edit already in progress.
 Runtime keypad and login text can be translated in **Languages**. On-screen
 keys edit at the cursor and replace selected text. Key rows wrap on narrow displays.
 The **Current login user** control displays the signed-in user. **PLC login**

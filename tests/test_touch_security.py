@@ -49,6 +49,25 @@ class TouchSecurityTests(unittest.TestCase):
         self.assertEqual(self.client.put(path, json={'value': 'abc'}).status_code, 422)
         self.assertEqual(self.client.put(path, json={'value': '中文'}).status_code, 200)
 
+    def test_stale_edit_revision_cannot_write_to_rebound_control(self):
+        self.install(self.edits)
+        previous_revision = self.client.get('/api/project/active').json()['revision']
+
+        def rebind(project):
+            project['tags'].append({'name': 'NewNumber', 'type': 'number', 'initial': 15, 'writable': True})
+            next(control for control in project['controls'] if control['id'] == 'number_edit')['tag'] = 'NewNumber'
+
+        self.install(rebind)
+        path = '/api/controls/number_edit/value'
+        with patch.object(self.app.state.driver, 'write') as write:
+            rejected = self.client.put(path, json={'value': 25, 'expected_revision': previous_revision})
+            self.assertEqual(rejected.status_code, 409)
+            self.assertIn('applied project changed', rejected.json()['detail'])
+            write.assert_not_called()
+        revision = self.client.get('/api/project/active').json()['revision']
+        self.assertEqual(self.client.put(path, json={'value': 25, 'expected_revision': revision}).status_code, 200)
+        self.assertEqual(self.app.state.driver.read('NewNumber'), [25])
+
     def test_bound_tags_participate_in_screen_and_udt_demands(self):
         self.install(self.edits)
         self.app.state.driver.lease('synthetic', ['overview'])
