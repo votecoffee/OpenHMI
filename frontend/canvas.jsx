@@ -4,6 +4,7 @@ import './canvas.css';
 
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const id = () => 'canvas-' + crypto.randomUUID();
+const HISTORY_LIMIT = 60;
 const maxX = box => box.x + box.width;
 const maxY = box => box.y + box.height;
 const settings = (layout, key, value) => ({ ...layout, [key]: value });
@@ -141,9 +142,12 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   const [preview, setPreview] = useState(null);
   const [message, setMessage] = useState('');
   const surface = useRef(null);
+  const editorRegion = useRef(null);
   const pendingImage = useRef(0);
-  const latest = useRef({ data, onChange });
-  latest.current = { data, onChange };
+  const latest = useRef({ data, onChange, canEdit, selected });
+  latest.current = { data, onChange, canEdit, selected };
+  const history = useRef({ undo: [], redo: [], field: '' }).current;
+  const dragging = useRef(false);
   useEffect(() => () => { pendingImage.current += 1; }, []);
   const members = memberIDs(layout);
   const item = selected.length === 1 ? data.content.find(entry => entry.props.id === selected[0]) : null;
@@ -154,8 +158,47 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   const top = topObjects(layout);
   const objects = Object.fromEntries(objectEntries(layout));
 
-  function change(next, content = data.content) {
-    onChange({ root: { props: { ...data.root.props, layout: next } }, content });
+  function publish(next) {
+    latest.current.data = next;
+    latest.current.onChange(next);
+  }
+
+  function commit(next, field = '') {
+    const current = latest.current;
+    if (!current.canEdit) return;
+    if (!field || history.field !== field) {
+      history.undo.push({ data: current.data, selected: current.selected });
+      if (history.undo.length > HISTORY_LIMIT) history.undo.shift();
+    }
+    history.field = field;
+    history.redo.length = 0;
+    publish(next);
+  }
+
+  function change(next, content = latest.current.data.content, field = '') {
+    commit({ root: { props: { ...latest.current.data.root.props, layout: next } }, content }, field);
+  }
+
+  function restore(direction) {
+    const current = latest.current;
+    if (!current.canEdit || dragging.current || !history[direction].length) return;
+    const target = history[direction].pop();
+    history[direction === 'undo' ? 'redo' : 'undo'].push({ data: current.data, selected: current.selected });
+    history.field = '';
+    pendingImage.current += 1;
+    setMessage('');
+    select(target.selected);
+    publish(target.data);
+    editorRegion.current?.focus({ preventScroll: true });
+  }
+
+  function historyShortcut(event) {
+    if (!canEdit || !(event.ctrlKey || event.metaKey) || event.altKey ||
+        event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const key = event.key.toLowerCase();
+    if (key !== 'z' && key !== 'y') return;
+    event.preventDefault();
+    restore(key === 'y' || event.shiftKey ? 'redo' : 'undo');
   }
 
   function boxesChanged(changes, original = layout) {
@@ -199,33 +242,39 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
     const anchor = objects[key];
     const area = bounds(keys.map(name => objects[name]));
     const element = event.currentTarget;
+    element.focus({ preventScroll: true });
     const startX = event.clientX, startY = event.clientY;
     const snap = value => layout.snap ? Math.round(value / layout.grid) * layout.grid : Math.round(value);
-    let next, moved = false;
+    let changes, moved = false;
     element.setPointerCapture(event.pointerId);
+    dragging.current = true;
     function move(pointer) {
       const dx = (pointer.clientX - startX) / zoom, dy = (pointer.clientY - startY) / zoom;
       if (!moved && Math.abs(dx) + Math.abs(dy) < 2) return;
       moved = true;
       if (resize) {
-        next = boxesChanged({ [key]: {
+        changes = { [key]: {
           width: clamp(snap(anchor.width + dx), 32, layout.width - anchor.x),
           height: clamp(snap(anchor.height + dy), 24, layout.height - anchor.y),
-        } });
+        } };
       } else {
         const x = clamp(snap(anchor.x + dx) - anchor.x, -area.x, layout.width - maxX(area));
         const y = clamp(snap(anchor.y + dy) - anchor.y, -area.y, layout.height - maxY(area));
-        next = boxesChanged(Object.fromEntries(keys.map(name => [name, { x: objects[name].x + x, y: objects[name].y + y }])));
+        changes = Object.fromEntries(keys.map(name => [name, { x: objects[name].x + x, y: objects[name].y + y }]));
       }
-      setPreview(next);
+      setPreview(boxesChanged(changes));
     }
     function finish(pointer) {
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerup', finish);
       element.removeEventListener('pointercancel', finish);
       element.removeEventListener('lostpointercapture', finish);
+      dragging.current = false;
       setPreview(null);
-      if (pointer.type === 'pointerup' && next) change(next);
+      if (pointer.type === 'pointerup' && changes && Object.entries(changes).some(([name, patch]) =>
+        Object.entries(patch).some(([key, value]) => objects[name][key] !== value))) {
+        change(boxesChanged(changes, latest.current.data.root.props.layout));
+      }
     }
     element.addEventListener('pointermove', move);
     element.addEventListener('pointerup', finish);
@@ -282,13 +331,13 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   function addDecoration(kind, label, image = '') {
     const current = latest.current.data;
     const activeLayout = current.root.props.layout;
-    if (decorationEntries(activeLayout).length >= 60) return;
+    if (!latest.current.canEdit || decorationEntries(activeLayout).length >= 60) return;
     const key = id();
     const box = { kind, label, image, fill: '#aaaaaa', locked: false, x: 8, y: 8,
       width: Math.min(240, activeLayout.width - 8), height: Math.min(160, activeLayout.height - 8),
       z: topObjects(activeLayout).length, group: '' };
     const next = { ...activeLayout, decorations: { ...activeLayout.decorations, [key]: box } };
-    latest.current.onChange({ ...current, root: { props: { ...current.root.props, layout: next } } });
+    commit({ ...current, root: { props: { ...current.root.props, layout: next } } });
     select([key]);
   }
 
@@ -305,10 +354,8 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
       const image = await api('/api/canvas-images', { method: 'POST', body: file, signal: AbortSignal.timeout(15000) });
       if (request !== pendingImage.current) return;
       if (asObject) addDecoration('image', file.name.slice(0, 100) || 'Image', image.id);
-      else {
-        const current = latest.current.data;
-        latest.current.onChange({ ...current, root: { props: { ...current.root.props,
-          layout: settings(current.root.props.layout, 'background', image.id) } } });
+      else if (latest.current.data.root.props.layout.background !== image.id) {
+        change(settings(latest.current.data.root.props.layout, 'background', image.id));
       }
       setMessage('');
     } catch (error) { if (request === pendingImage.current) setMessage(error.message); }
@@ -326,10 +373,13 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
   const canPack = freeSelection.length > 0 && freeSelection.every(key => lookup(layout.boxes, key)) && Object.keys(layout.containers).length < 30;
   const minWidth = Math.max(160, ...Object.values(objects).map(maxX));
   const minHeight = Math.max(120, ...Object.values(objects).map(maxY));
-  return <section className="canvas-editor" aria-label="Freeform designer">
+  return <section ref={editorRegion} tabIndex={-1} className="canvas-editor" aria-label="Freeform designer" onKeyDown={historyShortcut}
+    onBlurCapture={() => { history.field = ''; }}>
     <fieldset className="canvas-toolbar" disabled={!canEdit}><legend>Canvas tools</legend>
+      <button type="button" disabled={!history.undo.length} onClick={() => restore('undo')}>Undo</button>
+      <button type="button" disabled={!history.redo.length} onClick={() => restore('redo')}>Redo</button>
       <label>Screen name<input value={data.root.props.title} maxLength={120}
-        onChange={event => onChange({ ...data, root: { props: { ...data.root.props, title: event.target.value } } })} /></label>
+        onChange={event => commit({ ...data, root: { props: { ...data.root.props, title: event.target.value } } }, 'screen-title')} /></label>
       <NumberField label="Canvas width" value={layout.width} min={minWidth} max={4096} change={value => change(settings(layout, 'width', value))} />
       <NumberField label="Canvas height" value={layout.height} min={minHeight} max={4096} change={value => change(settings(layout, 'height', value))} />
       <label><input type="checkbox" checked={layout.snap} onChange={event => change(settings(layout, 'snap', event.target.checked))} />Snap to grid</label>
@@ -407,13 +457,14 @@ export function CanvasEditor({ data, config, onChange, canEdit }) {
         </fieldset>}
         {decoration && <fieldset disabled={!canEdit}><legend>Image or shape properties</legend>
           <label>Object label<input value={decoration.label} maxLength={100}
-            onChange={event => change(boxesChanged({ [selected[0]]: { label: event.target.value } }))} /></label>
+            onChange={event => change(boxesChanged({ [selected[0]]: { label: event.target.value } }), data.content, selected[0] + ':label')} /></label>
           {decoration.kind !== 'image' && <label>Fill color<input type="color" value={decoration.fill}
             onChange={event => change(boxesChanged({ [selected[0]]: { fill: event.target.value } }))} /></label>}
         </fieldset>}
         <fieldset disabled={!canEdit} className="canvas-properties">
           <Properties item={item} component={config.components[item?.type]} onChange={(key, value) =>
-            change(layout, data.content.map(block => block === item ? { ...block, props: { ...block.props, [key]: value } } : block))} />
+            change(layout, data.content.map(block => block === item ? { ...block, props: { ...block.props, [key]: value } } : block),
+              config.components[item.type].fields[key].type === 'text' ? item.props.id + ':' + key : '')} />
         </fieldset>
       </aside>
     </div>

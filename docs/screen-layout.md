@@ -30,6 +30,13 @@ objects to select more than one. Align their edges or centers, or space three
 or more objects evenly. **Group** makes a selection move together and
 **Ungroup** restores individual selection.
 
+Use **Undo** and **Redo** in **Canvas tools** to revisit the last 60 edits in
+the open freeform editor. With focus on a canvas object or toolbar button,
+use **Ctrl+Z**, **Ctrl+Shift+Z** or **Ctrl+Y** (Command also works on macOS).
+A drag or resize is one edit. Undo and redo update the draft and take effect
+for operators after **Apply live**. Reopening the editor starts a fresh undo
+history.
+
 ## Locked background objects
 
 Under **Images and shapes**, add an **Image object**, **Rectangle** or **Ellipse**.

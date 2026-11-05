@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=', 'base64');
 
 test('freeform layout supports backgrounds, overlap, selection and containers through apply', async ({ page, context }) => {
-  test.setTimeout(90000);
+  test.setTimeout(120000);
   const original = await (await page.request.get('/api/project')).json();
   async function save(project, apply = true) {
     const state = await (await page.request.get('/api/project')).json();
@@ -51,6 +51,12 @@ test('freeform layout supports backgrounds, overlap, selection and containers th
     await page.mouse.down();
     await page.mouse.move(point.x + 73, point.y + 30, { steps: 8 });
     await page.mouse.up();
+    await expect(level).toHaveCSS('left', '96px');
+    await expect(motor).toHaveCSS('left', '96px');
+    await page.keyboard.press('Control+z');
+    await expect(level).toHaveCSS('left', '64px');
+    await expect(motor).toHaveCSS('left', '64px');
+    await page.keyboard.press('Control+y');
     await expect(level).toHaveCSS('left', '96px');
     await expect(motor).toHaveCSS('left', '96px');
     await page.getByRole('button', { name: 'Ungroup', exact: true }).click();
@@ -153,6 +159,27 @@ test('freeform layout supports backgrounds, overlap, selection and containers th
     await outline.getByRole('button', { name: 'Unlock station.png' }).click();
     await expect(canvas.getByRole('button', { name: 'Select and move station.png' })).toBeVisible();
     await expect(canvas.locator('[data-background-locked]')).toHaveCount(1);
+
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    const redo = page.getByRole('button', { name: 'Redo', exact: true });
+    await undo.click();
+    await expect(canvas.locator('[data-background-locked]')).toHaveCount(2);
+    await page.keyboard.press('Control+Shift+z');
+    const unlocked = canvas.getByRole('button', { name: 'Select and move station.png' });
+    await expect(unlocked).toBeVisible();
+    await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
+    await expect(unlocked).toHaveCount(0);
+    await undo.click();
+    await expect(unlocked).toBeVisible();
+    await redo.click();
+    await expect(unlocked).toHaveCount(0);
+    await undo.click();
+    await dimension('X', 480);
+    await expect(redo).toBeDisabled();
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('left', '480px');
+    await undo.click();
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('left', '304px');
+    await expect(runtime.locator('[data-background-locked]')).toHaveCount(2);
   } finally {
     await save(original.active);
     await save(original.draft, false);
