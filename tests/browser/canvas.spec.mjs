@@ -417,3 +417,50 @@ test('fit canvas and fit selection adjust only the designer view', async ({ page
     await save(page, original.draft, false);
   }
 });
+
+test('step selected objects one layer at a time while preserving the background', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  const ids = ['one', 'two', 'three', 'four', 'five'];
+  const rectangle = { x: 40, y: 40, width: 120, height: 80 };
+  try {
+    await save(page, { ...original.active,
+      controls: ids.map(id => ({ kind: 'indicator', id, label: id, tag: 'MotorRunning' })),
+      layout: { boxes: Object.fromEntries(ids.map((id, z) => [id, { ...rectangle, z }])),
+        decorations: { machine: { ...rectangle, kind: 'rectangle', label: 'Machine', locked: true, z: 9999 } } },
+    });
+    await page.goto('/');
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    const outline = page.getByRole('group', { name: 'Objects', exact: true });
+    const select = (name, modifiers = []) => outline.getByRole('button', { name, exact: true }).click({ modifiers });
+    const layers = () => canvas.locator('[data-canvas-object]:not([data-background-locked])')
+      .evaluateAll(items => items.map(item => item.dataset.canvasObject));
+    const forward = page.getByRole('button', { name: 'Bring forward', exact: true });
+    const backward = page.getByRole('button', { name: 'Send backward', exact: true });
+
+    await select('one');
+    await expect(backward).toBeDisabled();
+    await select('two', ['Shift']);
+    await select('four', ['Shift']);
+    await forward.click();
+    expect(await layers()).toEqual(['three', 'one', 'two', 'five', 'four']);
+    await forward.click();
+    expect(await layers()).toEqual(['three', 'five', 'one', 'two', 'four']);
+    await expect(forward).toBeDisabled();
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    expect(await layers()).toEqual(['three', 'one', 'two', 'five', 'four']);
+    await backward.click();
+    expect(await layers()).toEqual(ids);
+    await forward.click();
+    await expect(canvas.locator('.canvas-background-objects')).toHaveCSS('z-index', '0');
+    await expect(canvas.locator('[data-background-locked]')).toHaveCSS('z-index', '10000');
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    const layout = (await (await page.request.get('/api/project')).json()).active.layout;
+    expect(layout.boxes.three.z).toBe(0);
+    expect(layout.boxes.four.z).toBe(4);
+    expect(layout.decorations.machine).toMatchObject({ locked: true, z: 9999 });
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});

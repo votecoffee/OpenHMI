@@ -441,10 +441,33 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     }]))), data.content, field);
   }
 
+  const layerIDs = top.map(([key]) => key);
+  const chosenLayers = new Set(freeSelection);
+  const canStep = direction => layerIDs.some((key, index) => {
+    const neighbor = index + direction;
+    return chosenLayers.has(key) && neighbor >= 0 && neighbor < layerIDs.length && !chosenLayers.has(layerIDs[neighbor]);
+  });
+
+  function saveLayers(order) {
+    change(boxesChanged(Object.fromEntries(order.map((key, z) => [key, { z }]))));
+  }
+
   function reorder(front) {
-    const chosen = top.filter(([key]) => freeSelection.includes(key));
-    const other = top.filter(([key]) => !freeSelection.includes(key));
-    change(boxesChanged(Object.fromEntries((front ? [...other, ...chosen] : [...chosen, ...other]).map(([key], z) => [key, { z }]))));
+    const chosen = layerIDs.filter(key => chosenLayers.has(key));
+    const other = layerIDs.filter(key => !chosenLayers.has(key));
+    saveLayers(front ? [...other, ...chosen] : [...chosen, ...other]);
+  }
+
+  function stepLayer(direction) {
+    const order = [...layerIDs];
+    const start = direction === 1 ? order.length - 2 : 1;
+    for (let index = start; index >= 0 && index < order.length; index -= direction) {
+      const neighbor = index + direction;
+      if (chosenLayers.has(order[index]) && !chosenLayers.has(order[neighbor])) {
+        [order[index], order[neighbor]] = [order[neighbor], order[index]];
+      }
+    }
+    saveLayers(order);
   }
 
   function align(axis, edge) {
@@ -702,6 +725,8 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
           <button type="button" disabled={!canLock} onClick={lockBackground}>Lock as background</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(true)}>Bring to front</button>
           <button type="button" disabled={!freeSelection.length} onClick={() => reorder(false)}>Send to back</button>
+          <button type="button" disabled={!canStep(1)} onClick={() => stepLayer(1)}>Bring forward</button>
+          <button type="button" disabled={!canStep(-1)} onClick={() => stepLayer(-1)}>Send backward</button>
           <button type="button" disabled={freeSelection.length < 2} onClick={() => {
             const group = id();
             change(boxesChanged(Object.fromEntries(freeSelection.map(key => [key, { group }]))));

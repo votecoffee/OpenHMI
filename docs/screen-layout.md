@@ -29,7 +29,10 @@ Toggle **Pan canvas** and drag to scroll around the editing view at the current
 zoom. Middle-button drag pans directly. Press **Escape** to exit Pan mode.
 
 Controls may overlap. Use **Objects** to select a control that is covered.
-**Bring to front** and **Send to back** change the stacking order. Drag a
+**Bring to front** and **Send to back** move the selection to either end of
+the control stack. **Bring forward** and **Send backward** move each run of
+selected objects past one neighboring object, preserving their relative order.
+The locked background layer stays below the control stack. Drag a
 selection box from empty canvas to select objects it touches. Hold **Shift**
 while dragging to add to the current selection. A group is selected together
 and locked backgrounds are skipped. **Escape** cancels the selection drag.
