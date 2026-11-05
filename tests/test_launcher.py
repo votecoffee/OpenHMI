@@ -104,6 +104,18 @@ class LauncherTests(unittest.TestCase):
             self.assertFalse(report['checks']['loopback_port']['ok'])
             self.assertEqual(list(project.parent.iterdir()), [])
 
+    def test_occupied_port_stops_startup_before_creating_project_or_logs(self):
+        with TemporaryDirectory() as directory, socket.socket() as listener, redirect_stderr(StringIO()) as output:
+            project = Path(directory) / 'absent' / 'Project.sqlite3'
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            port = listener.getsockname()[1]
+            with self.assertRaises(SystemExit) as error:
+                launcher.main(['--project', str(project), '--port', str(port)])
+            self.assertEqual(error.exception.code, 1)
+            self.assertIn(f'Cannot bind 127.0.0.1:{port}', output.getvalue())
+            self.assertFalse(project.parent.exists())
+
     def test_bundled_admin_setup_preserves_existing_users_and_requires_library_ownership(self):
         with TemporaryDirectory() as directory:
             project = Path(directory) / 'Project.sqlite3'

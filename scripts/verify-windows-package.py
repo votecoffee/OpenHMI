@@ -37,8 +37,18 @@ def main():
     report = {'self_check': json.loads(check.stdout), 'manifest_files_verified': len(manifest['files']), 'path_has_python_or_node': False}
     assert report['self_check']['frozen'] is True
     project = work / 'project library' / 'Pilot.openhmi.sqlite3'
+    handler = work / 'startup-probe.py'
+    marker = work / 'handler-ran'
+    handler.write_text(f'from pathlib import Path\nPath({str(marker)!r}).touch()\n', encoding='utf-8')
     with socket.socket() as reservation:
-        reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
+        reservation.bind(('127.0.0.1', 0))
+        reservation.listen()
+        port = reservation.getsockname()[1]
+        conflict = subprocess.run([str(executable), '--project', str(project), '--port', str(port), '--handlers', str(handler)],
+                                  cwd=work, env=env, capture_output=True, text=True, timeout=15, creationflags=hidden)
+        assert conflict.returncode == 1 and f'Cannot bind 127.0.0.1:{port}' in conflict.stderr
+        assert not project.parent.exists() and not marker.exists()
+    report['port_conflict_rejected_before_opening_project_or_handlers'] = True
     project.parent.mkdir()
     logs = project.parent / 'logs'
     logs.mkdir()

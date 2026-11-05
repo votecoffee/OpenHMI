@@ -1,6 +1,6 @@
 """Local runtime entry point for source installs and the portable Windows package."""
 import argparse
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from importlib.metadata import PackageNotFoundError, version
 import json
 import logging.config
@@ -91,6 +91,21 @@ def self_check():
             'assets': 'present'}
 
 
+@contextmanager
+def bind_loopback(port):
+    """Reserve the runtime endpoint before opening a project or loading handlers."""
+    with socket.socket() as listener:
+        if os.name == 'nt':
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        else:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            listener.bind(('127.0.0.1', port))
+        except OSError as error:
+            raise RuntimeError(f'Cannot bind 127.0.0.1:{port}. Check whether the port is available or select another with --port. {error}') from error
+        yield listener
+
+
 def preflight(project, logs, port):
     """Probe deployment permissions using the runtime account and disposable files."""
     checks = {}
@@ -117,10 +132,8 @@ def preflight(project, logs, port):
             pass
 
     def probe_port():
-        with socket.socket() as listener:
-            if os.name == 'nt':
-                listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-            listener.bind(('127.0.0.1', port))
+        with bind_loopback(port):
+            pass
 
     check('package', Path(__file__).parent, self_check)
     check('project_storage', project.parent, lambda: probe_storage(project.parent, project))
@@ -161,12 +174,15 @@ def main(argv=None):
             if not report['ok']:
                 raise SystemExit(1)
             return
-        with library_lock(project.parent):
+        with ExitStack() as stack:
+            if not args.create_admin:
+                self_check()
+                listener = stack.enter_context(bind_loopback(args.port))
+            stack.enter_context(library_lock(project.parent))
             if args.create_admin:
                 from .security import main as create_admin
                 create_admin(['--project', str(project), '--user', args.create_admin])
                 return
-            self_check()
             logs = (args.log_dir or project.parent / 'logs').resolve()
             logging.config.dictConfig(log_configuration(logs))
             from .workspace import ProjectWorkspace
@@ -186,7 +202,7 @@ def main(argv=None):
             if args.open_browser:
                 threading.Thread(target=open_when_started, daemon=True).start()
             try:
-                server.run()
+                server.run(sockets=[listener])
             except KeyboardInterrupt:
                 # Uvicorn completes lifespan shutdown, then asyncio re-raises Ctrl+C.
                 # Treat that ordinary console stop as success in a frozen executable.

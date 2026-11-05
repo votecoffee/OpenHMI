@@ -22,7 +22,9 @@ its `_internal` folder together. Open PowerShell in that folder:
 Open <http://127.0.0.1:8000> if the browser does not open. The program runs in the
 console; stop it with **Ctrl+C** and wait for application shutdown to complete.
 Closing the browser leaves the runtime running. Restart by running the same
-command. This preview binds only to the local computer, using one server process.
+command. OpenHMI reserves its local port before opening the project or running
+custom Python handlers. If the port is occupied, select a free one with `--port`.
+This preview binds only to the local computer, using one server process.
 It does not configure remote HTTP/HTTPS access or automatic startup.
 
 By default, projects are stored in `%LOCALAPPDATA%\OpenHMI\projects`, independently
