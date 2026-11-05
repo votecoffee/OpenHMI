@@ -18,7 +18,7 @@ from .recipe_auth import hash_password, verify_password
 from .windows_identity import WindowsIdentity
 
 COOKIE = 'openhmi_session'
-PERMISSIONS = {'project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'alarms.comment', 'alarms.shelve', 'security.manage', 'activity.view', 'diagnostics.view',
+PERMISSIONS = {'identity.publish', 'project.edit', 'runtime.operate', 'runtime.write', 'alarms.acknowledge', 'alarms.comment', 'alarms.shelve', 'security.manage', 'activity.view', 'diagnostics.view',
                'recipes.engineer', 'recipes.approver', 'recipes.operator', 'recipes.administrator'}
 DEFAULT_GROUPS = {
     'Administrators': sorted(PERMISSIONS),
@@ -54,6 +54,7 @@ class Security:
         self.sessions, self.failures = {}, {}
         self.dummy_hash = hash_password(secrets.token_urlsafe(24))
         with store.transaction() as db:
+            db.execute('CREATE TABLE IF NOT EXISTS security_group_style(name TEXT PRIMARY KEY,color TEXT NOT NULL)')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS security_settings(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL,windows_enabled INTEGER NOT NULL);
                 CREATE TABLE IF NOT EXISTS security_group(name TEXT PRIMARY KEY,permissions TEXT NOT NULL);
@@ -166,7 +167,7 @@ class Security:
             db = self.store._db
             version, enabled = db.execute('SELECT version,windows_enabled FROM security_settings').fetchone()
             return {'version': version, 'windows_enabled': bool(enabled), 'windows_available': self.windows.available,
-                    'permissions': sorted(PERMISSIONS), 'groups': [{'name': name, 'permissions': json.loads(grants)} for name, grants in db.execute('SELECT name,permissions FROM security_group ORDER BY name')],
+                    'permissions': sorted(PERMISSIONS), 'groups': self.legend(),
                     'users': [{'name': name, 'groups': json.loads(groups), 'enabled': bool(enabled)} for name, groups, enabled in db.execute('SELECT name,groups_json,enabled FROM security_user ORDER BY name')],
                     'bindings': [{'sid': sid, 'kind': kind, 'label': label, 'group': group} for sid, kind, label, group in db.execute('SELECT sid,kind,label,hmi_group FROM security_windows ORDER BY label')],
                     'audit': [{'timestamp': stamp, 'actor': actor, 'operation': operation, 'details': json.loads(details)} for stamp, actor, operation, details in db.execute('SELECT timestamp,actor,operation,details FROM security_audit ORDER BY id DESC LIMIT 200')]}
@@ -180,6 +181,8 @@ class Security:
                 raise HTTPException(409, 'Security changed; refresh before saving')
             names = {row[0] for row in db.execute('SELECT name FROM security_group')}
             if body.operation == 'group':
+                if body.color is not None:
+                    db.execute('INSERT OR REPLACE INTO security_group_style VALUES(?,?)', (body.name, body.color))
                 if not set(body.permissions) <= PERMISSIONS:
                     raise HTTPException(422, 'Unknown permission')
                 db.execute('INSERT INTO security_group VALUES(?,?) ON CONFLICT(name) DO UPDATE SET permissions=excluded.permissions', (body.name, json.dumps(body.permissions)))
@@ -207,11 +210,18 @@ class Security:
                 raise HTTPException(409, 'Retain at least one enabled local security administrator')
             db.execute('UPDATE security_settings SET version=version+1')
             self.audit(db, actor, body.operation, reason=body.reason, name=body.name, groups=body.groups,
-                       permissions=body.permissions, account=body.account, group=body.group, enabled=body.enabled)
+                       permissions=body.permissions, color=body.color, account=body.account, group=body.group, enabled=body.enabled)
         if body.operation == 'user':
             with self.lock:
                 self.sessions = {key: value for key, value in self.sessions.items() if not (value[0]['provider'] == 'local' and value[0]['key'] == body.name)}
         return self.snapshot()
+
+    def legend(self):
+        palette = ('#315a80', '#536b46', '#73548a', '#396b70', '#705c42', '#62616e')
+        with self.store._lock:
+            colors = dict(self.store._db.execute('SELECT name,color FROM security_group_style'))
+            return [{'name': name, 'permissions': json.loads(grants), 'color': colors.get(name, palette[hashlib.sha256(name.encode()).digest()[0] % len(palette)])}
+                    for name, grants in self.store._db.execute('SELECT name,permissions FROM security_group ORDER BY name')]
 
 
 def main(argv=None):

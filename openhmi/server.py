@@ -22,6 +22,8 @@ from .historian import Historian
 from .screens import expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
 from .alarm_routes import add_alarm_routes
+from .edit_limits import LIMIT_TAGS, edit_limits, validate_entry
+from .identity_publish import IdentityPublisher, add_identity_routes
 from .recipe_routes import add_recipe_routes
 from .security import Security
 from .security_routes import add_security_routes
@@ -43,7 +45,7 @@ class SubscriptionRequest(BaseModel):
 
 class ValueRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    value: float
+    value: float | int | str
 
 
 class AcknowledgeRequest(ActionRequest):
@@ -100,6 +102,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 await asyncio.to_thread(commands.poll)
                 await asyncio.to_thread(historian.sample)
                 await asyncio.to_thread(activity.maintenance)
+                await asyncio.to_thread(publisher.poll)
             except Exception:
                 logging.exception('Driver/history cycle failed')
             await asyncio.sleep(0.05)
@@ -122,6 +125,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             except asyncio.CancelledError:
                 pass
             await polling
+            await asyncio.to_thread(publisher.shutdown)
             await asyncio.to_thread(application.driver.close)
             store.close()
 
@@ -145,6 +149,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.alarms = monitor
     app.state.historian = historian
     security = app.state.security = Security(store)
+    publisher = app.state.identity_publisher = IdentityPublisher(application.driver, security)
+    add_identity_routes(app, publisher)
     activity = app.state.activity = ActivityJournal(store, security)
     commands = app.state.commands = CommandService(store, application.driver)
     add_command_routes(app, commands, security)
@@ -170,6 +176,22 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if alias in kinds:
                     raise HTTPException(422, 'Tag aliases collide')
                 kinds[alias] = kind
+        publication = project.identity_publication
+        if publication.enabled:
+            from .security import PERMISSIONS
+            definitions = {tag.name: tag for tag in project.tags}
+            physical_targets = set()
+            for name, kind in ((publication.username_tag, 'string'), (publication.privileges_tag, 'integer'), *([(publication.heartbeat_tag, 'integer')] if publication.heartbeat_tag else [])):
+                definition = definitions.get(name)
+                if not definition or definition.type != kind or not definition.writable or definition.scale != 1 or definition.offset != 0:
+                    raise HTTPException(422, 'Identity publication requires writable, unscaled root STRING/integer logical tags')
+                physical = (definition.connection, definition.address if definition.connection else definition.name)
+                if physical in physical_targets:
+                    raise HTTPException(422, 'Identity outputs must use separate physical PLC tags')
+                physical_targets.add(physical)
+            groups = {item['name'] for item in security.legend()}
+            if any(bit.name not in (PERMISSIONS if bit.source == 'permission' else groups) for bit in publication.bits):
+                raise HTTPException(422, 'Identity bit references an unknown permission or group')
         actions = {action["name"] for action in application.actions()}
         for language in project.languages:
             if not (web / "assets" / "flags" / f"{language.flag}.svg").is_file():
@@ -205,13 +227,18 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(422, 'Expanded control IDs collide; rename the screen, control or faceplate member control')
         known_groups = {group['name'] for group in security.snapshot()['groups']}
         for control in controls:
+            if publication.enabled and ((control['kind'] in ('input', 'text_input') and control.get('tag') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag)) or (control['kind'] == 'button' and control.get('mode') in ('set', 'toggle') and control.get('target') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag))):
+                raise HTTPException(422, 'Identity publication tags cannot be edit or button write targets')
+            for field in LIMIT_TAGS:
+                if control.get(field) and kinds.get(control[field]) not in ('number', 'integer'):
+                    raise HTTPException(422, 'Edit limits require an existing numeric tag')
             for field in ('visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled'):
                 if control.get(field) and kinds.get(control[field]) != 'boolean':
                     raise HTTPException(422, 'Conditional bindings require a Boolean tag')
             required = control.get('security_groups', [])
             if not set(required) <= known_groups:
                 raise HTTPException(422, 'Control references an unknown HMI security group')
-            if control['kind'] == 'recipe':
+            if control['kind'] in ('recipe', 'current_user'):
                 continue
             if control['kind'] == 'trend':
                 if any(kinds.get(tag) not in ('number', 'integer', 'boolean') for tag in control['tags']):
@@ -234,7 +261,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if kind not in ('number', 'integer', 'boolean', 'string') or (mode == 'toggle' and kind != 'boolean'):
                         raise HTTPException(422, 'Action target type is incompatible')
             else:
-                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'input') else ('boolean',)
+                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'input') else ('string',) if control['kind'] == 'text_input' else ('boolean',)
                 if kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 
@@ -254,6 +281,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             'tags': [{'name': name, 'type': kind} for name, kind in tag_types.items()],
             "actions": application.actions(),
             "flags": sorted(path.stem for path in (web / "assets" / "flags").glob("*.svg")),
+            "security_permissions": security.snapshot()["permissions"],
             "security_groups": [group['name'] for group in security.snapshot()['groups']],
         }
 
@@ -277,6 +305,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.put("/api/project/draft")
     def save(request: SaveRequest, http: Request) -> dict:
         security.require(http, 'project.edit')
+        if request.project.identity_publication.model_dump() != Project.model_validate(store.snapshot()['draft']).identity_publication.model_dump():
+            security.require(http, 'security.manage')
         validate_bindings(request.project)
         return transact(store.save, request)
 
@@ -286,6 +316,15 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
         with commands.lock, monitor.lock:
             def validate_apply(project):
+                old_publication = (application.driver.project or {}).get('identity_publication', {})
+                if old_publication.get('enabled') or publisher.last_config:
+                    old_tags = {tag['name']: tag for tag in application.driver.project['tags']}
+                    new_tags = {tag.name: tag.model_dump() for tag in project.tags}
+                    protected = publisher.last_config or old_publication
+                    if any(old_tags.get(protected[field]) != new_tags.get(protected[field]) for field in ('username_tag', 'privileges_tag', *(['heartbeat_tag'] if protected.get('heartbeat_tag') else []))) or (project.identity_publication.enabled and any(getattr(project.identity_publication, field) != protected[field] for field in ('username_tag', 'privileges_tag', *(['heartbeat_tag'] if protected.get('heartbeat_tag') else [])))):
+                        raise HTTPException(409, 'Disable identity publication and wait for its cleared status before changing its target tags')
+                if project.identity_publication.model_dump() != Project.model_validate(store.snapshot()['active']).identity_publication.model_dump():
+                    security.require(http, 'security.manage')
                 validate_bindings(project)
                 commands.validate_apply(project.model_dump())
             result = transact(lambda value: store.apply(value, validate_apply, identity), request)
@@ -362,7 +401,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     @app.put('/api/controls/{control_id}/value')
     def write_value(control_id: str, body: ValueRequest, http: Request):
-        control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] == 'input'), {})
+        control = next((item for item in expanded_controls(store.snapshot()['active']) if item['id'] == control_id and item['kind'] in ('input', 'text_input')), {})
         context = {'requested_value': body.value, 'control_id': control_id, 'tag': control.get('tag'), 'screen': control.get('_screen')}
         if control.get('tag'):
             context['before'] = application.driver.sample_snapshot().get(control['tag'])
@@ -370,18 +409,23 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
 
     def write_runtime(control_id, body, http, ticket):
         with application.lock:
-            control = next((control for control in expanded_controls(store.snapshot()['active']) if control['id'] == control_id and control['kind'] == 'input'), None)
+            control = next((control for control in expanded_controls(store.snapshot()['active']) if control['id'] == control_id and control['kind'] in ('input', 'text_input')), None)
             if not control:
-                raise HTTPException(404, 'Active numeric input not found')
+                raise HTTPException(404, 'Active edit control not found')
             security.require(http, 'runtime.write', control.get('security_groups', []))
             if not enabled(control, application.driver.snapshot()):
                 raise HTTPException(423, 'Control is disabled by its tag bindings')
             if control['tag'] not in application.driver.snapshot():
                 raise HTTPException(409, 'Input tag has no good-quality value')
-            import math
-            if not math.isfinite(body.value) or not control['minimum'] <= body.value <= control['maximum']:
-                raise HTTPException(422, 'Value is outside the configured input limits')
-            value = application.driver.coerce_number(control['tag'], body.value)
+            try:
+                limits = edit_limits(control, application.driver.snapshot())
+            except ValueError as error:
+                raise HTTPException(409, str(error)) from error
+            try:
+                validate_entry(control, body.value, limits)
+            except ValueError as error:
+                raise HTTPException(422, str(error)) from error
+            value = application.driver.coerce_number(control['tag'], body.value) if control['kind'] == 'input' else body.value
             ticket.dispatch(tag=control['tag'], screen=control['_screen'], before=application.driver.sample_snapshot().get(control['tag']), requested_value=value)
             try:
                 application.driver.write(control['tag'], [value])

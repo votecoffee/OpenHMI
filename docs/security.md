@@ -52,7 +52,8 @@ editable defaults, not fixed Windows roles. Supported permissions:
 | --- | --- |
 | `project.edit` | Save/apply screen, language and alarm configurations |
 | `runtime.operate` | Invoke an action bound to an active button |
-| `runtime.write` | Write a value through an active numeric input |
+| `runtime.write` | Write a value through an active numeric/text edit with current bounds |
+| `identity.publish` | Explicitly claim the station publishing its authenticated PLC identity |
 | `alarms.acknowledge` | Acknowledge selected/individual/all monitored alarms |
 | `alarms.comment` | Append attributed operator notes to alarm occurrences |
 | `alarms.shelve` | Start timed alarm shelves and restore them early, with a reason |
@@ -160,3 +161,8 @@ parsing, canonical account resolution and SID lookup were checked read-only usin
 the current process token, with the credential boundary replaced in the test.
 Actual Windows password/domain logon and
 browser SSO have not been commissioned against a domain or production accounts.
+
+Touch login, current-user controls, group colors/lock legends and optional PLC
+identity publication are described in [touch entry and identity](touch-entry-and-identity.md).
+Changing PLC publication configuration requires security administration as well
+as project editing. Existing groups retain their saved grants.

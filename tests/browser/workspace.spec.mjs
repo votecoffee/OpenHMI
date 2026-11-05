@@ -5,6 +5,7 @@ test.use({ baseURL: 'http://127.0.0.1:8766' });
 test('project library creates, opens, exports and imports a complete backup', async ({ page }, info) => {
   test.setTimeout(120000);
   async function login() {
+    await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
     await page.getByLabel('HMI user', { exact: true }).fill('admin');
     await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
     await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
@@ -31,7 +32,7 @@ test('project library creates, opens, exports and imports a complete backup', as
   await page.getByRole('button', { name: 'Open BrowserRestore.openhmi.sqlite3', exact: true }).click();
   await reloaded;
   await expect(observer.getByText('Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Sign in to HMI', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open HMI login', exact: true }).first()).toBeVisible();
   await expect(page.getByText('Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
   await login();
   await expect(page.getByRole('button', { name: 'Apply live', exact: true })).toBeVisible();

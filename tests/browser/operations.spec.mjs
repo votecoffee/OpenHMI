@@ -8,6 +8,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/activity');
   await expect(page.getByText('Sign in with activity viewing permission to inspect the operator journal.')).toBeVisible();
+  await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
   await page.getByLabel('HMI user', { exact: true }).fill('admin');
   await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
   await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
@@ -27,6 +28,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
   const denied = await page.request.post('/api/controls/toggle/activate', { data: {} });
   expect(denied.status()).toBe(401);
   expect(denied.headers()['x-openhmi-audit-status']).toBe('denied');
+  await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
   await page.getByLabel('HMI user', { exact: true }).fill('admin');
   await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
   await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();

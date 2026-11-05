@@ -1,6 +1,7 @@
 """Bounded offline smoke drill against an extracted package; no real PLC routes."""
 import argparse
 import hashlib
+import http.cookiejar
 import json
 import os
 from pathlib import Path
@@ -35,9 +36,10 @@ def main():
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
     base = f'http://127.0.0.1:{port}'
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     def request(path, data=None, method=None):
         body = json.dumps(data).encode() if data is not None else None
-        with urllib.request.urlopen(urllib.request.Request(base + path, body, {'Content-Type': 'application/json'}, method=method), timeout=5) as response:
+        with opener.open(urllib.request.Request(base + path, body, {'Content-Type': 'application/json'}, method=method), timeout=5) as response:
             return response.read()
     def start(log):
         process = subprocess.Popen([str(executable), '--project', str(project), '--port', str(port)], cwd=work, env=env,
@@ -58,10 +60,21 @@ def main():
                 assert request(path), f'Missing HTTP asset: {path}'
             state = json.loads(request('/api/project'))
             state['draft']['title'] = 'Packaged restart fixture'
+            state['draft']['tags'] += [{'name': 'PackageMaximum', 'type': 'number', 'initial': 50.0}, {'name': 'PackageUser', 'type': 'string', 'initial': '', 'writable': True}, {'name': 'PackagePrivileges', 'type': 'integer', 'initial': 0, 'writable': True}]
+            state['draft']['controls'] += [{'id': 'package_number', 'kind': 'input', 'label': 'Packaged number', 'tag': 'TankLevel', 'minimum': 10.0, 'maximum_tag': 'PackageMaximum'}, {'id': 'package_text', 'kind': 'text_input', 'label': 'Packaged text', 'tag': 'OperatorText', 'max_length': 4}]
+            state['draft']['identity_publication'] = {'enabled': True, 'username_tag': 'PackageUser', 'privileges_tag': 'PackagePrivileges', 'bits': [{'bit': 31, 'source': 'permission', 'name': 'security.manage'}]}
             alarm_button = next(control for control in state['draft']['controls'] if control['kind'] == 'button')
             alarm_button['action'] = 'toggle_alarm'
             saved = json.loads(request('/api/project/draft', {'expected_revision': state['draft_revision'], 'project': state['draft']}, 'PUT'))
             request('/api/project/apply', {'expected_revision': saved['draft_revision']}, 'POST')
+            request('/api/controls/package_number/value', {'value': 25.0}, 'PUT')
+            request('/api/controls/package_text/value', {'value': 'ab'}, 'PUT')
+            try:
+                request('/api/controls/package_text/value', {'value': 'too long'}, 'PUT')
+                raise AssertionError('Packaged text limit was not enforced')
+            except urllib.error.HTTPError as error:
+                assert error.code == 422
+            report['bounded_numeric_and_text_edits'] = True
             request(f'/api/controls/{alarm_button["id"]}/activate', {}, 'POST')
             alarm = json.loads(request('/api/alarms/occurrences'))['items'][0]
             shelved = json.loads(request(f'/api/alarms/occurrences/{alarm["occurrence_id"]}/shelve', {'duration_seconds': 3600, 'reason': 'Packaged shelf fixture'}, 'POST'))
@@ -77,13 +90,28 @@ def main():
         finally:
             # Forced-stop drill of this exact owned process. No PID enumeration or shared process cleanup.
             child.kill(); child.wait(timeout=10)
+        # Synthetic project-local administrator, never a Windows account or production credential.
+        account = subprocess.run([str(executable), '--project', str(project), '--create-admin', 'package_operator'],
+                                 cwd=work, env=env, input='PackageSmokeOnly-2026!\nPackageSmokeOnly-2026!\n', capture_output=True,
+                                 text=True, timeout=20, creationflags=hidden)
+        assert account.returncode == 0, 'Packaged synthetic administrator setup failed'
         child = start(log)
         try:
+            request('/api/security/login', {'name': 'package_operator', 'password': 'PackageSmokeOnly-2026!'}, 'POST')
+            request('/api/security/publication/claim', {'client': 'package-fixture'}, 'POST')
+            for _ in range(50):
+                if json.loads(request('/api/tags'))['values']['PackagePrivileges'] == -2147483648:
+                    break
+                time.sleep(.1)
+            else:
+                raise AssertionError('Packaged identity word was not published')
+            assert json.loads(request('/api/tags'))['values']['PackageUser'] == 'package_operator'
+            report['authenticated_identity_publication_bit31'] = True
             assert json.loads(request('/api/project'))['active']['title'] == 'Packaged restart fixture'
             assert json.loads(request('/api/alarms/shelves'))['items'][0]['expires_at'] == shelved['expires_at']
             report['forced_restart_preserved_project'] = True
             target = base + '/api/workspace/import?name=Restored'
-            with urllib.request.urlopen(urllib.request.Request(target, backup, method='POST'), timeout=10) as response:
+            with opener.open(urllib.request.Request(target, backup, method='POST'), timeout=10) as response:
                 assert response.status == 200
             request('/api/workspace/open', {'file': 'Restored.openhmi.sqlite3'}, 'POST')
             assert json.loads(request('/api/project'))['active']['title'] == 'Packaged restart fixture'

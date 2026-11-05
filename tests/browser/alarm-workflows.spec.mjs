@@ -7,6 +7,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('/runtime');
+  await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
   await page.getByLabel('HMI user', { exact: true }).fill('admin');
   await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
   await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();

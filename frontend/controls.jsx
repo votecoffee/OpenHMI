@@ -3,7 +3,9 @@ import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { LoadedRecipe } from './recipes.jsx';
-import { SecurityContext, allowed } from './security.jsx';
+import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
+
+import { EditControl } from './edit-control.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -133,38 +135,19 @@ function ActionButton({ id, label, action, mode = 'python', command = '', securi
     } catch (error) { setFeedback(error.message); setFailed(true); }
     finally { setBusy(false); }
   }
-  return <article className="hmi-control hmi-command" data-control="button">
+  return <article className="hmi-control hmi-command security-protected" data-control="button">
     <button className="hmi-action" disabled={puck?.isEditing || !live.connected || busy || !permitted || !!enabled_tag && live.values[enabled_tag] !== true || !!definition?.permit_member && live.values[`${definition.root_tag}.${definition.permit_member}`] !== true || mode === 'command' && !!transaction && ['prepared', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
       {busy ? ui('working') : text(`control.${id}.label`, label)}
     </button><span className={failed ? 'hmi-quality' : 'command-feedback'}>
       {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!live.connected ? ui('commLoss') : !permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
+    {!permitted && !puck?.isEditing && <SecurityLock label={label} permission="runtime.operate" groups={security_groups} additionalGroups={definition?.security_groups || []} />}
     {mode === 'command' && transaction && <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>}
   </article>;
 }
 
-function NumericInput({ id, label, tag, unit, decimals, minimum, maximum, security_groups = [], puck, enabled_tag = '' }) {
-  const live = useContext(Live);
-  const { session } = useContext(SecurityContext) || {};
-  const { text } = useLocalization();
-  const { value, valid, problem } = useValue(tag, 'number');
-  const [entry, setEntry] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const permitted = allowed(session, 'runtime.write', security_groups) && (!enabled_tag || live.values[enabled_tag] === true);
-  async function write(event) {
-    event.preventDefault(); setBusy(true);
-    try { if (!entry.trim()) throw new Error('Enter a value'); const result = await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value: Number(entry) })); setEntry(''); setMessage(result.audit_status === 'pending' ? `Value written; activity finalization pending. Operation ${result.operation_id}` : 'Value written'); }
-    catch (error) { setMessage(error.message); }
-    finally { setBusy(false); }
-  }
-  return <article className="hmi-control hmi-input" data-control="input"><span className="hmi-label">{text(`control.${id}.label`, label)}</span>
-    {valid ? <strong className="hmi-value">{value.toFixed(decimals)} {unit}</strong> : <Quality text={problem} />}
-    <form onSubmit={write}><input aria-label={`${label} new value`} type="number" min={minimum} max={maximum} step="any" value={entry} onChange={event => setEntry(event.target.value)} disabled={puck?.isEditing || !valid || !live.connected || !permitted || busy} />
-      <button disabled={puck?.isEditing || !valid || !live.connected || !permitted || busy}>Write value</button></form>
-    <span className="command-feedback">{!permitted ? 'Read only — authorized HMI group required' : message}</span><TagReference tag={tag} puck={puck} />
-  </article>;
-}
+function NumericInput(props) { return <EditControl {...props} />; }
+function TextInput(props) { return <EditControl {...props} text />; }
 
 function SelectedRecipe({ id, label }) {
   const { text } = useLocalization();
@@ -238,6 +221,7 @@ export function createConfig(catalog) {
     <small>No groups selected: use the user's operation permission.</small></fieldset> };
   const tagField = type => ({ type: 'select', label: 'Tag', options: catalog.tags
     .filter(tag => tag.type === type).map(tag => ({ label: tag.name, value: tag.name })) });
+  const limitTag = label => ({ type: 'select', label, options: [{ label: 'Fixed HMI value', value: '' }, ...catalog.tags.filter(tag => tag.type === 'number').map(tag => ({ label: tag.name, value: tag.name }))] });
   const labelField = { type: 'text', label: 'Label' };
   const numericFields = { label: labelField, tag: tagField('number'), unit: { type: 'text', label: 'Units' },
     decimals: { type: 'select', label: 'Decimal places', options: [0, 1, 2, 3, 4].map(value => ({ label: String(value), value })) } };
@@ -256,8 +240,10 @@ export function createConfig(catalog) {
       Faceplate: { label: 'UDT faceplate', fields: { label: labelField, template: { type: 'select', label: 'Definition', options: (catalog.faceplates || []).map(item => ({ label: item.name, value: item.id })) }, root_tag: tagField('struct') },
         defaultProps: { label: 'Equipment', template: catalog.faceplates?.[0]?.id || '', root_tag: catalog.tags.find(tag => tag.type === 'struct')?.name || '' },
         render: props => <FaceplateInstance {...props} config={config} /> },
-      NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, security_groups: groupsField },
+      NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, minimum_tag: limitTag('Minimum from tag'), maximum_tag: limitTag('Maximum from tag'), security_groups: groupsField },
         defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
+      CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
+      TextInput: { label: 'Text input', fields: { label: labelField, tag: tagField('string'), min_length: { type: 'number', label: 'Minimum length' }, max_length: { type: 'number', label: 'Maximum length' }, min_length_tag: limitTag('Minimum length from tag'), max_length_tag: limitTag('Maximum length from tag'), security_groups: groupsField }, defaultProps: { label: 'Operator text', tag: 'OperatorText', min_length: 0, max_length: 82, security_groups: [] }, render: TextInput },
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },
       Indicator: {

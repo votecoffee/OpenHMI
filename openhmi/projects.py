@@ -14,6 +14,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .runtime_models import Connection, TagDefinition, HistorianSettings
 from .runtime_models import CommandDefinition, RecipeTransferDefinition
+from .identity_publish import IdentityPublication
 from .project_diff import encoded, digest, same, differences, merge_project, SCREEN_FIELDS
 
 
@@ -80,6 +81,8 @@ class NumericInputControl(NumericControl):
     minimum: float = Field(default=0.0, allow_inf_nan=False)
     maximum: float = Field(default=100.0, allow_inf_nan=False)
     security_groups: list[str] = Field(default_factory=list, max_length=100)
+    minimum_tag: str = Field(default='', max_length=200)
+    maximum_tag: str = Field(default='', max_length=200)
 
     @model_validator(mode='after')
     def ordered_limits(self):
@@ -90,6 +93,26 @@ class NumericInputControl(NumericControl):
 
 class RecipeSelectionControl(ControlBase):
     kind: Literal['recipe']
+
+
+class TextInputControl(ControlBase):
+    kind: Literal['text_input']
+    tag: str = Field(min_length=1, max_length=200)
+    min_length: int = Field(default=0, ge=0, le=4096)
+    max_length: int = Field(default=82, ge=0, le=4096)
+    min_length_tag: str = Field(default='', max_length=200)
+    max_length_tag: str = Field(default='', max_length=200)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def ordered_lengths(self):
+        if self.min_length > self.max_length:
+            raise ValueError('Minimum text length must not exceed maximum text length')
+        return self
+
+
+class CurrentUserControl(ControlBase):
+    kind: Literal['current_user']
 
 
 class FaceplateControl(ControlBase):
@@ -138,7 +161,7 @@ class AlarmDefinition(StrictModel):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):
@@ -165,6 +188,7 @@ class FaceplateDefinition(StrictModel):
 
 
 class Project(StrictModel):
+    identity_publication: IdentityPublication = Field(default_factory=IdentityPublication)
     schema_version: Literal[1] = 1
     title: str = Field(min_length=1, max_length=120)
     columns: Literal[1, 2, 3] = 2
@@ -252,6 +276,7 @@ class MergeRequest(MergePreview, RevisionRequest):
 def default_project() -> Project:
     return Project.model_validate({
         "title": "Station overview", "columns": 2,
+        "tags": [{"name": "OperatorText", "type": "string", "initial": "", "writable": True}],
         "alarms": [{"id": "process_alarm", "tag": "ProcessAlarm", "message": "Process alarm"}],
         "controls": [
             {"id": "level", "kind": "numeric", "label": "Tank level", "tag": "TankLevel", "unit": "%", "decimals": 1},

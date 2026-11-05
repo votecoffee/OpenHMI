@@ -340,6 +340,15 @@ class RuntimeDriver(SimulatorDriver):
         return [self.snapshot()[address]]
 
     def write(self, address, values):
+        publication = (self.project or {}).get('identity_publication', {})
+        if publication.get('enabled'):
+            root, member = self.sources.get(address, (None, ''))
+            target = self.definitions.get(root)
+            for field in ('username_tag', 'privileges_tag', 'heartbeat_tag'):
+                reserved = self.definitions.get(publication.get(field))
+                aliases = target and reserved and target['connection'] and target['connection'] == reserved['connection'] and target['address'] + ('.' + member if member else '') == reserved['address']
+                if address == publication.get(field) or aliases:
+                    raise ValueError('Identity publication tags are runtime-owned')
         root, _ = self.sources.get(address, (None, ''))
         if any(item['root_tag'] == root for item in (self.project or {}).get('commands', [])):
             raise ValueError('Command UDT is protocol-owned; use a command button')

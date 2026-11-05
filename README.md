@@ -38,7 +38,8 @@ revision history, recorded approvals and an independent loaded recipe copy.
 No-code transfer profiles stage/verify a revision and its production BOOL, commit
 through a dedicated PLC command and verify the PLC-owned running copy.
 HMI security supports local accounts and Windows user/group assignments to local
-application groups, with protected buttons and numeric value inputs.
+application groups, with protected buttons and numeric/text edits, touch keypads,
+login dialogs, colored group lock legends and optional PLC identity publication.
 An operator journal records command/write/acknowledgement attempts and outcomes;
 protected Activity and Diagnostics pages expose traceability and cached runtime state.
 Configurable no-code PLC command buttons track requested, accepted and completed
@@ -255,17 +256,22 @@ Enable HMI login by creating the first local administrator (password is prompted
 .\.venv\Scripts\openhmi.exe --project .local/project.sqlite3
 ```
 
-Sign in through the login bar and open **Security**. Create HMI groups, choose
+Choose **Open HMI login** and open **Security** after signing in. Create HMI groups, choose
 their permissions, and assign local users or Windows users/groups. Windows login
 verifies credentials on the Windows server and maps authenticated SIDs to HMI groups.
 It uses an explicit credential prompt; automatic browser SSO is not implemented.
 
-Select an **Action button** or **Numeric input** in the designer, choose its
-allowed HMI groups, and apply. Unauthorized users see disabled controls. Python
+Select an **Action button**, **Numeric input** or **Text input** in the designer,
+choose its allowed HMI groups, and apply. Unauthorized users see colored lock
+symbols; clicking a locked area opens the group/permission legend. Python
 checks the same permissions and active binding on every action or value write.
 Project editing, alarm acknowledgement and recipe operations also use HMI permissions.
 New projects show **Unsecured simulation** until the first administrator exists.
-See [security setup, permissions and Windows behavior](docs/security.md).
+Numeric/text edits support HMI limits or limit-tag bindings and touch entry.
+The **Current login user** control displays the signed-in user. **PLC login**
+settings optionally publish a claimed station's user and mapped DINT privilege bits.
+See [touch entry and PLC identity](docs/touch-entry-and-identity.md) and
+[security setup, permissions and Windows behavior](docs/security.md).
 
 ### Recipes
 

@@ -12,6 +12,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     if (apply) expect((await page.request.post('/api/project/apply', { data: { expected_revision: (await response.json()).draft_revision } })).ok()).toBe(true);
   }
   async function drop(name) {
+    await page.getByRole('button', { name, exact: true }).scrollIntoViewIfNeeded();
     const source = await page.getByRole('button', { name, exact: true }).boundingBox();
     const target = await page.locator('.hmi-grid').boundingBox();
     await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);

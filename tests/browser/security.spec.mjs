@@ -6,6 +6,7 @@ test('HMI groups administer and enforce button and numeric input access', async 
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   async function login(name) {
+    await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
     await page.getByLabel('HMI user', { exact: true }).fill(name);
     await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
     await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();

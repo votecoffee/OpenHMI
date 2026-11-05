@@ -19,6 +19,7 @@ class SecurityChange(StrictModel):
     reason: str = Field(min_length=1, max_length=1000)
     name: str = Field(default='', max_length=60, pattern=r'^[A-Za-z0-9_. -]*$')
     permissions: list[str] = Field(default_factory=list, max_length=30)
+    color: str | None = Field(default=None, pattern=r'^#[A-Fa-f0-9]{6}$')
     groups: list[str] = Field(default_factory=list, max_length=100)
     password: str | None = Field(default=None, min_length=12, max_length=256)
     enabled: bool = True
@@ -51,12 +52,14 @@ def add_security_routes(app, security):
         with security.store._lock:
             enabled = security.store._db.execute('SELECT windows_enabled FROM security_settings').fetchone()[0]
         return {'configured': security.configured(), 'windows_enabled': bool(enabled),
-                'windows_available': security.windows.available, 'user': user.public() if user else None}
+                'windows_available': security.windows.available, 'user': user.public() if user else None, 'groups': security.legend()}
 
     @app.post('/api/security/login')
     def login(body: Login, request: Request, response: Response):
         security.origin(request)
         token, principal = security.login(body.name, body.password, request.client.host if request.client else 'local', body.provider)
+        if hasattr(app.state, 'identity_publisher'):
+            app.state.identity_publisher.replace_login(request.cookies.get(COOKIE), token)
         security.logout(request.cookies.get(COOKIE))
         set_session(response, request, token)
         return {'user': principal.public()}
@@ -64,6 +67,8 @@ def add_security_routes(app, security):
     @app.post('/api/security/logout')
     def logout(request: Request, response: Response):
         security.origin(request)
+        if hasattr(app.state, 'identity_publisher'):
+            app.state.identity_publisher.replace_login(request.cookies.get(COOKIE), None)
         security.logout(request.cookies.get(COOKIE))
         response.delete_cookie(COOKIE)
         return {'ok': True}
