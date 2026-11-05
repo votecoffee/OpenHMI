@@ -120,6 +120,10 @@ the PLC has never changed its copy since then. Unavailable status is explicit an
 retained rows are marked potentially outdated. History is permission protected
 and paginated; unresolved target state is checked independently of the page.
 
+After dispatch returns a transaction ID, the panel keeps that receipt if the
+status read fails. Further transfers wait for a successful status refresh and
+the target's normal unresolved-transfer checks.
+
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts
 remain supported without global HMI security; the journal identifies their

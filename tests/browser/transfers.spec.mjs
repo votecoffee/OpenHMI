@@ -75,8 +75,27 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(target).toHaveValue('');
   await expect(dispatch).toBeDisabled();
   await target.selectOption('product');
+  const dispatchEndpoint = '**/api/recipe-transfers/product/dispatch';
+  let failStatus = false;
+  await page.route(profilesEndpoint, route => failStatus
+    ? route.fulfill({ status: 503, json: { detail: 'Synthetic status outage' } })
+    : route.continue());
+  await page.route(dispatchEndpoint, async route => {
+    const response = await route.fetch();
+    failStatus = response.ok();
+    await route.fulfill({ response });
+  });
   await dispatch.click();
   const panel = page.getByRole('region', { name: 'PLC recipe transfers', exact: true });
+  await expect(panel.getByRole('alert')).toContainText('Synthetic status outage');
+  await expect(page.getByRole('status', { name: 'Recipe operation' })).toContainText(/PLC transfer requested\. Transaction \d+/);
+  await expect(dispatch).toBeDisabled();
+  const receipts = (await (await page.request.get('/api/recipe-transfers')).json()).items;
+  expect(receipts).toHaveLength(1);
+  expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.RequestSequence']).toBe(receipts[0].transaction.sequence);
+  await page.unroute(dispatchEndpoint);
+  await page.unroute(profilesEndpoint);
+  await expect(panel.getByRole('alert')).toHaveCount(0);
   await expect(panel.locator('tbody tr').first()).toContainText('requested');
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.Running.RevisionId']).toBe(0);
   await page.goto('/runtime');
