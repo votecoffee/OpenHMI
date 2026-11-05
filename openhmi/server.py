@@ -105,10 +105,17 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             await asyncio.sleep(0.25)
             sample_alarms()
 
+    async def acquisition_loop():
+        while not stopping.is_set():
+            try:
+                await asyncio.to_thread(application.driver.poll, wait=False)
+            except Exception:
+                logging.exception('PLC acquisition scheduling failed')
+            await asyncio.sleep(0.05)
+
     async def driver_loop():
         while not stopping.is_set():
             try:
-                await asyncio.to_thread(application.driver.poll)
                 await asyncio.to_thread(commands.poll)
                 await asyncio.to_thread(trends.sample)
                 await asyncio.to_thread(historian.sample)
@@ -125,6 +132,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         stopping.clear()
         sample_alarms()
         task = asyncio.create_task(alarm_loop())
+        acquisition = asyncio.create_task(acquisition_loop())
         polling = asyncio.create_task(driver_loop())
         try:
             yield
@@ -135,6 +143,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 await task
             except asyncio.CancelledError:
                 pass
+            await acquisition
             await polling
             await asyncio.to_thread(trends.shutdown)
             await asyncio.to_thread(publisher.shutdown)

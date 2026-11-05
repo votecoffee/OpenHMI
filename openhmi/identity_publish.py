@@ -141,31 +141,36 @@ class IdentityPublisher:
 
     def _write(self, config, name, mask):
         # The mask is invalidated first and granted last. These status tags are not an atomic pair.
-        for tag in (config['username_tag'], config['privileges_tag'], *([config['heartbeat_tag']] if config.get('heartbeat_tag') else [])):
-            definition = self.driver.definitions.get(tag)
-            if not definition:
-                raise ValueError('Publication requires root logical tags')
-            if definition['connection']:
-                connection = self.driver.connections.get(definition['connection'])
-                tags = connection.client.tags if connection and connection.client else {}
-                address = definition['address']
-                roots = [root for root in tags if address == root or address.startswith(root + '.') or address.startswith(root + '[')]
-                root = max(roots, key=len) if roots else ''
-                datatype = tags.get(root, {}).get('data_type')
-                for member in re.findall(r'[^.\[\]]+', address[len(root):]):
-                    if not member.isdigit():
-                        datatype = datatype.get('internal_tags', {}).get(member, {}).get('data_type') if isinstance(datatype, dict) else None
-                if tag != config['username_tag'] and datatype != 'DINT':
-                    raise ValueError('Privilege target must be a PLC DINT')
-                if tag == config['username_tag'] and not (isinstance(datatype, dict) and datatype.get('string')):
-                    raise ValueError('Username target must be a PLC STRING')
-        self.last_config = deepcopy(config)
-        self.driver._write(config['privileges_tag'], [0])
-        self.driver._write(config['username_tag'], [name])
-        self.driver._write(config['privileges_tag'], [mask if mask < 2**31 else mask - 2**32])
+        targets = [config['username_tag'], config['privileges_tag']]
         if config.get('heartbeat_tag'):
-            self.sequence = (self.sequence + 1) & 0x7fffffff
-            self.driver._write(config['heartbeat_tag'], [self.sequence])
+            targets.append(config['heartbeat_tag'])
+        with self.driver.write_scope(targets):
+            for tag in targets:
+                definition = self.driver.definitions.get(tag)
+                if not definition:
+                    raise ValueError('Publication requires root logical tags')
+                if definition['connection']:
+                    connection = self.driver.connections.get(definition['connection'])
+                    client = connection.client if connection and connection.connected else None
+                    tags = client.tags if client else {}
+                    address = definition['address']
+                    roots = [root for root in tags if address == root or address.startswith(root + '.') or address.startswith(root + '[')]
+                    root = max(roots, key=len) if roots else ''
+                    datatype = tags.get(root, {}).get('data_type')
+                    for member in re.findall(r'[^.\[\]]+', address[len(root):]):
+                        if not member.isdigit():
+                            datatype = datatype.get('internal_tags', {}).get(member, {}).get('data_type') if isinstance(datatype, dict) else None
+                    if tag != config['username_tag'] and datatype != 'DINT':
+                        raise ValueError('Privilege target must be a PLC DINT')
+                    if tag == config['username_tag'] and not (isinstance(datatype, dict) and datatype.get('string')):
+                        raise ValueError('Username target must be a PLC STRING')
+            self.last_config = deepcopy(config)
+            self.driver._write(config['privileges_tag'], [0])
+            self.driver._write(config['username_tag'], [name])
+            self.driver._write(config['privileges_tag'], [mask if mask < 2**31 else mask - 2**32])
+            if config.get('heartbeat_tag'):
+                self.sequence = (self.sequence + 1) & 0x7fffffff
+                self.driver._write(config['heartbeat_tag'], [self.sequence])
 
     def shutdown(self):
         with self.lock:

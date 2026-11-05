@@ -257,8 +257,9 @@ OpenHMI installation are separate. See [backup details](docs/runtime-and-project
 
 ### Activity and diagnostics
 
-When a PLC route fails, its cached values become unavailable to live controls
-and permits until fresh reads succeed.
+OpenHMI schedules scans independently per PLC route so a slow read on one
+route does not hold up the others. When a route fails, its cached values become
+unavailable to live controls and permits until fresh reads succeed.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

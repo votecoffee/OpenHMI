@@ -12,7 +12,7 @@ from threading import RLock
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from .runtime_models import Connection, TagDefinition, HistorianSettings
+from .runtime_models import MAX_PLC_CONNECTIONS, Connection, TagDefinition, HistorianSettings
 from .runtime_models import CommandDefinition, RecipeTransferDefinition
 from .identity_publish import IdentityPublication
 from .canvas import CanvasLayout
@@ -281,7 +281,7 @@ class Project(StrictModel):
     update_ms: int = Field(default=500, ge=100, le=60000)
     screens: list[Screen] = Field(default_factory=list, max_length=100)
     faceplates: list[FaceplateDefinition] = Field(default_factory=list, max_length=100)
-    connections: list[Connection] = Field(default_factory=list, max_length=20)
+    connections: list[Connection] = Field(default_factory=list, max_length=MAX_PLC_CONNECTIONS)
     tags: list[TagDefinition] = Field(default_factory=list, max_length=5000)
     historian: HistorianSettings = Field(default_factory=HistorianSettings)
     commands: list[CommandDefinition] = Field(default_factory=list, max_length=100)

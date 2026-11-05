@@ -146,7 +146,7 @@ class CommandService:
         return values, permit
 
     def submit(self, definition, ticket, reservation=None, prepare=None):
-        with self.lock, self.driver.io_lock:
+        with self.lock, self.driver.write_scope([definition['root_tag']]):
             project = self.driver.project
             if prepare is None and any(item['command_id'] == definition['id'] for item in project.get('recipe_transfers', [])):
                 raise HTTPException(409, 'Recipe commit channels require a validated recipe transfer')

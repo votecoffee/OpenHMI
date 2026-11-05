@@ -24,12 +24,13 @@ fragmented transfers. A pycomm3 read call may generate multiple wire packets.
 The runtime already records sample quality and age, applies reconnect backoff,
 and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ottowayi/pycomm3/blob/master/docs/usage/logixdriver.rst)
 
-1. **Isolate routes.** Poll each controller with independent bounded work and
-   serialize reads, writes and readbacks within that route. A slow route currently
-   holds the shared driver I/O lock and can delay healthy routes. Route loss
-   now invalidates all its aliases, including those outside the failed batch.
-   Each alias needs a fresh read before its value becomes available again.
-   Keep tag-level errors distinct from connection failures.
+1. **Isolate routes.** Each configured route now has at most one outstanding
+   scan and serializes its reads, writes and readbacks. The acquisition loop
+   continues scheduling healthy routes during a slow read or reconnect. Route
+   loss invalidates all its aliases, and each alias needs a fresh read before
+   its value becomes available again. A simulated two-route regression verifies
+   isolation and rejects results from a superseded configuration. Verify this
+   behavior on the bench and keep tag-level errors distinct from route failures.
 2. **Measure before tuning.** The current schedule includes scan duration and
    the polling loop delay. Record requested interval, p50/p95/p99 scan lateness
    and acquisition age, controller load, errors, cold connection and reconnect
@@ -93,9 +94,9 @@ camera, operator browser and station network.
 
 ## M6 — Resilience and pilot gate
 
-The [server](../openhmi/server.py) currently runs acquisition, command, trend,
-historian, maintenance and identity steps in a shared loop. A failed step can
-skip subsequent work in that cycle. Isolate independently recoverable work,
+The [server](../openhmi/server.py) schedules PLC acquisition independently.
+Command, trend, historian, maintenance and identity steps still share a loop.
+A failed step can skip subsequent work in that cycle. Isolate independently recoverable work,
 preserve each task's input and ordering requirements, and expose worker health,
 last success and retry state. Bound shutdown and I/O waits. Verify restart under
 the supported Windows launch method and recovery when the network, controller,

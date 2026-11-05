@@ -1,6 +1,9 @@
 """pycomm3 explicit-message adapter; shared batched polling, never CIP I/O subscriptions."""
 
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
+import logging
 import math
 import json
 import re
@@ -9,6 +12,7 @@ import time
 from uuid import uuid4
 
 from .drivers import SimulatorDriver
+from .runtime_models import MAX_PLC_CONNECTIONS
 from .screens import screen_map, expanded_controls, referenced_tags
 from .alarms import utc_now
 
@@ -170,7 +174,11 @@ class RuntimeDriver(SimulatorDriver):
         self.lock = RLock()
         self.io_lock = RLock()
         self.factory = factory
+        self._scan_pool = None
+        self._scans = {}
+        self._closing = False
         self.connections, self.definitions, self.sources, self.samples = {}, {}, {}, {}
+        self.address_aliases = {}
         self.project = None
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
@@ -178,37 +186,47 @@ class RuntimeDriver(SimulatorDriver):
         self.plc_hold = False
 
     def configure(self, project):
-        with self.io_lock, self.lock:
-            configs = {config['id']: config for config in project.get('connections', []) if config['enabled'] and not self.plc_hold}
-            changed_connections = {identifier for identifier, connection in self.connections.items() if configs.get(identifier) != connection.config}
-            for identifier, connection in list(self.connections.items()):
-                if configs.get(identifier) != connection.config:
-                    connection.close()
-                    del self.connections[identifier]
-            for identifier, config in configs.items():
-                if identifier not in self.connections:
-                    changed_connections.add(identifier)
-                    self.connections[identifier] = LogixConnection(config, self.factory)
-            old = self.definitions
-            self.definitions = {tag['name']: deepcopy(tag) for tag in project.get('tags', [])}
-            for name in self.local_names - self.definitions.keys():
-                self._tags.pop(name, None)
-            self.local_names = {name for name, tag in self.definitions.items() if not tag['connection']}
-            self.sources = {}
-            for name, tag in self.definitions.items():
-                self.sources[name] = (name, '')
-                for member in tag['members']:
-                    self.sources[f'{name}.{member}'] = (name, member)
-                if old.get(name) != tag or tag['connection'] in changed_connections:
-                    for alias, (root, _) in self.sources.items():
-                        if root == name:
-                            self.samples.pop(alias, None)
-                    if not tag['connection']:
-                        self._tags[name] = float(tag['initial']) if tag['type'] == 'number' else deepcopy(tag['initial'])
-                    else:
-                        self._tags.pop(name, None)
-            self.project = deepcopy(project)
-            self.deadlines.clear()
+        with self.io_lock:
+            retired = []
+            with self.lock:
+                configs = {config['id']: config for config in project.get('connections', []) if config['enabled'] and not self.plc_hold}
+                changed_connections = {identifier for identifier, connection in self.connections.items() if configs.get(identifier) != connection.config}
+                for identifier, connection in list(self.connections.items()):
+                    if configs.get(identifier) != connection.config:
+                        retired.append(connection)
+                        del self.connections[identifier]
+                for identifier, config in configs.items():
+                    if identifier not in self.connections:
+                        changed_connections.add(identifier)
+                        self.connections[identifier] = LogixConnection(config, self.factory)
+                old = self.definitions
+                self.definitions = {tag['name']: deepcopy(tag) for tag in project.get('tags', [])}
+                for name in self.local_names - self.definitions.keys():
+                    self._tags.pop(name, None)
+                self.local_names = {name for name, tag in self.definitions.items() if not tag['connection']}
+                self.sources = {}
+                for name, tag in self.definitions.items():
+                    self.sources[name] = (name, '')
+                    for member in tag['members']:
+                        self.sources[f'{name}.{member}'] = (name, member)
+                    if old.get(name) != tag or tag['connection'] in changed_connections:
+                        for alias, (root, _) in self.sources.items():
+                            if root == name:
+                                self.samples.pop(alias, None)
+                        if not tag['connection']:
+                            self._tags[name] = float(tag['initial']) if tag['type'] == 'number' else deepcopy(tag['initial'])
+                        else:
+                            self._tags.pop(name, None)
+                self.address_aliases = {}
+                for alias, (root, member) in self.sources.items():
+                    tag = self.definitions[root]
+                    if tag['connection']:
+                        key = (tag['connection'], tag['address'])
+                        self.address_aliases.setdefault(key, []).append((alias, tag, member))
+                self.project = deepcopy(project)
+                self.deadlines.clear()
+            for connection in retired:
+                connection.close()
 
     def lease(self, client, screens, now=None, preview_root=''):
         now = time.monotonic() if now is None else now
@@ -250,78 +268,112 @@ class RuntimeDriver(SimulatorDriver):
             demand(command['root_tag'], command['update_ms'])
         return rates
 
-    def poll(self, now=None):
+    def poll(self, now=None, *, wait=True):
+        """Schedule at most one scan per route. Explicit callers can wait for completion."""
         real_clock = now is None
-        now = time.monotonic() if now is None else now
-        with self.io_lock:
-            with self.lock:
-                demands = self.demands(now)
-                grouped = {}
-                for alias, rate in demands.items():
-                    root, _ = self.sources.get(alias, (None, ''))
-                    tag = self.definitions.get(root)
-                    if tag and tag['connection']:
-                        key = (tag['connection'], tag['address'])
-                        grouped[key] = min(rate, grouped.get(key, rate))
-                for key, rate in grouped.items():
-                    if rate < self.last_rates.get(key, rate):
-                        self.deadlines[key] = now
-                self.last_rates = grouped
-            for identifier, connection in list(self.connections.items()):
-                if not connection.connected:
+        now = time.monotonic() if real_clock else now
+        with self.lock:
+            if self._closing:
+                return
+            for identifier, future in list(self._scans.items()):
+                if future.done():
+                    del self._scans[identifier]
+                    try:
+                        future.result()
+                    except Exception:
+                        logging.exception('PLC scan failed for route %s', identifier)
+
+            grouped = {}
+            for alias, rate in self.demands(now).items():
+                root, _ = self.sources.get(alias, (None, ''))
+                tag = self.definitions.get(root)
+                if tag and tag['connection']:
+                    key = (tag['connection'], tag['address'])
+                    grouped[key] = min(rate, grouped.get(key, rate))
+            for key, rate in grouped.items():
+                if rate < self.last_rates.get(key, rate):
+                    self.deadlines[key] = now
+            self.last_rates = grouped
+
+            for identifier, connection in self.connections.items():
+                if identifier in self._scans:
+                    continue
+                reconnect = not connection.connected
+                if reconnect:
                     if now < connection.retry_at:
                         continue
-                    # Refresh current demand on reconnect, even if its old deadline is later.
+                    # A reconnect refreshes demand without waiting for old deadlines.
                     for key in list(self.deadlines):
                         if key[0] == identifier:
                             del self.deadlines[key]
-                due = [address for conn, address in grouped if conn == identifier and now >= self.deadlines.get((conn, address), 0)]
-                if not due and not connection.connected:
-                    # Metadata browsing is available even before a screen leases tags.
+                due = [address for conn, address in grouped
+                       if conn == identifier and now >= self.deadlines.get((conn, address), 0)]
+                if not due and not reconnect:
+                    continue
+                if self._scan_pool is None:
+                    self._scan_pool = ThreadPoolExecutor(max_workers=MAX_PLC_CONNECTIONS, thread_name_prefix='openhmi-plc')
+                self._scans[identifier] = self._scan_pool.submit(
+                    self._scan, identifier, connection, self.project, due, now, real_clock
+                )
+            scheduled = tuple(self._scans.values()) if wait else ()
+        for future in scheduled:
+            future.result()
+
+    def _scan(self, identifier, connection, project, due, now, real_clock):
+        # Serialize reads, writes and publication for this route. Never hold the
+        # runtime state lock across socket operations.
+        with connection.lock:
+            with self.lock:
+                if self._closing or self.project is not project:
+                    return
+            if real_clock:
+                now = time.monotonic()
+            if not due:
+                # Metadata browsing is available even before a screen leases tags.
+                if now >= connection.retry_at:
                     try:
-                        with connection.lock:
-                            connection.connect(now)
+                        connection.connect(now)
                     except Exception as error:
                         connection.failed(error, now)
-                if not due:
-                    continue
-                try:
-                    results = connection.read(due, now)
-                except Exception:
-                    # A route failure invalidates its entire cache in sample_snapshot.
-                    continue
-                acquired = time.monotonic() if real_clock else now
-                with self.lock:
-                    for address, result in zip(due, results):
-                        rate = grouped[(identifier, address)]
-                        self.deadlines[(identifier, address)] = acquired + rate / 1000
-                        for root, tag in self.definitions.items():
-                            if tag['connection'] != identifier or tag['address'] != address:
-                                continue
-                            for alias, (source, member) in self.sources.items():
-                                if source != root:
-                                    continue
-                                try:
-                                    if result is None or result.error:
-                                        raise ValueError(result.error if result is not None else 'PLC read failed')
-                                    value = member_value(result.value, member) if member else result.value
-                                    kind = tag['members'][member] if member else tag['type']
-                                    if not type_ok(value, kind):
-                                        raise ValueError('PLC value does not match configured type')
-                                    if not member and kind in ('number', 'integer'):
-                                        if tag['scale'] != 1 or tag['offset'] != 0:
-                                            value = value * tag['scale'] + tag['offset']
-                                        elif kind == 'number':
-                                            value = float(value)
-                                        if not math.isfinite(value):
-                                            raise ValueError('Scaled PLC value is not finite')
-                                    sample = {'value': value, 'quality': 'good', 'error': None}
-                                except (ValueError, KeyError, TypeError, IndexError) as failure:
-                                    sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
-                                self.samples[alias] = {
-                                    **sample, 'timestamp': utc_now(), 'monotonic': acquired, 'rate_ms': rate,
-                                    'failure_generation': connection.failure_generation,
-                                }
+                return
+            try:
+                results = connection.read(due, now)
+            except Exception:
+                # A route failure invalidates its entire cache in sample_snapshot.
+                return
+            acquired = time.monotonic() if real_clock else now
+            timestamp = utc_now()
+            with self.lock:
+                if self._closing or self.project is not project:
+                    return
+                for address, result in zip(due, results):
+                    key = (identifier, address)
+                    rate = self.last_rates.get(key)
+                    if rate is None:
+                        continue
+                    self.deadlines[key] = acquired + rate / 1000
+                    for alias, tag, member in self.address_aliases[key]:
+                        try:
+                            if result is None or result.error:
+                                raise ValueError(result.error if result is not None else 'PLC read failed')
+                            value = member_value(result.value, member) if member else result.value
+                            kind = tag['members'][member] if member else tag['type']
+                            if not type_ok(value, kind):
+                                raise ValueError('PLC value does not match configured type')
+                            if not member and kind in ('number', 'integer'):
+                                if tag['scale'] != 1 or tag['offset'] != 0:
+                                    value = value * tag['scale'] + tag['offset']
+                                elif kind == 'number':
+                                    value = float(value)
+                                if not math.isfinite(value):
+                                    raise ValueError('Scaled PLC value is not finite')
+                            sample = {'value': value, 'quality': 'good', 'error': None}
+                        except (ValueError, KeyError, TypeError, IndexError) as failure:
+                            sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
+                        self.samples[alias] = {
+                            **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
+                            'failure_generation': connection.failure_generation,
+                        }
 
     def sample_snapshot(self, now=None):
         now = time.monotonic() if now is None else now
@@ -390,6 +442,15 @@ class RuntimeDriver(SimulatorDriver):
         command = next(item for item in self.project['commands'] if item['id'] == profile['command_id'])
         return self._write(command['root_tag'] + '.' + member, [value])
 
+    @contextmanager
+    def write_scope(self, roots):
+        """Keep scans out of the routes touched by a multi-step write."""
+        with self.io_lock, ExitStack() as stack:
+            routes = {self.definitions.get(root, {}).get('connection') for root in roots}
+            for identifier in sorted(routes & self.connections.keys()):
+                stack.enter_context(self.connections[identifier].lock)
+            yield
+
     def read_command_root(self, definition):
         """Explicit verification read; it does not replace normal displayed samples."""
         with self.io_lock:
@@ -421,17 +482,19 @@ class RuntimeDriver(SimulatorDriver):
                 connection = self.connections.get(tag['connection'])
                 if not connection:
                     raise ConnectionError('PLC connection is disabled')
-                metadata = connection.tag_metadata(tag['address'])
-                if metadata.get('external_access') != 'Read/Write':
-                    raise ValueError('PLC metadata does not permit writes')
-                raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
-                if kind == 'integer':
-                    if int(raw) != raw:
-                        raise ValueError('Scaled integer writes must resolve to an integer')
-                    raw = int(raw)
-                connection.write(tag['address'] + ('.' + member if member else ''), raw)
-                # A write readback verifies the transaction; normal polling owns displayed samples.
-                self.deadlines.pop((tag['connection'], tag['address']), None)
+                with connection.lock:
+                    metadata = connection.tag_metadata(tag['address'])
+                    if metadata.get('external_access') != 'Read/Write':
+                        raise ValueError('PLC metadata does not permit writes')
+                    raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
+                    if kind == 'integer':
+                        if int(raw) != raw:
+                            raise ValueError('Scaled integer writes must resolve to an integer')
+                        raw = int(raw)
+                    connection.write(tag['address'] + ('.' + member if member else ''), raw)
+                    # A write readback verifies the transaction; normal polling owns displayed samples.
+                    with self.lock:
+                        self.deadlines.pop((tag['connection'], tag['address']), None)
             else:
                 with self.lock:
                     if member:
@@ -466,5 +529,18 @@ class RuntimeDriver(SimulatorDriver):
 
     def close(self):
         with self.io_lock:
-            for connection in self.connections.values():
-                connection.close()
+            with self.lock:
+                self._closing = True
+                pool = self._scan_pool
+            try:
+                if pool is not None:
+                    pool.shutdown(wait=True, cancel_futures=True)
+                for connection in self.connections.values():
+                    connection.close()
+            finally:
+                with self.lock:
+                    self._scans.clear()
+                    self.samples.clear()
+                    self.deadlines.clear()
+                    self._scan_pool = None
+                    self._closing = False

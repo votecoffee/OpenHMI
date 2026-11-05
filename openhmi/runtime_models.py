@@ -7,6 +7,9 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
+MAX_PLC_CONNECTIONS = 20
+
+
 class Model(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
 

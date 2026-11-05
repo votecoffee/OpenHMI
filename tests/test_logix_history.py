@@ -2,6 +2,7 @@
 
 import csv
 from io import StringIO
+from threading import Event
 import time
 from types import SimpleNamespace
 import unittest
@@ -181,6 +182,64 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertIn('Level', connection.client.reads[-1])
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['value'], 85.0)
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['quality'], 'good')
+
+    def test_background_scans_keep_healthy_routes_fresh_while_another_read_waits(self):
+        blocked, release = Event(), Event()
+
+        class BlockingPLC(FakePLC):
+            def read(self, *addresses):
+                if self.path == 'offline-only/0':
+                    blocked.set()
+                    if not release.wait(10):
+                        raise ConnectionError('Test did not release the blocked read')
+                return super().read(*addresses)
+
+        project = logix_project()
+        project['connections'].append({**project['connections'][0], 'id': 'other', 'path': 'other-offline/0'})
+        project['tags'].append({**project['tags'][1], 'name': 'OtherLevel', 'connection': 'other'})
+        project['screens'][1]['controls'].append({
+            'id': 'other-level', 'kind': 'numeric', 'label': 'Other level', 'tag': 'OtherLevel',
+        })
+        driver = RuntimeDriver(BlockingPLC)
+        self.addCleanup(driver.close)
+        self.addCleanup(release.set)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.lease('viewer', ['slow'], 1)
+
+        driver.poll(1, wait=False)
+        self.assertTrue(blocked.wait(5))
+        slow_scan = driver._scans['plc']
+        driver._scans['other'].result(timeout=5)
+        self.assertEqual(driver.sample_snapshot(1)['OtherLevel']['value'], 65.0)
+
+        healthy = driver.connections['other'].client
+        healthy.values['Level'] = 40.0
+        driver.poll(1.5, wait=False)
+        driver.poll(2, wait=False)
+        driver._scans['other'].result(timeout=5)
+        self.assertIs(driver._scans['plc'], slow_scan)
+        self.assertFalse(slow_scan.done())
+        self.assertEqual(healthy.reads, [('Level',), ('Level',)])
+        self.assertEqual(driver.sample_snapshot(2)['OtherLevel']['value'], 85.0)
+
+        # An in-flight read from the old project must not publish after Apply.
+        project['tags'][1]['scale'] = 3.0
+        driver.configure(Project.model_validate(project).model_dump())
+        release.set()
+        slow_scan.result(timeout=5)
+        self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'pending')
+        driver.poll(2.1)
+        self.assertEqual(driver.sample_snapshot(2.1)['LevelA']['value'], 95.0)
+        self.assertEqual(len(driver.connections['plc'].client.reads), 2)
+
+        with driver.write_scope(['LevelA']):
+            driver.poll(3.2, wait=False)
+            driver._scans['other'].result(timeout=5)
+            protected_scan = driver._scans['plc']
+            self.assertFalse(protected_scan.done())
+            self.assertEqual(len(driver.connections['plc'].client.reads), 2)
+        protected_scan.result(timeout=5)
+        self.assertEqual(len(driver.connections['plc'].client.reads), 3)
 
     def test_chart_faceplate_tags_join_screen_subscription(self):
         project = logix_project()
