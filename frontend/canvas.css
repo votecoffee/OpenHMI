@@ -1,0 +1,36 @@
+.canvas-editor { padding: 8px; background: #ddd; color: #333; }
+.canvas-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 6px 12px; margin: 0 0 8px; }
+.canvas-toolbar label, .canvas-tools label { display: flex; gap: 3px; flex-direction: column; font-size: 12px; }
+.canvas-toolbar label:has([type="checkbox"]) { flex-direction: row; align-items: center; }
+.canvas-toolbar input[type="number"] { width: 7ch; }
+.canvas-toolbar :is(input, select, button), .canvas-tools :is(input, select, button) {
+  min-height: 28px; border: 1px solid #888; background: #eee; color: #333; font: inherit;
+}
+.canvas-tools button { text-align: start; padding: 3px 5px; overflow-wrap: anywhere; }
+.canvas-tools button[aria-pressed="true"] { border: 2px solid #002878; }
+.canvas-tools button:disabled { opacity: .48; }
+.canvas-workbench { display: grid; grid-template-columns: minmax(125px, 155px) minmax(0, 1fr) minmax(175px, 220px); min-height: 400px; }
+.canvas-tools { background: #ddd; max-height: 72vh; overflow: auto; }
+.canvas-tools fieldset { display: grid; gap: 4px; min-width: 0; margin: 4px; padding: 4px; }
+.canvas-tools fieldset :is(input, select) { min-width: 0; max-width: 100%; }
+.canvas-tools .canvas-properties { border: none; padding: 0; }
+.canvas-outline-member { margin-inline-start: 12px; }
+.canvas-scroll { overflow: auto; min-width: 0; }
+.canvas-workbench > .canvas-scroll { max-height: 72vh; background: #bbb; }
+.hmi-canvas { position: relative; isolation: isolate; overflow: hidden; background: #ddd; }
+.hmi-canvas.canvas-grid { background-image: radial-gradient(#999 0.65px, transparent 0.8px); background-size: var(--canvas-grid) var(--canvas-grid); }
+.canvas-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.canvas-object { position: absolute; min-width: 0; }
+.canvas-object-body { height: 100%; overflow: auto; }
+.canvas-object .hmi-control { min-height: 0; padding: 4px; gap: 3px; border-bottom: 0; }
+.canvas-object .hmi-value { font-size: 19px; }
+.canvas-object .hmi-action { min-height: 32px; padding: 5px 8px; }
+.canvas-container { display: grid; gap: 4px; align-content: start; min-height: 100%; padding: 4px; background: #ddd; border: 1px solid #888; }
+.canvas-container-grid { grid-template-columns: repeat(var(--container-columns), minmax(0, 1fr)); }
+.canvas-container-stack { grid-template-columns: minmax(0, 1fr); }
+.canvas-member { min-width: 0; border-bottom: 1px solid #bbb; }
+.canvas-move, .canvas-resize { position: absolute; padding: 0; background: transparent; border: 1px dashed #666; touch-action: none; }
+.canvas-move { inset: 0; cursor: move; }
+.canvas-selected { outline: 2px solid #002878; outline-offset: -2px; }
+.canvas-resize { width: 14px; height: 14px; right: 0; bottom: 0; cursor: nwse-resize; background: #002878; border: 1px solid #fff; }
+.canvas-runtime { max-width: min(100%, 1800px); }

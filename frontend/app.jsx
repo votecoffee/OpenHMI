@@ -10,7 +10,8 @@ import './security.css';
 import './engineering.css';
 import './operations.css';
 import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operations.jsx';
-import { Live, ScreenControls, createConfig } from './controls.jsx';
+import { Live, ScreenControls, ScreenFrame, createConfig } from './controls.jsx';
+import { CanvasEditor, CanvasSurface, initialCanvas } from './canvas.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
 import { RecipeTransferSettings } from './recipe-transfer-settings.jsx';
@@ -26,6 +27,14 @@ import { RecipeWorkspace } from './recipes.jsx';
 import { SecurityContext, SecurityBar, SecurityAdmin, allowed } from './security.jsx';
 
 const editorOverrides = { headerActions: () => null };
+
+function ScreenView({ screen, config }) {
+  const data = toEditor(screen);
+  return <ScreenControls.Provider value={screen.controls}>
+    {screen.layout ? <ScreenFrame {...data.root.props} canvas={<CanvasSurface data={data} config={config} />} />
+      : <Render config={config} data={data} />}
+  </ScreenControls.Provider>;
+}
 
 function Builder({ initial, catalog }) {
   const live = useContext(Live);
@@ -43,6 +52,7 @@ function Builder({ initial, catalog }) {
   const scopeRef = useRef('overview');
   const document = useRef(starting);
   const [initialData, setInitialData] = useState(toEditor(starting));
+  const [canvasData, setCanvasData] = useState(initialData);
   const revision = useRef(cached?.base_revision || initial.draft_revision);
   const latest = useRef(toEditor(starting));
   const [generation, setGeneration] = useState(0);
@@ -66,9 +76,9 @@ function Builder({ initial, catalog }) {
   function compose(data, projectSettings = metadata.current) {
     const content = toProject(data);
     const next = { ...document.current, ...projectSettings };
-    if (scopeRef.current === 'overview') Object.assign(next, { title: content.title, columns: content.columns, controls: content.controls });
+    if (scopeRef.current === 'overview') Object.assign(next, { title: content.title, columns: content.columns, layout: content.layout, controls: content.controls });
     else if (scopeRef.current.startsWith('faceplate:')) next.faceplates = next.faceplates.map(item => `faceplate:${item.id}` === scopeRef.current ? { ...item, name: content.title, controls: content.controls } : item);
-    else next.screens = next.screens.map(item => item.id === scopeRef.current ? { ...item, title: content.title, columns: content.columns, controls: content.controls } : item);
+    else next.screens = next.screens.map(item => item.id === scopeRef.current ? { ...item, title: content.title, columns: content.columns, layout: content.layout, controls: content.controls } : item);
     return next;
   }
 
@@ -83,7 +93,7 @@ function Builder({ initial, catalog }) {
     clearTimeout(timer.current);
     base.current = state.draft; document.current = state.draft; revision.current = state.draft_revision;
     metadata.current = getSettings(state.draft); latest.current = toEditor(state.draft);
-    scopeRef.current = 'overview'; setScope('overview'); setSettings(metadata.current); setInitialData(latest.current);
+    scopeRef.current = 'overview'; setScope('overview'); setSettings(metadata.current); setInitialData(latest.current); setCanvasData(latest.current);
     setPreviewControls(state.draft.controls); setPreviewProject(state.draft); setGeneration(value => value + 1);
     blocked.current = false; setRecovery(null); setTab('screen');
     try { localStorage.removeItem(recoveryKey); } catch {}
@@ -119,6 +129,7 @@ function Builder({ initial, catalog }) {
   function changed(data) {
     if (recovery) return;
     latest.current = data;
+    setCanvasData(data);
     setPreviewControls(toProject(data).controls);
     const next = compose(data);
     setPreviewProject(next);
@@ -149,8 +160,17 @@ function Builder({ initial, catalog }) {
     if (!target) return;
     scopeRef.current = identifier; setScope(identifier);
     const data = toEditor(identifier.startsWith('faceplate:') ? { title: target.name, columns: 2, controls: target.controls } : target);
-    latest.current = data; setInitialData(data); setPreviewControls(target.controls); setTab('screen');
+    latest.current = data; setInitialData(data); setCanvasData(data); setPreviewControls(target.controls); setTab('screen');
     setSettings(getSettings(document.current));
+  }
+
+  function changeLayout(freeform) {
+    if (!freeform && !window.confirm('Switch to grid layout and discard freeform positions and containers?')) return;
+    const current = latest.current;
+    const next = { ...current, root: { props: { ...current.root.props, layout: freeform ? initialCanvas(current) : null } } };
+    setInitialData(next);
+    setGeneration(value => value + 1);
+    changed(next);
   }
 
   async function apply() {
@@ -171,7 +191,11 @@ function Builder({ initial, catalog }) {
     <div className="builder-guide"><p>Drop a control, select a tag, and apply your screen. No code required.</p>
       <div><button disabled={!canEdit} onClick={() => { clearTimeout(timer.current); save(latest.current); }}>Save draft</button>
         <button className="apply-button" onClick={apply} disabled={busy || !canEdit}>{busy ? 'Applying...' : 'Apply live'}</button>
-        <a href="/runtime" target="_blank" rel="noreferrer">Open live screen ↗</a><a href="/projects">Projects</a><a href="/revisions">Revisions</a><span>Editing: {scope}</span></div>
+        <a href="/runtime" target="_blank" rel="noreferrer">Open live screen ↗</a><a href="/projects">Projects</a><a href="/revisions">Revisions</a><span>Editing: {scope}</span>
+        {!template && tab === 'screen' && <button type="button" disabled={!canEdit || !!recovery}
+          onClick={() => changeLayout(!canvasData.root.props.layout)}>
+          {canvasData.root.props.layout ? 'Switch to grid layout' : 'Enable freeform layout'}
+        </button>}</div>
       <label>Apply reason<input aria-label="Apply reason" value={applyReason} maxLength={1000} onChange={event => setApplyReason(event.target.value)} placeholder="Optional description of this live change" /></label></div>
     <p role="status" aria-label="Draft status" className="save-status">{message}</p>
     <div className="operations-actions"><button disabled={!canEdit} onClick={() => { clearTimeout(timer.current); blocked.current = true; cache(); setRecovery(recoveryCandidate()); }}>Review local recovery / merge</button><button onClick={() => exportCandidate(recoveryCandidate())}>Export local recovery JSON</button></div>
@@ -182,9 +206,12 @@ function Builder({ initial, catalog }) {
     {['languages', 'alarms'].includes(tab) && <ProjectSettings tab={tab} settings={settings} controls={previewControls} title={previewProject.title} catalog={dynamicCatalog} onChange={settingsChanged} />}
     {tab === 'recipe_transfers' && <RecipeTransferSettings settings={settings} onChange={settingsChanged} />}
     {['screens', 'connections', 'tags', 'faceplates', 'history', 'commands'].includes(tab) && <EngineeringSettings key={tab} tab={tab} settings={settings} onChange={settingsChanged} editScope={editScope} catalog={dynamicCatalog} />}
-    <div hidden={tab !== 'screen'}><Puck key={`${scope}:${generation}`} config={config} data={initialData} iframe={{ enabled: false }}
-      headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed}
-      overrides={editorOverrides} /></div>
+    <div hidden={tab !== 'screen'}>
+      {canvasData.root.props.layout
+        ? <CanvasEditor key={`${scope}:${generation}`} data={canvasData} config={config} onChange={changed} canEdit={canEdit && !recovery} />
+        : <Puck key={`${scope}:${generation}`} config={config} data={initialData} iframe={{ enabled: false }}
+          headerTitle="Screen builder" headerPath="" height="calc(100vh - 182px)" onChange={changed} overrides={editorOverrides} />}
+    </div>
     {recovery && <MergeReview candidate={recovery} onClose={() => { setRecovery(null); setMessage('Local changes retained. Review and merge before saving to the server.'); }} onAccepted={accepted} />}
   </ScreenControls.Provider></Live.Provider></Localization>;
 }
@@ -268,12 +295,12 @@ function App({ initial, catalog }) {
     {!identityAvailable && <p role="status" className="save-status">HMI identity status unavailable. Showing the last confirmed sign-in; the server checks permission on every operation.</p>}
     {projectChanged && <p role="alert" className="save-status">A different project was opened. Saves from this editor are blocked; copy any unsaved work before reloading. <button onClick={() => location.reload()}>Reload opened project</button></p>}
     {live.plcHold && <p role="status" className="save-status">Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.</p>}
-    {runtime ? <main className="runtime"><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
+    {runtime ? <main className={currentScreen.layout && location.pathname === '/runtime' ? 'runtime canvas-runtime' : 'runtime'}><div className="runtime-bar"><span>Live screen / revision {active.revision}</span>
       <a href="/runtime">Overview</a><a href="/alarms">Alarms</a><a href="/recipes">Recipes</a><a href="/commands">Commands</a><a href="/activity">Activity</a><a href="/diagnostics">Diagnostics</a><a href="/revisions">Revisions</a><a href="/projects">Projects</a><a href="/">Edit screen</a></div>{!screenConnected && <p role="alert">Screen updates unavailable. Showing the last applied layout.</p>}
       <Localization project={active.project}>{location.pathname === '/revisions' ? <ProjectHistory /> : location.pathname === '/commands' ? <CommandConsole /> : location.pathname === '/activity' ? <ActivityConsole /> : location.pathname === '/diagnostics' ? <DiagnosticsConsole /> : location.pathname === '/projects' ? <WorkspacePage key={session?.user?.name || 'anonymous'} /> : location.pathname === '/security' ? <SecurityAdmin /> : ['/recipes', '/recipe-editor'].includes(location.pathname) ? <RecipeWorkspace edit={location.pathname === '/recipe-editor'} catalog={runtimeCatalog} /> : location.pathname === '/alarms' ? <AlarmConsole /> : <>
         <nav className="screen-navigation" aria-label="HMI screens">{projectScreens(active.project).filter(screen => !screen.popup).map(screen => <button key={screen.id} aria-pressed={currentScreen.id === screen.id} onClick={() => { setScreenId(screen.id); history.replaceState(null, '', `/runtime?screen=${encodeURIComponent(screen.id)}`); }}>{screen.title}</button>)}</nav>
-        <ScreenControls.Provider value={currentScreen.controls}><Render config={config} data={toEditor(currentScreen)} /></ScreenControls.Provider>
-        {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenControls.Provider value={screen.controls}><Render config={config} data={toEditor(screen)} /></ScreenControls.Provider></section></div>; })}
+        <ScreenView screen={currentScreen} config={config} />
+        {popups.map((id, index) => { const screen = scopedScreen(active.project, id); return <div className="hmi-popup-shade" key={id} style={{ zIndex: 10000 + index }}><section className="hmi-popup" role="dialog" aria-modal="true" aria-label={screen.title}><header><strong>{screen.title}</strong><button onClick={() => setPopups(previous => previous.filter(item => item !== id))}>Close popup</button></header><ScreenView screen={screen} config={config} /></section></div>; })}
       </>}</Localization></main> : editorStarted.current ? <MemoBuilder initial={initial} catalog={catalog} /> : <main className="security-admin"><p>Sign in with a group that has project.edit permission to edit this HMI.</p><a href="/runtime">Open live screen</a></main>}
   </Live.Provider></SecurityContext.Provider>;
 }

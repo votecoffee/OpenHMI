@@ -109,6 +109,15 @@ Source installs retain the cross-version dependency ranges in `pyproject.toml`.
 
 ## Usage
 
+
+### Freeform screens
+
+Select **Enable freeform layout** on the screen you want to design. Set the
+canvas size, upload a machine image, then drag and resize controls over it.
+The designer supports layers, snapping, grouping, alignment, equal spacing,
+grid containers and scrollable stacks. Freeform positions and backgrounds
+are included in project backups. See [screen layout](docs/screen-layout.md).
+
 ### Sample project
 
 Build a self-contained simulation project with preloaded recipes, history and a

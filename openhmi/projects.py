@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .runtime_models import Connection, TagDefinition, HistorianSettings
 from .runtime_models import CommandDefinition, RecipeTransferDefinition
 from .identity_publish import IdentityPublication
+from .canvas import CanvasLayout
 from .project_diff import encoded, digest, same, differences, merge_project, SCREEN_FIELDS
 
 
@@ -252,6 +253,7 @@ class Screen(StrictModel):
     columns: Literal[1, 2, 3] = 2
     update_ms: int = Field(default=500, ge=100, le=60000)
     popup: bool = False
+    layout: CanvasLayout | None = None
     controls: list[Control] = Field(default_factory=list, max_length=100)
 
 
@@ -275,6 +277,7 @@ class Project(StrictModel):
     title: str = Field(min_length=1, max_length=120)
     columns: Literal[1, 2, 3] = 2
     controls: list[Control] = Field(max_length=100)
+    layout: CanvasLayout | None = None
     update_ms: int = Field(default=500, ge=100, le=60000)
     screens: list[Screen] = Field(default_factory=list, max_length=100)
     faceplates: list[FaceplateDefinition] = Field(default_factory=list, max_length=100)
@@ -314,6 +317,9 @@ class Project(StrictModel):
         connections = {connection.id for connection in self.connections}
         if any(tag.connection and tag.connection not in connections for tag in self.tags):
             raise ValueError('Tag references an unknown connection')
+        for layout, controls in [(self.layout, self.controls), *((screen.layout, screen.controls) for screen in self.screens)]:
+            if layout and layout.boxes.keys() != {control.id for control in controls}:
+                raise ValueError('Freeform layout must include a position for every control')
         for screen in self.screens:
             if len({control.id for control in screen.controls}) != len(screen.controls):
                 raise ValueError('Control IDs must be unique within a screen')

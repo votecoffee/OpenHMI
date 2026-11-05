@@ -7,7 +7,7 @@ import json
 ABSENT = object()
 COLLECTION_KEYS = {'controls': 'id', 'screens': 'id', 'faceplates': 'id', 'connections': 'id',
                    'commands': 'id', 'recipe_transfers': 'id', 'alarms': 'id', 'tags': 'name', 'languages': 'code'}
-SCREEN_FIELDS = ('title', 'columns', 'controls', 'update_ms', 'screens', 'faceplates', 'languages', 'default_language')
+SCREEN_FIELDS = ('title', 'columns', 'controls', 'layout', 'update_ms', 'screens', 'faceplates', 'languages', 'default_language')
 
 
 def encoded(project):

@@ -10,7 +10,7 @@ const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type])
 
 export function toEditor(project) {
   return {
-    root: { props: { title: project.title, columns: project.columns, update_ms: project.update_ms || 500, screen_id: project.id || 'overview' } },
+    root: { props: { title: project.title, columns: project.columns, update_ms: project.update_ms || 500, screen_id: project.id || 'overview', layout: project.layout ?? null } },
     content: project.controls.map(({ kind, ...props }) => {
       if (kind === 'trend') {
         const { tags, series, ...common } = props;
@@ -24,7 +24,7 @@ export function toEditor(project) {
 export function toProject(data, settings = {}) {
   return {
     ...settings,
-    schema_version: 1, title: data.root.props.title, columns: Number(data.root.props.columns), update_ms: Number(data.root.props.update_ms || 500),
+    schema_version: 1, layout: data.root.props.layout ?? null, title: data.root.props.title, columns: Number(data.root.props.columns), update_ms: Number(data.root.props.update_ms || 500),
     controls: data.content.map(({ type, props }) => {
       const base = { kind: kinds[type], id: props.id, label: props.label, visible_tag: props.visible_tag || '', enabled_tag: props.enabled_tag || '', color_tag: props.color_tag || '', active_color: props.active_color || '#002878' };
       if (type === 'Faceplate') return { ...base, template: props.template, root_tag: props.root_tag };
@@ -50,10 +50,17 @@ export function toProject(data, settings = {}) {
 }
 
 export function projectScreens(project) {
-  return [{ id: 'overview', title: project.title, columns: project.columns, update_ms: project.update_ms || 500, popup: false, controls: project.controls }, ...(project.screens || [])];
+  return [{ id: 'overview', title: project.title, columns: project.columns, update_ms: project.update_ms || 500, popup: false, layout: project.layout, controls: project.controls }, ...(project.screens || [])];
 }
 
 export function scopedScreen(project, id) {
   const screen = projectScreens(project).find(item => item.id === id) || projectScreens(project)[0];
-  return { ...screen, controls: screen.controls.map(control => ({ ...control, id: screen.id === 'overview' ? control.id : `${screen.id}__${control.id}` })) };
+  if (screen.id === 'overview') return screen;
+  const scoped = id => `${screen.id}__${id}`;
+  const layout = screen.layout && { ...screen.layout,
+    boxes: Object.fromEntries(Object.entries(screen.layout.boxes).map(([id, box]) => [scoped(id), box])),
+    containers: Object.fromEntries(Object.entries(screen.layout.containers)
+      .map(([id, container]) => [id, { ...container, members: container.members.map(scoped) }])),
+  };
+  return { ...screen, layout, controls: screen.controls.map(control => ({ ...control, id: scoped(control.id) })) };
 }

@@ -1,0 +1,45 @@
+# Screen layout
+
+Every screen starts in the grid layout. Select **Enable freeform layout** in
+the designer to convert the selected screen. Existing controls get initial
+positions and retain their bindings. The layout is saved with the draft and
+takes effect in runtime when you select **Apply live**. Faceplate definitions
+have their own grid layout. A faceplate instance can be placed and resized as
+one object on a freeform screen.
+
+## Machine graphics and overlays
+
+Set **Canvas width** and **Canvas height** to the target work area. Upload a PNG,
+JPEG or WebP using **Background image**. The image is fitted to the exact canvas
+rectangle, so use matching proportions for undistorted machine artwork. It is
+stored with the project. Images may be up to 8 MiB and 4096 pixels per side.
+Complete backups include the image, and applied
+revisions retain their image references.
+
+Choose a control in **Control palette** and drag **Add or drag control** to the
+canvas. Clicking the button also adds it. Move controls by dragging their
+borders or bodies. Select a control to use the corner resize handle or enter
+exact **X**, **Y**, **Width** and **Height** values. **Snap to grid** applies to
+dragging and resizing. The position fields accept exact pixels. **Zoom** changes
+the editing view. The live canvas uses the configured pixel sizes and scrolls
+if the viewer is smaller.
+
+Controls may overlap. Use **Objects** to select a control that is covered.
+**Bring to front** and **Send to back** change the stacking order. Shift-click
+objects to select more than one. Align their edges or centers, or space three
+or more objects evenly. **Group** makes a selection move together and
+**Ungroup** restores individual selection.
+
+## Grid and stack containers
+
+Select one or more freeform controls and choose **Pack into grid** or **Pack into
+scrollable stack**. The resulting container can be positioned and resized on the
+canvas. A grid uses the configured **Grid columns**. A stack places controls in
+a single column and scrolls when they exceed the available height. Members
+appear in selection order and can be selected in **Objects** to edit their
+bindings. **Unpack container** puts its members back on the canvas at their
+stored freeform positions.
+
+**Switch to grid layout** removes freeform placement, containers and the
+background from the draft screen after confirmation. Previously applied layouts
+can be recovered through project revisions.

@@ -30,6 +30,7 @@ from .security import Security
 from .security_routes import add_security_routes
 from .projects import Project, ProjectStore, RevisionConflict, ApplyRequest, SaveRequest
 from .project_routes import add_project_routes
+from .canvas import CanvasImages, add_canvas_routes
 
 
 class ActionRequest(BaseModel):
@@ -162,11 +163,14 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     add_command_routes(app, commands, security)
     add_operations_routes(app, activity, security, application.driver)
     add_security_routes(app, security)
+    canvas_images = CanvasImages(store)
+    add_canvas_routes(app, canvas_images, security)
     add_trend_routes(app, trends, security)
     add_recipe_routes(app, store, application, recipe_users, security, commands, activity)
     web = Path(__file__).parent / "web"
 
     def validate_bindings(project: Project):
+        canvas_images.validate(project)
         try:
             validate_commands(project.model_dump(), {group['name'] for group in security.snapshot()['groups']})
             validate_transfers(project.model_dump())
