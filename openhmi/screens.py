@@ -33,7 +33,14 @@ def expanded_controls(project, screen_id=None):
                     if item.get(field, '').startswith('$.'):
                         item[field] = control['root_tag'] + item[field][1:]
                 if item.get('tags'):
-                    item['tags'] = [control['root_tag'] + tag[1:] if tag.startswith('$.') else tag for tag in item['tags']]
+                    def resolve(tag):
+                        return control['root_tag'] + tag[1:] if tag.startswith('$.') else tag
+
+                    item['tags'] = [resolve(tag) for tag in item['tags']]
+                    item['series'] = {resolve(tag): settings for tag, settings in item.get('series', {}).items()}
+                    for field in ('start_tag', 'stop_tag'):
+                        if item.get('recording'):
+                            item['recording'][field] = resolve(item['recording'][field])
                 # Instance visibility/enable conditions apply in addition to member conditions.
                 item['_parent_visible'] = base.get('visible_tag', '')
                 item['_parent_enabled'] = base.get('enabled_tag', '')

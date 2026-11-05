@@ -136,11 +136,25 @@ class TrendSeries(StrictModel):
         return self
 
 
+class TrendRecording(StrictModel):
+    sample_ms: int = Field(default=250, ge=100, le=60000)
+    max_samples: int = Field(default=4000, ge=10, le=20000)
+    start_tag: str = Field(default='', max_length=200)
+    stop_tag: str = Field(default='', max_length=200)
+
+    @model_validator(mode='after')
+    def distinct_triggers(self):
+        if self.start_tag and self.start_tag == self.stop_tag:
+            raise ValueError('Trend start and stop must use different Boolean tags')
+        return self
+
+
 class TrendControl(ControlBase):
     kind: Literal['trend']
     tags: list[str] = Field(min_length=1, max_length=12)
     seconds: int = Field(default=300, ge=10, le=604800)
     series: dict[str, TrendSeries] = Field(default_factory=dict, max_length=12)
+    recording: TrendRecording | None = None
 
     @model_validator(mode='after')
     def known_series(self):

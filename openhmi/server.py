@@ -19,6 +19,7 @@ from .recipe_transfers import validate_transfers
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .historian import Historian
+from .trend_recording import TrendRecorder, add_trend_routes
 from .screens import expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
 from .alarm_routes import add_alarm_routes
@@ -69,7 +70,9 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     application.driver.plc_hold = hold_connections
     application.driver.configure(Project.model_validate(store.snapshot()['active']).model_dump())
     historian = Historian(store, application.driver)
-    historian.configure(Project.model_validate(store.snapshot()['active']).historian.model_dump())
+    historian.configure(application.driver.project['historian'])
+    trends = TrendRecorder(store, application.driver)
+    trends.configure(application.driver.project)
     if handlers:
         try:
             application.load_handlers(handlers)
@@ -100,6 +103,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             try:
                 await asyncio.to_thread(application.driver.poll)
                 await asyncio.to_thread(commands.poll)
+                await asyncio.to_thread(trends.sample)
                 await asyncio.to_thread(historian.sample)
                 await asyncio.to_thread(activity.maintenance)
                 await asyncio.to_thread(publisher.poll)
@@ -125,6 +129,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             except asyncio.CancelledError:
                 pass
             await polling
+            await asyncio.to_thread(trends.shutdown)
             await asyncio.to_thread(publisher.shutdown)
             await asyncio.to_thread(application.driver.close)
             store.close()
@@ -148,6 +153,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.store = store
     app.state.alarms = monitor
     app.state.historian = historian
+    app.state.trends = trends
     security = app.state.security = Security(store)
     publisher = app.state.identity_publisher = IdentityPublisher(application.driver, security)
     add_identity_routes(app, publisher)
@@ -156,6 +162,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     add_command_routes(app, commands, security)
     add_operations_routes(app, activity, security, application.driver)
     add_security_routes(app, security)
+    add_trend_routes(app, trends, security)
     add_recipe_routes(app, store, application, recipe_users, security, commands, activity)
     web = Path(__file__).parent / "web"
 
@@ -243,6 +250,11 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if control['kind'] == 'trend':
                 if any(kinds.get(tag) not in ('number', 'integer', 'boolean') for tag in control['tags']):
                     raise HTTPException(422, 'Trend requires numeric or Boolean tags')
+                recording = control.get('recording')
+                if recording and any(recording[field] and kinds.get(recording[field]) != 'boolean' for field in ('start_tag', 'stop_tag')):
+                    raise HTTPException(422, 'Trend recording triggers require Boolean tags')
+                if recording and recording['start_tag'] and recording['start_tag'] == recording['stop_tag']:
+                    raise HTTPException(422, 'Trend recording triggers must resolve to different tags')
                 continue
             if control['kind'] == "button":
                 mode = control.get('mode', 'python')
@@ -314,7 +326,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     def apply(request: ApplyRequest, http: Request) -> dict:
         principal = security.require(http, 'project.edit')
         identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
-        with commands.lock, monitor.lock:
+        with commands.lock, monitor.lock, trends.lock:
             def validate_apply(project):
                 old_publication = (application.driver.project or {}).get('identity_publication', {})
                 if old_publication.get('enabled') or publisher.last_config:
@@ -332,7 +344,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if hasattr(app.state, 'release_connections'):
                 app.state.release_connections()
             application.driver.configure(Project.model_validate(result['active']).model_dump())
-            historian.configure(Project.model_validate(result['active']).historian.model_dump())
+            historian.configure(application.driver.project['historian'])
+            trends.configure(application.driver.project)
             sample_alarms()
             return result
 

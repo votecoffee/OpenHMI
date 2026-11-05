@@ -29,7 +29,7 @@ export function toProject(data, settings = {}) {
       const base = { kind: kinds[type], id: props.id, label: props.label, visible_tag: props.visible_tag || '', enabled_tag: props.enabled_tag || '', color_tag: props.color_tag || '', active_color: props.active_color || '#002878' };
       if (type === 'Faceplate') return { ...base, template: props.template, root_tag: props.root_tag };
       if (type === 'Trend') return { ...base, tags: props.pens?.tags ?? props.tags ?? ['TankLevel'],
-        series: props.pens?.series ?? props.series ?? {}, seconds: Number(props.seconds ?? 300) };
+        series: props.pens?.series ?? props.series ?? {}, seconds: Number(props.seconds ?? 300), recording: props.recording ?? null };
       if (type === 'SelectedRecipe' || type === 'CurrentUser') return base;
       if (type === 'TextInput') return { ...base, tag: props.tag, min_length: Number(props.min_length ?? 0), max_length: Number(props.max_length ?? 82), min_length_tag: props.min_length_tag || '', max_length_tag: props.max_length_tag || '', security_groups: props.security_groups || [] };
       if (type === 'ActionButton') return { ...base, action: props.action || '', mode: props.mode || 'python', command: props.command || '', target: props.target || '', value: props.value ?? false, screen: props.screen || 'overview', security_groups: props.security_groups || [] };

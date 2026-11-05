@@ -168,6 +168,7 @@ class RuntimeDriver(SimulatorDriver):
         self.factory = factory
         self.connections, self.definitions, self.sources, self.samples = {}, {}, {}, {}
         self.project = None
+        self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self.local_names = set()
         self.plc_hold = False
@@ -237,6 +238,8 @@ class RuntimeDriver(SimulatorDriver):
         for alarm in project.get('alarms', []):
             if alarm['enabled']:
                 demand(alarm['tag'], 250)
+        for tag, rate in self.trend_demands.items():
+            demand(tag, rate)
         for history in project.get('historian', {}).get('tags', []):
             demand(history['tag'], history['sample_ms'])
         for command in project.get('commands', []):

@@ -17,3 +17,11 @@
 .trend-fields fieldset { margin-block: 8px; min-width: 0; overflow-wrap: anywhere; }
 .trend-fields :is(input,select) { width: 100%; }
 .trend-fields button { margin-top: 5px; }
+.trend-tools input[type="number"] { width: 9ch; }
+.trend-plot-row svg { touch-action: pan-y; cursor: crosshair; }
+.trend-cursor { stroke: #222; stroke-dasharray: 3 2; pointer-events: none; }
+.trend-cursor-time { font-variant-numeric: tabular-nums; }
+.trend-captures { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.trend-seek { display: flex; align-items: center; gap: 8px; }
+.trend-seek input { flex: 1; min-width: 0; }
+.trend-fields input[type="checkbox"] { width: auto; align-self: start; }

@@ -2,6 +2,7 @@ import React, { useEffect, useId, useMemo, useState } from 'react';
 import { api } from './api.mjs';
 import { useLocalization } from './localization.jsx';
 import './trend.css';
+import { CaptureTools, useTrendCaptures } from './trend-recording.jsx';
 
 const colors = ['#002878', '#803e00', '#11615b', '#563684', '#39522b', '#8a3350'];
 const dashes = [undefined, '9 4', '2 3', '12 3 2 3'];
@@ -58,8 +59,13 @@ function scale(settings, samples) {
     return Number.isFinite(minimum) && Number.isFinite(maximum) && Number.isFinite(maximum - minimum) && maximum > minimum
       ? [minimum, maximum] : null;
   }
-  const values = samples.filter(row => row.quality === 'good' && isAnalog(row.value)).map(row => row.value);
-  return values.length ? [Math.min(...values), Math.max(...values)] : null;
+  let minimum = Infinity, maximum = -Infinity;
+  for (const row of samples) {
+    if (!goodSample(row, false)) continue;
+    minimum = Math.min(minimum, row.value);
+    maximum = Math.max(maximum, row.value);
+  }
+  return minimum === Infinity ? null : [minimum, maximum];
 }
 
 function yPosition(value, [minimum, maximum]) {
@@ -71,11 +77,31 @@ function yPosition(value, [minimum, maximum]) {
   return 160 * (1 - Math.max(-100000, Math.min(100000, fraction)));
 }
 
-function Trace({ series, start, seconds }) {
+function goodSample(row, digital) {
+  return row?.quality === 'good' && (digital ? typeof row.value === 'boolean' : isAnalog(row.value));
+}
+
+function cursorValue({ samples, digital }, epoch) {
+  let first = 0, last = samples.length;
+  while (first < last) {
+    const middle = Math.floor((first + last) / 2);
+    if (samples[middle].epoch <= epoch) first = middle + 1;
+    else last = middle;
+  }
+  const before = samples[first - 1], after = samples[first];
+  if (!goodSample(before, digital)) return undefined;
+  if (before.epoch === epoch) return before.value;
+  if (!goodSample(after, digital)) return undefined;
+  if (digital) return before.value;
+  const fraction = (epoch - before.epoch) / (after.epoch - before.epoch);
+  return before.value * (1 - fraction) + after.value * fraction;
+}
+
+const Trace = React.memo(function Trace({ series, start, seconds }) {
   const segments = [];
   let points = null;
   for (const row of series.samples) {
-    if (row.quality !== 'good' || !(series.digital ? typeof row.value === 'boolean' : isAnalog(row.value))) {
+    if (!goodSample(row, series.digital)) {
       points = null;
       continue;
     }
@@ -92,26 +118,48 @@ function Trace({ series, start, seconds }) {
     ? <circle key={index} cx={points[0][0]} cy={points[0][1]} r="2" fill={series.color} />
     : <polyline key={index} points={points.map(point => point.join(',')).join(' ')} fill="none"
       stroke={series.color} strokeDasharray={series.dash} strokeWidth="1.6" vectorEffect="non-scaling-stroke" />)}</g>;
-}
+}, (previous, next) => {
+  const before = previous.series, after = next.series;
+  return previous.start === next.start && previous.seconds === next.seconds && before.samples === after.samples
+    && before.tag === after.tag && before.digital === after.digital && before.color === after.color
+    && before.dash === after.dash && before.range?.[0] === after.range?.[0] && before.range?.[1] === after.range?.[1];
+});
 
-function Plot({ analog, digital, start, seconds, historical, label }) {
+function TrendPlot({ analog, digital, start, seconds, historical, label, cursor, setCursor }) {
   const clipId = useId();
-  return <div className="trend-plot" dir="ltr">
+  function point(event) {
+    const svg = event.currentTarget;
+    const left = svg.getBoundingClientRect().left + svg.clientLeft;
+    setCursor(Math.max(0, Math.min(1, (event.clientX - left) / svg.clientWidth)));
+  }
+  function key(event) {
+    if (event.key === 'Escape') { setCursor(null); return; }
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    setCursor(previous => Math.max(0, Math.min(1, (previous ?? 0.5) + (event.key === 'ArrowLeft' ? -0.01 : 0.01))));
+  }
+  const pointer = { onPointerMove: point, onPointerDown: point };
+  const line = height => cursor != null && <line className="trend-cursor" data-trend-cursor=""
+    x1={cursor * 600} x2={cursor * 600} y1="0" y2={height} vectorEffect="non-scaling-stroke" />;
+  return <div className="trend-plot" dir="ltr" tabIndex={0} aria-label={label + ' timeline. Use left and right arrows to move the cursor.'}
+    onPointerLeave={event => { if (event.pointerType === 'mouse') setCursor(null); }} onKeyDown={key}>
     {analog.length > 0 && <div className="trend-plot-row">
       <span>Analog</span>
-      <svg role="img" aria-label={label + ' trend'} viewBox="0 0 600 160" preserveAspectRatio="none">
+      <svg role="img" aria-label={label + ' trend'} viewBox="0 0 600 160" preserveAspectRatio="none" {...pointer}>
         <defs><clipPath id={clipId}><rect width="600" height="160" /></clipPath></defs>
         <path className="trend-grid" d="M0 40H600 M0 80H600 M0 120H600" />
         {gridTimes.map(x => <path key={x} className="trend-grid" d={`M${x} 0V160`} />)}
         <g clipPath={`url(#${clipId})`}>{analog.filter(item => item.range).map(item => <Trace key={item.binding} series={item} start={start} seconds={seconds} />)}</g>
+        {line(160)}
       </svg>
     </div>}
     {digital.map(item => <div className="trend-plot-row trend-lane" key={item.binding} data-trend-lane={item.tag}>
       <span title={item.tag}>{item.tag}</span>
-      <svg role="img" aria-label={item.tag + ' Boolean history'} viewBox="0 0 600 28" preserveAspectRatio="none">
+      <svg role="img" aria-label={item.tag + ' Boolean history'} viewBox="0 0 600 28" preserveAspectRatio="none" {...pointer}>
         <path className="trend-grid" d="M0 5H600 M0 23H600" />
         {gridTimes.map(x => <path key={x} className="trend-grid" d={`M${x} 0V28`} />)}
         <Trace series={item} start={start} seconds={seconds} />
+        {line(28)}
       </svg>
     </div>)}
     <div className="trend-plot-row"><span>Time</span><div className="trend-time"><span>{'-' + seconds + ' s'}</span><span>{historical ? 'End' : 'Now'}</span></div></div>
@@ -124,36 +172,43 @@ function formatTime(seconds) {
   return seconds + ' s';
 }
 
-export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings, seconds = 300, puck, live, catalog }) {
+export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings, seconds = 300, recording, puck, live, catalog }) {
   const { text, ui, language } = useLocalization();
   label = text(`control.${id}.label`, label);
   const [response, setResponse] = useState(null);
   const [windowSeconds, setWindowSeconds] = useState(seconds);
-  const [endTime, setEndTime] = useState('');
-  useEffect(() => setWindowSeconds(seconds), [seconds]);
+  const [windowInput, setWindowInput] = useState(String(seconds));
+  const [endTime, setEndTime] = useState(null);
+  const [cursor, setCursor] = useState(null);
+  const captures = useTrendCaptures(id, puck?.isEditing, !!recording);
+  const capture = captures.capture;
+  useEffect(() => { setWindowSeconds(seconds); setWindowInput(String(seconds)); }, [seconds]);
+  useEffect(() => { setEndTime(null); }, [capture?.id]);
+  useEffect(() => { setCursor(null); }, [capture?.id, windowSeconds, endTime]);
 
   const root = pens?.root || live.previewRoot;
   const seriesTags = [...new Set(pens?.tags ?? tags)];
   const resolve = tag => tag.startsWith('$.') ? (root ? root + tag.slice(1) : '') : tag;
   const names = [...new Set(seriesTags.map(resolve).filter(Boolean))].join(',');
-  const end = endTime ? Date.parse(endTime) / 1000 : null;
-  const query = names && windowSeconds > 0 && (end === null || Number.isFinite(end))
-    ? new URLSearchParams({ tags: names, seconds: windowSeconds, ...(end === null ? {} : { end }) }).toString() : '';
+  const follow = endTime === null && (!capture || capture.stopped === null);
+  const parameters = new URLSearchParams({ seconds: windowSeconds, ...(endTime === null ? {} : { end: endTime }) });
+  if (!capture) parameters.set('tags', names);
+  const query = capture ? `/api/trend-captures/${capture.id}?${parameters}` : names ? `/api/history?${parameters}` : '';
   useEffect(() => {
     if (!query) return;
     let stopped = false, timer;
     async function refresh() {
       try {
-        const data = await api('/api/history?' + query);
+        const data = await api(query);
         if (!stopped) setResponse({ query, data });
       } catch {
         if (!stopped) setResponse({ query, error: true });
       }
-      if (!stopped && end === null) timer = setTimeout(refresh, 1000);
+      if (!stopped && follow) timer = setTimeout(refresh, 1000);
     }
     refresh();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [query, end]);
+  }, [query, follow]);
 
   const history = response?.query === query ? response.data : null;
   const error = response?.query === query && response.error;
@@ -165,12 +220,14 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     }
     return result;
   }, [history]);
-  const plotted = seriesTags.map((tag, index) => {
-    const name = resolve(tag);
-    const config = (pens?.series ?? settings)?.[tag] ?? {};
+  const bindings = capture?.series ?? seriesTags.map(tag => ({ binding: tag, tag: resolve(tag) || tag,
+    ...(pens?.series ?? settings)?.[tag] }));
+  const plotted = bindings.map((config, index) => {
+    const name = config.tag;
+    const tag = config.binding ?? name;
     const current = Object.hasOwn(live.values, name) ? live.values[name] : undefined;
     const samples = samplesByTag.get(name) ?? [];
-    const kind = catalog.tags.find(item => item.name === tag || item.name === name)?.type;
+    const kind = config.type ?? catalog.tags.find(item => item.name === tag || item.name === name)?.type;
     const digital = kind === 'boolean' || !kind && (typeof current === 'boolean' ||
       typeof samples.findLast(row => row.quality === 'good')?.value === 'boolean');
     const range = digital ? null : scale(config, samples);
@@ -179,8 +236,23 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   });
   const analog = plotted.filter(item => !item.digital);
   const digital = plotted.filter(item => item.digital);
-  const hasSamples = plotted.some(item => item.samples.some(row => row.quality === 'good'
-    && (item.digital ? typeof row.value === 'boolean' : isAnalog(row.value))));
+  const hasSamples = plotted.some(item => item.samples.some(row => goodSample(row, item.digital)));
+  const cursorEpoch = cursor === null || !history ? null : history.start + cursor * (history.end - history.start);
+  const cursorDate = cursorEpoch === null ? null : new Date(cursorEpoch * 1000);
+  const cursorTime = cursorDate?.toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3,
+  });
+  const shownEnd = endTime === null ? null : new Date(endTime * 1000);
+  const localEnd = shownEnd ? new Date(shownEnd.getTime() - shownEnd.getTimezoneOffset() * 60000).toISOString().slice(0, 19) : '';
+  function changeWindow(value) {
+    setWindowSeconds(value);
+    setWindowInput(String(value));
+  }
+  function applyWindow() {
+    const value = Number(windowInput);
+    if (Number.isInteger(value) && value >= 1 && value <= 604800) changeWindow(value);
+    else setWindowInput(String(windowSeconds));
+  }
   function formatValue(value, decimals) {
     const options = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false };
     try { return new Intl.NumberFormat(language.code, options).format(value); }
@@ -191,30 +263,45 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     <span className="hmi-label">{label}</span>
     {!puck?.isEditing && <div className="trend-tools">
       <label>Time range<select aria-label={label + ' time range'} value={windowSeconds}
-        onChange={event => setWindowSeconds(Number(event.target.value))}>
-        {[...new Set([seconds, 60, 300, 900, 3600, 86400])].sort((a, b) => a - b).map(value => <option key={value} value={value}>{formatTime(value)}</option>)}
+        onChange={event => changeWindow(Number(event.target.value))}>
+        {[...new Set([windowSeconds, seconds, 10, 30, 60, 300, 900, 3600, 86400])].sort((a, b) => a - b).map(value => <option key={value} value={value}>{formatTime(value)}</option>)}
       </select></label>
-      <label>End time<input aria-label={label + ' history end'} type="datetime-local" value={endTime}
-        onChange={event => setEndTime(event.target.value)} /></label>
-      <button type="button" onClick={() => setEndTime('')}>Live</button>
+      <label>Window (seconds)<input aria-label={label + ' window seconds'} type="number" min="1" max="604800"
+        value={windowInput} onChange={event => setWindowInput(event.target.value)} onBlur={applyWindow}
+        onKeyDown={event => { if (event.key === 'Enter') applyWindow(); }} /></label>
+      <label>End time<input aria-label={label + ' history end'} type="datetime-local" step="1" value={localEnd}
+        onChange={event => {
+          const epoch = Date.parse(event.target.value) / 1000;
+          setEndTime(Number.isFinite(epoch) && epoch >= 0 && epoch <= 32503680000 ? epoch : null);
+        }} /></label>
+      <button type="button" onClick={() => setEndTime(null)}>{capture?.stopped != null ? 'Latest' : 'Live'}</button>
     </div>}
-    {plotted.length > 0 && <Plot analog={analog} digital={digital} start={history?.start ?? 0}
-      seconds={history ? history.end - history.start : windowSeconds} historical={!!endTime} label={label} />}
-    {plotted.length > 0 && <table className="trend-legend"><thead><tr><th>Tag</th><th>Current (live)</th><th>Y-axis range</th></tr></thead>
-      <tbody>{plotted.map(item => <tr key={item.binding} data-trend-value={item.tag}>
+    {!puck?.isEditing && <CaptureTools state={captures} recording={recording} endTime={endTime} setEndTime={setEndTime} />}
+    {plotted.length > 0 && <TrendPlot analog={analog} digital={digital} start={history?.start ?? 0}
+      seconds={history ? history.end - history.start : windowSeconds} historical={!follow} label={label}
+      cursor={cursor} setCursor={setCursor} />}
+    {cursorDate && <span className="trend-cursor-time" data-trend-cursor-time="">
+      Cursor: {cursorDate.toLocaleDateString()} {cursorTime}
+    </span>}
+    {plotted.length > 0 && <table className="trend-legend"><thead><tr><th>Tag</th><th>Current (live)</th>
+      <th>At cursor</th><th>Y-axis range</th></tr></thead>
+      <tbody>{plotted.map(item => {
+        const atCursor = cursorEpoch == null ? undefined : cursorValue(item, cursorEpoch);
+        return <tr key={item.binding} data-trend-value={item.tag}>
         <th scope="row"><svg width="24" height="10" aria-hidden="true"><path d="M0 5H24" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} /></svg>{item.tag}</th>
         <td>{!live.connected ? ui('commLoss')
           : item.digital && typeof item.current === 'boolean' ? ui(item.current ? 'on' : 'off')
             : !item.digital && isAnalog(item.current) ? formatValue(item.current, item.decimals) : ui('badData')}</td>
+        <td data-trend-cursor-value="">{atCursor === undefined ? '—' : item.digital ? ui(atCursor ? 'on' : 'off') : formatValue(atCursor, item.decimals)}</td>
         <td>{item.digital ? '0 / 1'
           : item.range ? <>{item.range.join(' to ')} <small>{item.fixed ? 'Fixed' : 'Observed'}</small></>
             : item.fixed ? 'Invalid range' : 'Waiting for samples'}</td>
-      </tr>)}</tbody>
+      </tr>; })}</tbody>
     </table>}
     {error ? <span className="hmi-quality">{ui('badData')} - history unavailable</span>
       : !plotted.length ? <p>Select trend tags.</p>
-        : history && !hasSamples ? <p>No recorded good samples in this window. Check History settings and tag quality.</p> : null}
+        : history && !hasSamples ? <p>No recorded good samples in this window. Check acquisition settings and tag quality.</p> : null}
     {history?.truncated && <p>Result limited; shorten the time range.</p>}
-    {!puck?.isEditing && query && <a href={'/api/history.csv?' + query}>Export history CSV</a>}
+    {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>Export history CSV</a>}
   </article>;
 }

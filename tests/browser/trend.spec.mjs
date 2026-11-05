@@ -37,6 +37,10 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Fixed trend scale requires');
     await fields.getByLabel('TrendLevel maximum').fill('60');
+    const recording = page.getByRole('group', { name: 'Saved trend recording', exact: true });
+    await recording.getByLabel('Enable recording').check();
+    await recording.getByLabel('Record interval (ms)').fill('100');
+    await recording.getByLabel('Retained samples per capture').fill('10');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
 
@@ -72,6 +76,35 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await expect(chart.locator('[data-trend-value="TrendLevel"]')).toContainText('42.000');
     await chart.getByRole('button', { name: 'Live', exact: true }).click();
     await expect(chart.getByRole('link', { name: 'Export history CSV' })).not.toHaveAttribute('href', /&end=/);
+    await page.getByLabel('Process trend time range').selectOption('10');
+    await expect(chart.getByRole('link', { name: 'Export history CSV' })).toHaveAttribute('href', /seconds=10/);
+    const customWindow = page.getByLabel('Process trend window seconds');
+    await customWindow.fill('17');
+    await customWindow.press('Enter');
+    await expect(chart.getByRole('link', { name: 'Export history CSV' })).toHaveAttribute('href', /seconds=17/);
+    const analog = chart.getByRole('img', { name: 'Process trend trend', exact: true });
+    const point = await analog.boundingBox();
+    await analog.hover({ position: { x: point.width / 8, y: point.height / 2 } });
+    await expect(chart.locator('[data-trend-cursor]')).toHaveCount(3);
+    const atLevel = chart.locator('[data-trend-value="TrendLevel"] [data-trend-cursor-value]');
+    await expect.poll(async () => Math.abs(Number(await atLevel.textContent()) - 40)).toBeLessThan(0.5);
+    await expect(chart.locator('[data-trend-value="TrendMotor"] [data-trend-cursor-value]')).toHaveText('OFF');
+    await analog.hover({ position: { x: point.width * 0.6, y: point.height / 2 } });
+    await expect(chart.locator('[data-trend-value="TrendLevel"] [data-trend-cursor-value]')).toHaveText(/^.$/u);
+
+    await chart.getByRole('button', { name: 'Run trend' }).click();
+    await expect(chart.getByText(/10 \/ 10 samples retained.*rolled off/)).toBeVisible();
+    await chart.getByRole('button', { name: 'Stop trend' }).click();
+    await expect(chart.getByText(/manual stop/)).toBeVisible();
+    const download = chart.getByRole('link', { name: 'Export entire capture CSV' });
+    const href = await download.getAttribute('href');
+    const csv = await (await page.request.get(href)).text();
+    expect(csv.trim().split(/\r?\n/)).toHaveLength(41);
+    await page.reload();
+    await expect(chart.getByRole('link', { name: 'Export entire capture CSV' })).toHaveAttribute('href', href);
+    await chart.getByRole('button', { name: 'Delete saved capture' }).click();
+    await chart.getByRole('button', { name: 'Confirm delete capture' }).click();
+    await expect(chart.getByRole('link', { name: 'Export entire capture CSV' })).toHaveCount(0);
     if (process.env.OPENHMI_TREND_SCREENSHOT) await chart.screenshot({ path: process.env.OPENHMI_TREND_SCREENSHOT });
   } finally {
     await save(original.active);

@@ -169,6 +169,10 @@ keeps its running copy; test recipes carry production status false. See the
    decimal places and choose fixed or observed Y-axis bounds. Boolean tags appear
    as separate step traces under the analog chart. The control shows current live
    values alongside time-range/end-time selection and CSV export.
+   Set a 10-second, 1-minute or custom viewing window and move the cursor
+   across the plot to read every tag at the same time. Enable **Saved trend
+   recording** for manual Run/Stop or optional Boolean triggers, independent
+   rolling sample retention, saved capture review and full capture CSV export.
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

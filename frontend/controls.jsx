@@ -7,6 +7,7 @@ import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.
 
 import { EditControl } from './edit-control.jsx';
 import { Trend, TrendFields } from './trend.jsx';
+import { TrendRecordingFields } from './trend-recording.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -220,6 +221,7 @@ export function createConfig(catalog) {
       Trend: { label: 'Trend', fields: {
         label: labelField, seconds: { type: 'number', label: 'Time window (seconds)', min: 10, max: 604800 },
         pens: { type: 'custom', render: ({ value, onChange }) => <TrendFields value={value} onChange={onChange} catalog={catalog} /> },
+        recording: { type: 'custom', render: ({ value, onChange }) => <TrendRecordingFields value={value} onChange={onChange} catalog={catalog} /> },
       }, defaultProps: { label: 'Process trend', pens: { tags: ['TankLevel'], series: {} }, seconds: 300 },
       render: props => <LiveTrend {...props} catalog={catalog} /> },
       Faceplate: { label: 'UDT faceplate', fields: { label: labelField, template: { type: 'select', label: 'Definition', options: (catalog.faceplates || []).map(item => ({ label: item.name, value: item.id })) }, root_tag: tagField('struct') },

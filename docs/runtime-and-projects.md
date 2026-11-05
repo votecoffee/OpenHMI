@@ -93,6 +93,41 @@ timestamps reflect when Python receives the values. Queries retain the newest
 bounded results and report truncation. Observed ranges use those returned points.
 Export is limited to 20,000 records per requested tag.
 
+### Saved trend captures
+
+Set the default viewing window in the designer. In runtime, choose a preset
+such as **10 s** or **1 min**, or enter a custom window of 1 to 604,800 seconds.
+Hover or tap a trace to align the cursor across all lanes. With the timeline
+focused, use Left/Right to move it and Escape to clear it. Analog cursor values
+interpolate between good points. Boolean values follow the preceding good state
+between good points. Gaps and times outside the recorded traces show a dash.
+The live value column remains separate.
+
+Enable **Saved trend recording** in the Trend properties and **Apply live**.
+Choose a sample interval of 100 to 60,000 ms and retain 10 to 20,000 samples per
+capture. One sample records every configured tag from the runtime cache. Timing
+depends on the driver and runtime cycle. Retention is a sample count independent
+of the viewing window. The capture rolls over its oldest samples as it fills.
+Continuous tag history keeps its own schedule and retention.
+
+**Run trend** starts a new capture, and **Stop trend** saves it in the project
+database. Each configured Boolean start/stop tag acts on a sampled, good
+false-to-true transition. A configured stop tag must be good and false for an
+automatic start. Tags are monitored at 250 ms or the recording interval,
+whichever is faster, subject to PLC communication timing. Short pulses can be
+missed. Recording and triggers work with the browser closed while the Python
+runtime is running. A restart preserves the captured data and stops the run.
+Changing recording settings or tag acquisition definitions also stops the run.
+
+Use **Trend data** to select a saved capture and **Capture position** or **End
+time** to review it. The plot shows up to 2,000 samples from the chosen window
+and reports truncation. **Export entire capture CSV** exports all retained
+samples, with timestamps and quality, independently of that window. Project
+backups include captures. Projects reserve at most 100,000 samples across up to
+100 captures. Operators with runtime permission can run and stop recording.
+An engineer with project editing permission can delete a stopped capture to
+free space.
+
 ## Project library and complete backups
 
 The `openhmi` CLI hosts a project library in the selected database's directory.
