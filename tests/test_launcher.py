@@ -1,8 +1,10 @@
 """Launcher ownership, user-data defaults and administrator setup contracts."""
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -67,6 +69,40 @@ class LauncherTests(unittest.TestCase):
                 launcher.main(['--version'])
             self.assertEqual(error.exception.code, 0)
             self.assertFalse(project.parent.exists())
+
+    def test_preflight_preserves_existing_files_and_does_not_start_runtime(self):
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()) as output:
+            library = Path(directory)
+            project = library / 'Project.sqlite3'
+            project.write_bytes(b'Existing database fixture')
+            logs = library / 'logs'
+            logs.mkdir()
+            log = logs / 'runtime.log'
+            log.write_bytes(b'Existing log fixture')
+            with socket.socket() as listener:
+                listener.bind(('127.0.0.1', 0))
+                port = listener.getsockname()[1]
+            launcher.main(['--preflight', '--project', str(project), '--port', str(port)])
+            self.assertTrue(json.loads(output.getvalue())['ok'])
+            self.assertEqual(project.read_bytes(), b'Existing database fixture')
+            self.assertEqual(log.read_bytes(), b'Existing log fixture')
+            self.assertEqual(set(library.iterdir()), {project, logs})
+            self.assertEqual(list(logs.iterdir()), [log])
+
+    def test_preflight_reports_missing_log_directory_and_occupied_port(self):
+        with TemporaryDirectory() as directory, socket.socket() as listener, redirect_stdout(StringIO()) as output:
+            project = Path(directory) / 'Project.sqlite3'
+            listener.bind(('127.0.0.1', 0))
+            listener.listen()
+            with self.assertRaises(SystemExit) as error:
+                launcher.main(['--preflight', '--project', str(project), '--port', str(listener.getsockname()[1])])
+            self.assertEqual(error.exception.code, 1)
+            report = json.loads(output.getvalue())
+            self.assertFalse(report['ok'])
+            self.assertTrue(report['checks']['project_storage']['ok'])
+            self.assertFalse(report['checks']['log_storage']['ok'])
+            self.assertFalse(report['checks']['loopback_port']['ok'])
+            self.assertEqual(list(project.parent.iterdir()), [])
 
     def test_bundled_admin_setup_preserves_existing_users_and_requires_library_ownership(self):
         with TemporaryDirectory() as directory:

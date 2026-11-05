@@ -42,6 +42,25 @@ guard covers this launcher; direct Python API access and old launches cannot be
 made safe by a lock they do not use. Keep databases on local storage and do not
 run another runtime or security utility against the same library.
 
+## Check the target account before first start
+
+Sign in as the Windows account that will run OpenHMI. Create the intended project
+library and log folders if needed, then run the preflight from the extracted folder:
+
+```powershell
+$library = 'D:\HMI Data\projects'
+New-Item -ItemType Directory -Force -Path $library, (Join-Path $library 'logs')
+.\OpenHMI.exe --preflight --project (Join-Path $library 'Line1.openhmi.sqlite3') --port 8010
+```
+
+Preflight reports package dependencies and assets, temporary file creation and
+cleanup in both folders, write access to any existing project database and active
+log file, and whether OpenHMI can bind the selected loopback port at check time.
+Use `--log-dir` if you plan to store logs elsewhere. Each check appears in the
+JSON output. An unsuccessful check returns exit code 1. Preflight leaves the
+project contents intact and starts no HMI server or PLC connection. Target
+credentials, HMI group assignments and runtime behavior are verified separately.
+
 ## Create a local administrator
 
 Stop the runtime first. The bundled command prompts for the password and its

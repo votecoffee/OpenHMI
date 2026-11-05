@@ -6,7 +6,10 @@ import json
 import logging.config
 import os
 from pathlib import Path
+import socket
+import stat
 import sys
+from tempfile import TemporaryFile
 import threading
 import webbrowser
 
@@ -88,6 +91,44 @@ def self_check():
             'assets': 'present'}
 
 
+def preflight(project, logs, port):
+    """Probe deployment permissions using the runtime account and disposable files."""
+    checks = {}
+
+    def check(name, target, probe):
+        result = {'target': str(target), 'ok': True}
+        try:
+            probe()
+        except (OSError, RuntimeError) as error:
+            result.update(ok=False, error=str(error))
+        checks[name] = result
+
+    def probe_storage(directory, existing_file):
+        with TemporaryFile(dir=directory, prefix='.openhmi-preflight-') as scratch:
+            scratch.write(b'OpenHMI')
+            scratch.flush()
+        try:
+            if not stat.S_ISREG(existing_file.stat().st_mode):
+                raise OSError(f'Expected an ordinary file: {existing_file}')
+            # Request write access without creating, truncating or updating the file.
+            with existing_file.open('r+b'):
+                pass
+        except FileNotFoundError:
+            pass
+
+    def probe_port():
+        with socket.socket() as listener:
+            if os.name == 'nt':
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            listener.bind(('127.0.0.1', port))
+
+    check('package', Path(__file__).parent, self_check)
+    check('project_storage', project.parent, lambda: probe_storage(project.parent, project))
+    check('log_storage', logs, lambda: probe_storage(logs, logs / 'runtime.log'))
+    check('loopback_port', f'127.0.0.1:{port}', probe_port)
+    return {'ok': all(result['ok'] for result in checks.values()), 'checks': checks}
+
+
 def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments and arguments[0] == 'package':
@@ -97,6 +138,7 @@ def main(argv=None):
     parser.add_argument('--version', action='version', version=f'OpenHMI {application_version()}')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--self-check', action='store_true', help='Check bundled dependencies/assets without starting a project')
+    mode.add_argument('--preflight', action='store_true', help='Check package, storage access and loopback port without starting the runtime')
     mode.add_argument('--create-admin', metavar='USER', help='Create a local administrator while the runtime is stopped; password is prompted')
     parser.add_argument('--project', type=Path, default=default_project(), help='Database path; its folder is the project library')
     parser.add_argument('--handlers', type=Path, help='Trusted local Python action module loaded at startup')
@@ -112,6 +154,13 @@ def main(argv=None):
             print(json.dumps(self_check(), indent=2))
             return
         project = args.project.resolve()
+        if args.preflight:
+            logs = (args.log_dir or project.parent / 'logs').resolve()
+            report = preflight(project, logs, args.port)
+            print(json.dumps(report, indent=2))
+            if not report['ok']:
+                raise SystemExit(1)
+            return
         with library_lock(project.parent):
             if args.create_admin:
                 from .security import main as create_admin

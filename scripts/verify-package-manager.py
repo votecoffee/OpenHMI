@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 
 
@@ -48,6 +49,14 @@ def main():
     command('activate', second)
     new_check = command('launch', '--self-check')
     assert new_check['frozen'] and old_check['frozen']
+    logs = work / 'preflight logs'
+    logs.mkdir()
+    with socket.socket() as reservation:
+        reservation.bind(('127.0.0.1', 0))
+        port = reservation.getsockname()[1]
+    preflight = command('launch', '--preflight', '--project', projects / 'Fixture.openhmi.sqlite3',
+                        '--log-dir', logs, '--port', port)
+    assert preflight['ok'] and not list(logs.iterdir())
     command('activate', first)
     assert command('list')['active']['release'] == first
     command('launch', '--self-check')
@@ -57,6 +66,7 @@ def main():
     report = {'initial': installed, 'updated': updated, 'rollback_release': first,
               'retained_versions': 2, 'project_and_external_handler_hashes_unchanged': before == after,
               'selected_versions_self_check': {'initial': old_check, 'updated': new_check},
+              'selected_version_preflight_passed': True,
               'child_path_without_python_or_node': True,
               'scope': 'Build-machine frozen manager/install/update/selection/rollback checks; self-check only, not database downgrade or clean-machine acceptance.'}
     (work / 'report.json').write_bytes((json.dumps(report, indent=2) + '\n').encode('utf-8'))

@@ -42,7 +42,9 @@ Use a separate local application root when needed; put `--root` before the comma
 .\OpenHMI.exe package --root 'D:\OpenHMI\application' launch --project 'D:\OpenHMI\projects\Line1.openhmi.sqlite3' --port 8010
 ```
 
-`launch` also accepts `--log-dir`, `--handlers`, `--open-browser` and `--self-check`.
+`launch` also accepts `--log-dir`, `--handlers`, `--open-browser`, `--self-check`
+and `--preflight`. Preflight checks the selected executable and the target
+storage and port without starting the HMI. See [target account checks](windows-package.md#check-the-target-account-before-first-start).
 The selected package is verified before execution. Projects and logs explicitly
 placed inside the application installation are rejected. The runtime's existing
 library lock prevents simultaneous launchers from owning the same project library.

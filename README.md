@@ -83,8 +83,9 @@ needed by the packaged HMI developer. This is an unsigned development preview;
 clean-machine, Windows service and pilot acceptance remain open.
 
 See [Windows package instructions](docs/windows-package.md) for building a preview,
-project selection, logs, update/rollback and data preservation. No public release
-installer is published yet.
+project selection, logs, update/rollback and data preservation. Use `--preflight`
+under the intended Windows account to check package, folder access and the local
+port before starting. No public release installer is published yet.
 
 The bundled `package` commands provide verified side-by-side installation, version
 selection and rollback while retaining project data. To stop a managed launch,

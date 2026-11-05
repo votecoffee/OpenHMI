@@ -220,7 +220,10 @@ def main(argv=None):
     launch = sub.add_parser('launch')
     launch.add_argument('--project', type=Path); launch.add_argument('--port', type=int, default=8000)
     launch.add_argument('--handlers', type=Path); launch.add_argument('--log-dir', type=Path)
-    launch.add_argument('--open-browser', action='store_true'); launch.add_argument('--self-check', action='store_true')
+    launch.add_argument('--open-browser', action='store_true')
+    mode = launch.add_mutually_exclusive_group()
+    mode.add_argument('--self-check', action='store_true')
+    mode.add_argument('--preflight', action='store_true')
     args = parser.parse_args(argv)
     packages = Packages(args.root)
     try:
@@ -242,6 +245,7 @@ def main(argv=None):
             arguments += ['--port', str(args.port)]
             if args.open_browser: arguments += ['--open-browser']
             if args.self_check: arguments += ['--self-check']
+            if args.preflight: arguments += ['--preflight']
             executable = packages.release(selection['release']) / 'OpenHMI/OpenHMI.exe'
             with subprocess.Popen([str(executable), *arguments]) as runtime:
                 while True:

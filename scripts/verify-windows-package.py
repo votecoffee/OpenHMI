@@ -39,6 +39,14 @@ def main():
     project = work / 'project library' / 'Pilot.openhmi.sqlite3'
     with socket.socket() as reservation:
         reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
+    project.parent.mkdir()
+    logs = project.parent / 'logs'
+    logs.mkdir()
+    preflight = subprocess.run([str(executable), '--preflight', '--project', str(project), '--port', str(port)],
+                               cwd=work, env=env, capture_output=True, text=True, check=True, creationflags=hidden)
+    assert json.loads(preflight.stdout)['ok']
+    assert list(project.parent.iterdir()) == [logs] and list(logs.iterdir()) == []
+    report['preflight_passed_without_creating_runtime_files'] = True
     base = f'http://127.0.0.1:{port}'
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     def request(path, data=None, method=None):
