@@ -1,5 +1,6 @@
 """pycomm3 explicit-message adapter; shared batched polling, never CIP I/O subscriptions."""
 
+from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
@@ -7,7 +8,7 @@ import logging
 import math
 import json
 import re
-from threading import RLock
+from threading import Lock, RLock
 import time
 from uuid import uuid4
 
@@ -36,6 +37,31 @@ def type_ok(value, kind):
     return True
 
 
+class ScanTimings:
+    """Bounded, in-memory timing samples for one configured route."""
+
+    def __init__(self):
+        self.lock = Lock()
+        self.series = defaultdict(lambda: deque(maxlen=256))
+
+    def record(self, metric, seconds):
+        with self.lock:
+            self.series[metric].append(max(0, seconds) * 1000)
+
+    def snapshot(self):
+        with self.lock:
+            series = {name: list(samples) for name, samples in self.series.items()}
+        result = {}
+        for name, samples in series.items():
+            ordered = sorted(samples)
+            result[name] = {
+                'count': len(samples), 'last_ms': round(samples[-1], 3),
+                **{f'p{percentile}_ms': round(ordered[math.ceil(len(samples) * percentile / 100) - 1], 3)
+                   for percentile in (50, 95, 99)},
+            }
+        return result
+
+
 class LogixConnection:
     def __init__(self, config, factory=None):
         self.config, self.factory = config, factory
@@ -46,6 +72,8 @@ class LogixConnection:
         self.error = None
         self.retry_at, self.failures = 0, 0
         self.failure_generation = 0
+        self.outage_started = None
+        self.timings = ScanTimings()
         self.metadata = {}
         self.read_calls = self.tags_read = 0
 
@@ -69,6 +97,7 @@ class LogixConnection:
             factory = LogixDriver
         else:
             factory = self.factory
+        started = time.monotonic()
         # Use public tag initialization. Do not request an empty metadata namespace filter.
         client = factory(self.config['path'], init_tags=True, init_program_tags=self.config['program_tags'])
         client.socket_timeout = self.config['timeout_seconds']
@@ -78,6 +107,8 @@ class LogixConnection:
                 raise ConnectionError('PLC connection did not open')
             self.metadata = {name: self._metadata(name, info) for name, info in client.tags.items()}
             self.connected = True
+            metric = 'cold_open' if self.outage_started is None else 'reconnect_open'
+            self.timings.record(metric, time.monotonic() - started)
         except Exception:
             self.close()
             raise
@@ -123,12 +154,16 @@ class LogixConnection:
     def failed(self, error, now):
         self.error = str(error)
         self.failure_generation += 1
+        if self.outage_started is None:
+            self.outage_started = now
         self.failures += 1
         self.retry_at = now + min(30, 2 ** min(self.failures - 1, 5))
         self.close()
 
-    def read(self, addresses, now):
+    def read(self, addresses, now=None):
+        real_clock = now is None
         with self.lock:
+            now = time.monotonic() if real_clock else now
             if self.client is None and now < self.retry_at:
                 raise ConnectionError(self.error or 'Waiting for reconnect backoff')
             try:
@@ -146,7 +181,7 @@ class LogixConnection:
                 self.error, self.failures = None, 0
                 return results
             except Exception as error:
-                self.failed(error, now)
+                self.failed(error, time.monotonic() if real_clock else now)
                 raise
 
     def write(self, address, value):
@@ -312,36 +347,44 @@ class RuntimeDriver(SimulatorDriver):
                     continue
                 if self._scan_pool is None:
                     self._scan_pool = ThreadPoolExecutor(max_workers=MAX_PLC_CONNECTIONS, thread_name_prefix='openhmi-plc')
+                deadline = min((self.deadlines[(identifier, address)] for address in due
+                                if (identifier, address) in self.deadlines), default=None)
                 self._scans[identifier] = self._scan_pool.submit(
-                    self._scan, identifier, connection, self.project, due, now, real_clock
+                    self._scan, identifier, connection, self.project, due, deadline, None if real_clock else now
                 )
             scheduled = tuple(self._scans.values()) if wait else ()
         for future in scheduled:
             future.result()
 
-    def _scan(self, identifier, connection, project, due, now, real_clock):
+    def _scan(self, identifier, connection, project, due, deadline, now):
         # Serialize reads, writes and publication for this route. Never hold the
         # runtime state lock across socket operations.
         with connection.lock:
             with self.lock:
                 if self._closing or self.project is not project:
                     return
-            if real_clock:
-                now = time.monotonic()
+            started = time.monotonic()
+            scan_start = started if now is None else now
+            if scan_start < connection.retry_at and not connection.connected:
+                return
             if not due:
                 # Metadata browsing is available even before a screen leases tags.
-                if now >= connection.retry_at:
-                    try:
-                        connection.connect(now)
-                    except Exception as error:
-                        connection.failed(error, now)
+                try:
+                    connection.connect(scan_start)
+                except Exception as error:
+                    connection.failed(error, time.monotonic() if now is None else now)
                 return
+            if deadline is not None:
+                connection.timings.record('scan_lateness', scan_start - deadline)
             try:
                 results = connection.read(due, now)
             except Exception:
                 # A route failure invalidates its entire cache in sample_snapshot.
                 return
-            acquired = time.monotonic() if real_clock else now
+            finally:
+                finished = time.monotonic()
+                connection.timings.record('scan', finished - started)
+            acquired = finished if now is None else now
             timestamp = utc_now()
             with self.lock:
                 if self._closing or self.project is not project:
@@ -368,6 +411,9 @@ class RuntimeDriver(SimulatorDriver):
                                 if not math.isfinite(value):
                                     raise ValueError('Scaled PLC value is not finite')
                             sample = {'value': value, 'quality': 'good', 'error': None}
+                            if connection.outage_started is not None:
+                                connection.timings.record('recovery', acquired - connection.outage_started)
+                                connection.outage_started = None
                         except (ValueError, KeyError, TypeError, IndexError) as failure:
                             sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
                         self.samples[alias] = {
@@ -461,7 +507,7 @@ class RuntimeDriver(SimulatorDriver):
             connection = self.connections.get(tag['connection'])
             if not connection:
                 raise ConnectionError('PLC connection is disabled')
-            result = connection.read([tag['address']], time.monotonic())[0]
+            result = connection.read([tag['address']])[0]
             if result.error or not isinstance(result.value, dict):
                 raise ValueError('Recipe verification root read failed')
             return result.value
@@ -518,11 +564,12 @@ class RuntimeDriver(SimulatorDriver):
             return int(value)
         return value
 
-    def status(self):
+    def status(self, *, include_timing=False):
         with self.lock:
             return [{'id': identifier, 'connected': connection.connected, 'error': connection.error,
                      'connection_instance': connection.instance,
                      'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
+                     **({'timings': connection.timings.snapshot(), 'route_failures': connection.failure_generation} if include_timing else {}),
                      'groups': [{'rate_ms': rate, 'addresses': sorted(address for (conn, address), interval in self.last_rates.items() if conn == identifier and interval == rate)}
                                 for rate in sorted({interval for (conn, _), interval in self.last_rates.items() if conn == identifier})]}
                     for identifier, connection in self.connections.items()]

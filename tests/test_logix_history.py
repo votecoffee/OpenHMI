@@ -6,7 +6,8 @@ from threading import Event
 import time
 from types import SimpleNamespace
 import unittest
-from openhmi.logix import RuntimeDriver
+from unittest.mock import patch
+from openhmi.logix import RuntimeDriver, ScanTimings
 from openhmi.projects import Project, ProjectStore, default_project
 from openhmi.historian import Historian, HistoryChanged
 from openhmi.runtime_models import HistorianSettings
@@ -95,6 +96,51 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertTrue(connection.connected)
         self.assertEqual(driver.sample_snapshot(3.6)['LevelA']['quality'], 'good')
         driver.close()
+    def test_scan_timing_separates_read_deadlines_open_and_data_recovery(self):
+        clock = SimpleNamespace(now=1.0)
+        clock.monotonic = lambda: clock.now
+
+        class TimedPLC(FakePLC):
+            def open(self):
+                clock.now += 0.125
+                return super().open()
+
+            def read(self, *addresses):
+                clock.now += 0.25
+                return super().read(*addresses)
+
+        driver = RuntimeDriver(TimedPLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['slow'], 1)
+        with patch('openhmi.logix.time', clock):
+            driver.poll()
+            connection = driver.connections['plc']
+            self.assertEqual(driver.status(include_timing=True)[0]['timings']['cold_open']['last_ms'], 125)
+            clock.now = 2.875  # Half a second after the first scan deadline.
+            connection.client.fail = True
+            driver.poll()
+            self.assertEqual(connection.retry_at, 4.125)  # Backoff starts when failure is observed.
+            self.assertNotIn('recovery', driver.status(include_timing=True)[0]['timings'])
+            clock.now = 4.125
+            driver.poll()
+
+        status = driver.status(include_timing=True)[0]
+        self.assertEqual(status['route_failures'], 1)
+        self.assertEqual(status['timings']['scan']['count'], 3)
+        self.assertEqual(status['timings']['scan_lateness']['p95_ms'], 500)
+        self.assertEqual(status['timings']['reconnect_open']['last_ms'], 125)
+        self.assertEqual(status['timings']['recovery']['last_ms'], 1375)
+        self.assertNotIn('timings', driver.status()[0])
+
+    def test_timing_window_keeps_recent_samples_and_uses_nearest_rank(self):
+        timings = ScanTimings()
+        for sample in range(260):
+            timings.record('scan', sample / 1000)
+        self.assertEqual(timings.snapshot()['scan'], {
+            'count': 256, 'last_ms': 259, 'p50_ms': 131, 'p95_ms': 247, 'p99_ms': 257,
+        })
+
     def test_shared_subscription_rates_udt_dedup_and_lease_expiry(self):
         driver = RuntimeDriver(FakePLC)
         driver.configure(logix_project())

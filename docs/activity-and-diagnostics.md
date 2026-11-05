@@ -80,9 +80,14 @@ configured routes, connected/disconnected/disabled/held status, errors, effectiv
 scan groups and counters. Counters mean pycomm3 read calls/requested addresses,
 not measured wire packets. Scan intervals remain best effort.
 
+Expand **Timing (ms)** for the latest measurement and p50, p95 and p99 by
+route. Each metric uses up to 256 recent observations in memory and is also
+in the JSON export. A new connection instance starts a fresh window.
+
 Tag rows show logical source/type, quality, observation timestamp, age and error.
-An unsuccessful read's timestamp describes that failure observation, not the
-last valid PLC acquisition. Bad/stale values are not presented as usable values.
+A tag-level read error records the failed observation time. Route failure
+invalidates the cached samples and preserves their previous timestamps and ages.
+Bad/stale values are unavailable to controls and permits.
 Filtering/pagination bounds the display; JSON export includes at most 5,000 matching
 tag rows and indicates truncation. Diagnostic exports omit tag values and HMI
 authentication credentials.

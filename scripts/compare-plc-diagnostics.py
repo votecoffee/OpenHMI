@@ -28,6 +28,8 @@ def compare(before, after, identifier):
     start, finish = connection(before), connection(after)
     if start['connection_instance'] != finish['connection_instance'] or start['path'] != finish['path']:
         raise ValueError('The connection was replaced between exports. Start a new measurement.')
+    if 'route_failures' in start and 'route_failures' in finish and start['route_failures'] != finish['route_failures']:
+        raise ValueError('The route reported a failure between exports. Start a new steady measurement.')
     if start['groups'] != finish['groups']:
         raise ValueError('Scan groups differ. Keep screen demand and configuration fixed for the measurement.')
 

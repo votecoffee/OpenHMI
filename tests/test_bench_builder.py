@@ -1,5 +1,6 @@
 from contextlib import ExitStack
 from pathlib import Path
+import runpy
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
@@ -81,6 +82,27 @@ class BenchBuilderTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'read-only'):
                 driver.write('BenchRun', [False])
             self.assertEqual(plc.writes, [])
+            before = client.get('/api/diagnostics.json').json()
+            connection = before['connections'][0]
+            self.assertEqual(connection['timings']['scan']['count'], 2)
+            self.assertIn('p99_ms', connection['timings']['scan_lateness'])
+            self.assertEqual(connection['route_failures'], 0)
+            self.assertNotIn('value', before['tags'][0])
+
+            plc.fail = True
+            driver.poll(3)
+            driver.poll(4)
+            after = client.get('/api/diagnostics.json').json()
+            self.assertEqual(after['connections'][0]['state'], 'connected')
+            self.assertEqual(after['connections'][0]['timings']['recovery']['last_ms'], 1000)
+            compare = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts' / 'compare-plc-diagnostics.py'))['compare']
+            with self.assertRaisesRegex(ValueError, 'failure between exports'):
+                compare(before, after, 'bench')
+
+            # Earlier exports still support a counter comparison.
+            for export in (before, after):
+                del export['connections'][0]['route_failures']
+            self.assertGreater(compare(before, after, 'bench')['counters']['pycomm3_read_calls']['delta'], 0)
 
     def test_rejects_unapproved_options_and_refuses_existing_output(self):
         for field, value in [('writable', True), ('address', 'TestArray[1]{10}'),

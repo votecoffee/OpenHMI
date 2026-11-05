@@ -66,14 +66,15 @@ def add_operations_routes(app, journal, security, driver):
                          'type': definition['members'][member] if definition and member else definition['type'] if definition else type(sample.get('value')).__name__,
                          'quality': sample['quality'], 'timestamp': sample.get('timestamp'), 'age_seconds': sample.get('age_seconds', 0 if sample['quality'] == 'good' else None),
                          'error': sample.get('error')})
-        live = {connection['id']: connection for connection in driver.status()}
+        live = {connection['id']: connection for connection in driver.status(include_timing=True)}
         connections = []
         for config in (driver.project or {}).get('connections', []):
             status = live.get(config['id'], {})
             state = 'held' if driver.plc_hold and config['enabled'] else 'disabled' if not config['enabled'] else 'connected' if status.get('connected') else 'disconnected'
             connections.append({'id': config['id'], 'name': config['name'], 'path': config['path'], 'state': state,
                                 'connection_instance': status.get('connection_instance'),
-                                'error': status.get('error'), 'read_calls': status.get('read_calls', 0), 'tags_read': status.get('tags_read', 0), 'groups': status.get('groups', [])})
+                                'error': status.get('error'), 'read_calls': status.get('read_calls', 0), 'tags_read': status.get('tags_read', 0), 'groups': status.get('groups', []),
+                                'timings': status.get('timings', {}), 'route_failures': status.get('route_failures', 0)})
         return {'connections': connections, 'tags': tags, 'total_tags': len(names), 'offset': offset,
                 'next_offset': offset + limit if offset + limit < len(names) else None, 'truncated': offset + limit < len(names),
                 'plc_hold': driver.plc_hold, 'counter_scope': 'pycomm3 read calls and requested addresses; not wire-packet measurements', 'scan_timing': 'best effort'}

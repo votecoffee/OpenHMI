@@ -99,6 +99,21 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await page.getByRole('link', { name: 'Export diagnostics JSON', exact: true }).click();
   expect((await jsonDownload).suggestedFilename()).toBe('runtime-diagnostics.json');
   if (process.env.OPENHMI_DIAGNOSTICS_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_DIAGNOSTICS_SCREENSHOT, fullPage: true });
+  await page.route('**/api/diagnostics?*', async route => {
+    const response = await route.fetch();
+    const data = await response.json();
+    data.connections = [{
+      id: 'bench', name: 'Bench PLC', path: 'offline-only/0', state: 'connected',
+      read_calls: 8, tags_read: 12, groups: [], route_failures: 1,
+      timings: { recovery: { last_ms: 1375, p50_ms: 1375, p95_ms: 1375, p99_ms: 1375, count: 1 } },
+    }];
+    await route.fulfill({ response, json: data });
+  });
+  const bench = page.getByRole('row').filter({ hasText: 'Bench PLC' });
+  await bench.getByText('Timing (ms)', { exact: true }).click();
+  await expect(bench.getByText('Loss to first good read', { exact: true })).toBeVisible();
+  await expect(bench).toContainText('p95 1375');
+  await expect(bench).toContainText('Route failures: 1');
   expect(errors).toEqual([]);
   if ((await (await page.request.get('/api/tags')).json()).values.MotorRunning !== originalMotor) {
     expect((await page.request.post('/api/controls/toggle/activate', { data: {} })).ok()).toBe(true);

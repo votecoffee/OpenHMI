@@ -32,9 +32,10 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
    isolation and rejects results from a superseded configuration. Verify this
    behavior on the bench and keep tag-level errors distinct from route failures.
 2. **Measure before tuning.** The current schedule includes scan duration and
-   the polling loop delay. Record requested interval, p50/p95/p99 scan lateness
-   and acquisition age, controller load, errors, cold connection and reconnect
-   duration. Test mixed-rate screens, overlapping aliases, alarm/history demand,
+   the polling loop delay. Diagnostics now reports rolling p50/p95/p99 for
+   scan duration and start lateness, successful opens and loss to first good
+   data. Record these along with requested rates, representative tag ages,
+   controller load and errors on the bench. Test mixed-rate screens, overlapping aliases, alarm/history demand,
    multiple routes, and a slow or disconnected route. Label calls and requested
    addresses separately from packet counts measured by a capture or controller
    diagnostics. Agree load and latency bounds for the intended project profile.

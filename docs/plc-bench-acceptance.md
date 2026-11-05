@@ -67,7 +67,7 @@ the approved subset at its configured interval.
 | Check | Evidence to retain |
 | --- | --- |
 | Binding and quality | Logical tag, controller address, expected/observed type and value, quality and source time. Record unsupported types or address shapes explicitly. |
-| Stable scan and grouping | Capture Diagnostics before and after a stable interval. Record the requested screen rates, actual effective groups, pycomm3 call/requested-address deltas and representative tag timestamp changes. Repeat with the approved overlapping screen demand to check shared-tag grouping. |
+| Stable scan and grouping | Capture Diagnostics before and after a stable interval. Record the requested screen rates, actual effective groups, pycomm3 call/requested-address deltas, recent scan duration/lateness and representative tag timestamp changes. Repeat with the approved overlapping screen demand to check shared-tag grouping. |
 | Controller load | Record independent controller-side load and communication measurements before OpenHMI, then during the agreed demand. Compare with the owner's limits. Stop acquisition if a limit is exceeded. |
 | Communication loss and recovery | With the approved disconnect method, retain before/loss/recovery Diagnostics. Record quality transitions, elapsed recovery time, resumed scan groups and whether readings matched the engineering reference after recovery. |
 | Decision | Record date, operator/owner, environment, measured limits, evidence filenames, and pass, fail or deferred for each check. Keep failures and their retest results. |
@@ -83,11 +83,24 @@ python scripts/compare-plc-diagnostics.py before.json after.json --connection be
 
 The comparison requires the same runtime session, connection instance and scan
 groups at both endpoints. It reports average pycomm3 read calls and requested
-addresses per second over the observed interval. It cannot establish intervening
-demand or network state, controller load, wire-packet counts or per-tag sample
-cadence from two snapshots. Record those separately as required by the matrix.
-For the disconnect test, keep the individual snapshots and times instead of a
-steady-interval comparison.
+addresses per second over the observed interval. Current exports also reject
+an interval where the driver detected a route failure. Record controller load,
+wire-packet counts and per-tag sample cadence separately.
+
+Keep the individual snapshots for the disconnect test. Each route's rolling
+timing summaries include up to 256 observations per metric and show the last
+value, sample count and nearest-rank p50/p95/p99. These windows can include
+observations from before the capture interval.
+
+* **Read cycle** measures a scheduled batch from when it can access the route
+  until its read returns or fails. It includes connection setup if needed.
+* **Scan start lateness** measures how late the batch started relative to the
+  earliest existing deadline among its due addresses. First reads with no
+  prior deadline do not contribute.
+* **Initial connection** and **Reconnect** report successful open and tag
+  metadata setup time. **Loss to first good read** measures from the first
+  detected route failure to the acquisition time of the first good sample
+  published after recovery. Keep demand active for a comparable result.
 
 ## Release to controlled write tests
 
