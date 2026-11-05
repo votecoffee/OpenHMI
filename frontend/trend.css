@@ -1,0 +1,19 @@
+.hmi-trend { width: 100%; }
+.hmi-trend a { color: #002878; font-size: 12px; }
+.trend-tools { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; font-size: 12px; }
+.trend-tools label, .trend-fields label { display: flex; flex-direction: column; gap: 4px; }
+.trend-tools :is(input,select,button) { font: inherit; border: 1px solid #888; padding: 6px; background: #eee; color: #333; }
+.trend-plot { width: 100%; min-width: 0; }
+.trend-plot-row { display: grid; grid-template-columns: minmax(0, 22%) minmax(0, 1fr); align-items: center; gap: 6px; font-size: 12px; }
+.trend-plot-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trend-plot-row svg { display: block; width: 100%; height: 160px; border: 1px solid #888; background: #eee; }
+.trend-lane svg { height: 28px; border-top: 0; }
+.trend-grid { fill: none; stroke: #b6b6b6; vector-effect: non-scaling-stroke; }
+.trend-time { display: flex; justify-content: space-between; }
+.trend-legend { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+.trend-legend :is(td,th) { text-align: start; border-bottom: 1px solid #bbb; padding: 4px; overflow-wrap: anywhere; }
+.trend-legend svg { margin-inline-end: 5px; }
+.trend-fields { min-width: 0; }
+.trend-fields fieldset { margin-block: 8px; min-width: 0; overflow-wrap: anywhere; }
+.trend-fields :is(input,select) { width: 100%; }
+.trend-fields button { margin-top: 5px; }

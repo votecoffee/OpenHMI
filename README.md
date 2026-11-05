@@ -165,7 +165,10 @@ keeps its running copy; test recipes carry production status false. See the
    or registered Python actions. Boolean tag properties control visibility,
    enabled state and value color. Server checks also enforce conditional enablement.
 6. In **History**, choose tags, sampling, deadband and retention. Drop a **Trend**
-   onto a screen for live/history viewing, time-range/end-time selection and CSV export.
+   onto a screen and add up to 12 numeric or Boolean tags. Set each numeric tag's
+   decimal places and choose fixed or observed Y-axis bounds. Boolean tags appear
+   as separate step traces under the analog chart. The control shows current live
+   values alongside time-range/end-time selection and CSV export.
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

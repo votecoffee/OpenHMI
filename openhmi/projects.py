@@ -121,10 +121,32 @@ class FaceplateControl(ControlBase):
     root_tag: str = Field(min_length=1, max_length=200)
 
 
+class TrendSeries(StrictModel):
+    decimals: int = Field(default=1, ge=0, le=8)
+    minimum: float | None = Field(default=None, allow_inf_nan=False)
+    maximum: float | None = Field(default=None, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def ordered_scale(self):
+        if self.minimum is None and self.maximum is None:
+            return self
+        if (self.minimum is None or self.maximum is None or self.minimum >= self.maximum
+                or not math.isfinite(self.maximum - self.minimum)):
+            raise ValueError('Fixed trend scale requires a finite minimum less than maximum')
+        return self
+
+
 class TrendControl(ControlBase):
     kind: Literal['trend']
     tags: list[str] = Field(min_length=1, max_length=12)
     seconds: int = Field(default=300, ge=10, le=604800)
+    series: dict[str, TrendSeries] = Field(default_factory=dict, max_length=12)
+
+    @model_validator(mode='after')
+    def known_series(self):
+        if self.series.keys() - set(self.tags):
+            raise ValueError('Trend series settings require a selected tag')
+        return self
 
 
 class Language(StrictModel):

@@ -6,6 +6,7 @@ import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
 import { EditControl } from './edit-control.jsx';
+import { Trend, TrendFields } from './trend.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 export const ScreenControls = createContext([]);
@@ -190,29 +191,9 @@ function Conditional({ children, visible_tag, enabled_tag, color_tag, active_col
     <fieldset className="binding-contents" disabled={!!disabled}>{children}</fieldset></div>;
 }
 
-function Trend({ label, tags = ['TankLevel'], seconds = 300, puck }) {
-  const [history, setHistory] = useState(null);
-  const [error, setError] = useState('');
-  const [windowSeconds, setWindowSeconds] = useState(seconds);
-  const [endTime, setEndTime] = useState('');
-  useEffect(() => setWindowSeconds(seconds), [seconds]);
-  useEffect(() => {
-    let stopped = false, timer;
-    async function tick() { try { const result = await api(`/api/history?tags=${encodeURIComponent(tags.join(','))}&seconds=${windowSeconds}${endTime ? `&end=${Date.parse(endTime) / 1000}` : ''}`); if (!stopped) { setHistory(result); setError(''); } } catch (problem) { if (!stopped) setError(problem.message); } if (!stopped && !endTime) timer = setTimeout(tick, 1000); }
-    tick(); return () => { stopped = true; clearTimeout(timer); };
-  }, [tags.join(','), windowSeconds, endTime]);
-  const good = (history?.samples || []).filter(item => item.quality === 'good' && typeof item.value === 'number');
-  const values = good.map(item => item.value), minimum = Math.min(...values, 0), maximum = Math.max(...values, 1);
-  const colors = ['#002878', '#555', '#885500', '#225555'];
-  return <article className="hmi-control hmi-trend" data-control="trend"><span className="hmi-label">{label}</span>
-    {!puck?.isEditing && <div className="trend-tools"><label>Time range<select aria-label={`${label} time range`} value={windowSeconds} onChange={event => setWindowSeconds(Number(event.target.value))}>{[...new Set([seconds, 60, 300, 900, 3600, 86400])].sort((a,b) => a-b).map(value => <option key={value} value={value}>{value < 3600 ? `${value / 60} min` : `${value / 3600} h`}</option>)}</select></label>
-      <label>End time<input aria-label={`${label} history end`} type="datetime-local" value={endTime} onChange={event => setEndTime(event.target.value)} /></label><button onClick={() => setEndTime('')}>Live</button></div>}
-    {error ? <Quality text="BAD DATA" /> : <><svg role="img" aria-label={`${label} trend`} viewBox="0 0 500 170"><path d="M40 10V140H490" fill="none" stroke="#888" /><text x="2" y="18">{maximum.toFixed(1)}</text><text x="2" y="138">{minimum.toFixed(1)}</text>
-      {tags.map((tag, index) => { const segments = [[]]; for (const item of history?.samples.filter(row => row.tag === tag) || []) { if (item.quality !== 'good' || typeof item.value !== 'number') { segments.push([]); continue; } segments.at(-1).push(`${40 + 450 * (item.epoch - history.start) / windowSeconds},${140 - 125 * (item.value - minimum) / (maximum - minimum || 1)}`); } return segments.map((points, i) => <polyline key={`${tag}-${i}`} points={points.join(' ')} fill="none" stroke={colors[index % colors.length]} strokeWidth="1.5" />); })}
-      <text x="40" y="162">−{windowSeconds}s</text><text x="455" y="162">{endTime ? 'End' : 'Now'}</text></svg><div>{tags.map((tag, i) => <span key={tag} style={{ color: colors[i % colors.length], marginRight: 12 }}>{tag}</span>)}</div>
-      {!good.length && <p>No recorded numeric samples yet. Configure SQL history for these tags.</p>}{history?.truncated && <p>Result limited; shorten the time range.</p>}</>}
-    {!puck?.isEditing && <a href={`/api/history.csv?tags=${encodeURIComponent(tags.join(','))}&seconds=${windowSeconds}${endTime ? `&end=${Date.parse(endTime) / 1000}` : ''}`}>Export history CSV</a>}
-  </article>;
+function LiveTrend(props) {
+  const live = useContext(Live);
+  return <Trend {...props} live={live} />;
 }
 
 export function createConfig(catalog) {
@@ -236,7 +217,11 @@ export function createConfig(catalog) {
     },
     categories: { hmi: { title: 'High performance HMI', components: Object.values(controlTypes).filter(type => type !== 'Faceplate' || catalog.faceplates?.length) } },
     components: {
-      Trend: { label: 'Trend', fields: { label: labelField, seconds: { type: 'number', label: 'Time window (seconds)' }, tags: { type: 'custom', render: ({ value = [], onChange }) => <fieldset><legend>Trend tags</legend>{catalog.tags.filter(tag => tag.type === 'number').map(tag => <label key={tag.name} style={{ display: 'block' }}><input type="checkbox" checked={value.includes(tag.name)} onChange={event => onChange(event.target.checked ? [...value, tag.name] : value.filter(item => item !== tag.name))} />{tag.name}</label>)}</fieldset> } }, defaultProps: { label: 'Process trend', tags: ['TankLevel'], seconds: 300 }, render: Trend },
+      Trend: { label: 'Trend', fields: {
+        label: labelField, seconds: { type: 'number', label: 'Time window (seconds)', min: 10, max: 604800 },
+        pens: { type: 'custom', render: ({ value, onChange }) => <TrendFields value={value} onChange={onChange} catalog={catalog} /> },
+      }, defaultProps: { label: 'Process trend', pens: { tags: ['TankLevel'], series: {} }, seconds: 300 },
+      render: props => <LiveTrend {...props} catalog={catalog} /> },
       Faceplate: { label: 'UDT faceplate', fields: { label: labelField, template: { type: 'select', label: 'Definition', options: (catalog.faceplates || []).map(item => ({ label: item.name, value: item.id })) }, root_tag: tagField('struct') },
         defaultProps: { label: 'Equipment', template: catalog.faceplates?.[0]?.id || '', root_tag: catalog.tags.find(tag => tag.type === 'struct')?.name || '' },
         render: props => <FaceplateInstance {...props} config={config} /> },
@@ -290,7 +275,7 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config }) {
   return <article className="hmi-faceplate" data-control="faceplate"><strong>{text(`control.${id}.label`, label)}</strong><div className="faceplate-grid">{definition.controls.map(control => {
     const resolved = { ...control, id: `${id}__${control.id}`, puck };
     for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag']) if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
-    if (resolved.tags) resolved.tags = resolved.tags.map(tag => tag.startsWith('$.') ? root_tag + tag.slice(1) : tag);
+    if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
     return <React.Fragment key={control.id}>{config.components[controlTypes[control.kind]].render(resolved)}</React.Fragment>;
   })}</div></article>;
 }

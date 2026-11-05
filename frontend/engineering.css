@@ -10,11 +10,6 @@
 .engineering pre { white-space: pre-wrap; }
 .binding-contents { border: 0; padding: 0; margin: 0; min-width: 0; }
 .binding-frame { min-width: 0; }
-.hmi-trend svg { width: 100%; min-height: 140px; font: 10px sans-serif; }
-.hmi-trend a { color: #002878; font-size: 12px; }
-.trend-tools { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; margin: 8px 0; }
-.trend-tools label { display: flex; flex-direction: column; gap: 4px; }
-.trend-tools :is(input,select,button) { font: inherit; border: 1px solid #888; padding: 5px; background: #eee; color: #333; }
 .hmi-faceplate { border: 1px solid #999; padding: 10px; background: #d4d4d4; }
 .faceplate-grid { display: grid; gap: 8px; margin-top: 8px; }
 .screen-navigation { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }

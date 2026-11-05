@@ -22,7 +22,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
   try {
     const project = structuredClone(original.active);
     project.tags = [{ name: 'UnitA', type: 'struct', initial: { Speed: 12.5 }, members: { Speed: 'number' }, udt_type: 'GenericUnit', writable: true }];
-    project.historian = { tags: [{ tag: 'UnitA.Speed', sample_ms: 100, deadband: 0 }], retention_days: 30, max_rows: 1000 };
+    project.historian = { tags: [{ tag: 'UnitA.Speed', sample_ms: 100, deadband: 0 }, { tag: 'MotorRunning', sample_ms: 100, deadband: 0 }], retention_days: 30, max_rows: 1000 };
     await saveProject(project);
     await page.goto('/');
     await page.getByRole('button', { name: 'Connections', exact: true }).click();
@@ -72,7 +72,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const latest = (await (await page.request.get('/api/project')).json()).active;
     expect(latest.screens[0].update_ms).toBe(200);
-    latest.screens.push({ id: 'details', title: 'Details', popup: true, update_ms: 1000, columns: 1, controls: [{ id: 'trend', kind: 'trend', label: 'Speed history', tags: ['UnitA.Speed', 'PLCLevel'], seconds: 60 }] });
+    latest.screens.push({ id: 'details', title: 'Details', popup: true, update_ms: 1000, columns: 1, controls: [{ id: 'trend', kind: 'trend', label: 'Speed history', tags: ['UnitA.Speed', 'PLCLevel', 'MotorRunning'], seconds: 60 }] });
     latest.screens[0].controls.push({ id: 'detailsButton', kind: 'button', label: 'Open details', mode: 'popup', screen: 'details' });
     await saveProject(latest);
     const viewer = await context.newPage();
@@ -83,6 +83,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await viewer.getByRole('button', { name: 'Open details', exact: true }).click();
     await expect(viewer.getByRole('dialog', { name: 'Details', exact: true })).toBeVisible();
     await expect(viewer.locator('[data-control="trend"] svg polyline').first()).toHaveAttribute('points', /[0-9]/);
+    await expect(viewer.locator('[data-trend-lane="MotorRunning"] polyline')).toHaveAttribute('points', /[0-9]/);
     expect((await (await page.request.get('/api/tags')).json()).values.PLCLevel).toBe(65);
     if (process.env.OPENHMI_ENGINEERING_RUNTIME) await viewer.screenshot({ path: process.env.OPENHMI_ENGINEERING_RUNTIME, fullPage: true });
     await viewer.getByRole('button', { name: 'Close popup', exact: true }).click();

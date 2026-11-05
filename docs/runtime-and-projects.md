@@ -75,12 +75,23 @@ the project SQLite database. Configure sampling, numeric deadband, retention day
 and a maximum row count. Quality changes are always retained; unchanged deadband
 values receive at least a one-minute heartbeat. The query API bounds result size
 and reports truncation. CSV export includes quality and timestamps.
-Trend controls plot recorded numeric values and break lines at bad-quality points.
-Operators can choose a time range/end time or return to live viewing. Sampling
-and deadband are configured through **History**. Acquisition timestamps are from
-Python's reception of values, not a synchronized PLC source clock. Queries retain
-the newest bounded results and report truncation; they do not perform min/max
-aggregate downsampling. Export is limited to 20,000 records per requested tag.
+A **Trend** shares one time axis across up to 12 tags. Each numeric tag has an
+independent scale, shown in the legend. **Observed min/max** uses the returned
+good samples for that tag in the selected window and centers a constant value.
+**Fixed** uses the configured bounds and clips the trace at the chart edges.
+Choose 0 to 8 decimal places per numeric live readout. Existing trend controls
+default to observed ranges and one decimal place.
+
+Boolean tags have individual 0/1 step lanes below the analog plot. Transitions
+appear at recorded sample times, so pulses between acquisitions can be missed.
+Bad-quality records break both analog and Boolean traces. The legend's current
+values continue updating from the runtime even when the plot shows a historical
+window. Each plotted tag needs a **History** entry for persistent traces.
+
+Operators can choose a time range/end time or return to live viewing. Acquisition
+timestamps reflect when Python receives the values. Queries retain the newest
+bounded results and report truncation. Observed ranges use those returned points.
+Export is limited to 20,000 records per requested tag.
 
 ## Project library and complete backups
 

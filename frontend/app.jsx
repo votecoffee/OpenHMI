@@ -167,7 +167,7 @@ function Builder({ initial, catalog }) {
     } finally { setBusy(false); }
   }
 
-  return <Localization project={previewProject}><Live.Provider value={{ ...live, values: previewValues, project: previewProject }}><ScreenControls.Provider value={previewControls}>
+  return <Localization project={previewProject}><Live.Provider value={{ ...live, values: previewValues, previewRoot: template ? previewRoot : '', project: previewProject }}><ScreenControls.Provider value={previewControls}>
     <div className="builder-guide"><p>Drop a control, select a tag, and apply your screen. No code required.</p>
       <div><button disabled={!canEdit} onClick={() => { clearTimeout(timer.current); save(latest.current); }}>Save draft</button>
         <button className="apply-button" onClick={apply} disabled={busy || !canEdit}>{busy ? 'Applying...' : 'Apply live'}</button>
