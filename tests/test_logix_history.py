@@ -238,6 +238,29 @@ class LogixHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(HistoryChanged, 'Retention removed'):
             list(batches)
 
+    def test_recorded_tags_use_literal_prefix_pagination_and_latest_record(self):
+        app = create_app()
+        self.addCleanup(app.state.store.close)
+        client = TestClient(app)
+        with app.state.store.transaction() as db:
+            db.executemany("INSERT INTO tag_history(tag,timestamp,value,quality) VALUES(?,?,'42','good')",
+                           [('Machine.Old', 10), ('Machine.Old', 20), ('Machine.Other', 30),
+                            ('MachineX', 40), ('machine.Old', 50)])
+        params = {'prefix': 'Machine.', 'limit': 1, 'project_instance': app.state.project_instance}
+        response = client.get('/api/history/tags', params=params)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            'items': [{'tag': 'Machine.Old', 'latest': '1970-01-01T00:00:20+00:00'}],
+            'next_after': 'Machine.Old',
+        })
+        second = client.get('/api/history/tags', params={**params, 'after': response.json()['next_after']})
+        self.assertEqual(second.json(), {
+            'items': [{'tag': 'Machine.Other', 'latest': '1970-01-01T00:00:30+00:00'}],
+            'next_after': None,
+        })
+        self.assertEqual(client.get('/api/history/tags', params={**params, 'after': 'Different'}).status_code, 422)
+        self.assertEqual(client.get('/api/history/tags', params={**params, 'project_instance': 'old'}).status_code, 409)
+
     def test_on_change_logs_transitions_deadband_and_heartbeat(self):
         store = ProjectStore()
         self.addCleanup(store.close)

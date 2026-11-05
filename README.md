@@ -197,7 +197,8 @@ keeps its running copy; test recipes carry production status false. See the
    mode** to **On change** for steady tags. Use **Export
    recorded data** to download a CSV for selected tags using a preset or exact
    start and end times in local time or UTC. Select **Export all retained rows
-   in this range** for a complete download. Drop a **Trend**
+   in this range** for a complete download. Use **Find recorded tags** to
+   include tags removed from the logging configuration. Drop a **Trend**
    onto a screen and add up to 12 numeric or Boolean tags. Set each numeric tag's
    decimal places and choose fixed or observed Y-axis bounds. Boolean tags appear
    as separate step traces under the analog chart. **On change** tags hold their

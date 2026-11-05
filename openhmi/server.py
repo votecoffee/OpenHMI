@@ -549,6 +549,19 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     def history(tags: str, seconds: int = Query(default=300, ge=1, le=31536000), limit: int = Query(default=2000, ge=1, le=20000), end: float | None = None, trend_context: bool = False):
         return historian.query(*history_window(tags, seconds, end), limit, trend_context)
 
+    def require_history_project(project_instance):
+        if project_instance is not None and project_instance != instance:
+            raise HTTPException(409, 'A different project was opened. Reload before exporting history.')
+
+    @app.get('/api/history/tags')
+    def history_tags(prefix: str = Query(default='', max_length=200), after: str | None = Query(default=None, max_length=200),
+                     limit: int = Query(default=50, ge=1, le=100),
+                     project_instance: str | None = Query(default=None, max_length=32)):
+        require_history_project(project_instance)
+        if after is not None and not after.startswith(prefix):
+            raise HTTPException(422, 'History tag cursor must match the search prefix')
+        return historian.recorded_tags(prefix, after, limit)
+
     @app.get('/api/history.csv')
     def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
                     end: float | None = None, start: float | None = None):
@@ -566,8 +579,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     def history_full_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
                          end: float | None = None, start: float | None = None,
                          project_instance: str | None = Query(default=None, max_length=32)):
-        if project_instance is not None and project_instance != instance:
-            raise HTTPException(409, 'A different project was opened. Reload before exporting history.')
+        require_history_project(project_instance)
         return complete_history_csv(historian, *history_window(tags, seconds, end, start))
 
     @app.get("/", include_in_schema=False)

@@ -107,6 +107,23 @@ class Historian:
             data['change_context'] = context
         return data
 
+    def recorded_tags(self, prefix, after, limit):
+        tags = []
+        cursor = after if after is not None else prefix
+        with self.store._lock:
+            for index in range(limit + 1):
+                # Seek past the previous tag instead of scanning its history rows.
+                comparison = '>=' if index == 0 and after is None else '>'
+                row = self.store._db.execute(
+                    f'SELECT tag FROM tag_history WHERE tag {comparison} ? ORDER BY tag LIMIT 1', (cursor,)
+                ).fetchone()
+                if not row or not row[0].startswith(prefix):
+                    break
+                cursor = row[0]
+                stamp = self.store._db.execute('SELECT MAX(timestamp) FROM tag_history WHERE tag=?', (cursor,)).fetchone()[0]
+                tags.append({'tag': cursor, 'latest': datetime.fromtimestamp(stamp, timezone.utc).isoformat()})
+        return {'items': tags[:limit], 'next_after': tags[limit - 1]['tag'] if len(tags) > limit else None}
+
     def export_batches(self, tags, start, end, batch_size=1024):
         # History is append-only apart from pruning. A high-water ID excludes
         # new inserts. A count check detects rows pruned before they were copied.

@@ -56,14 +56,36 @@ function HistoryExport({ tags, projectInstance }) {
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const names = tags.map(item => item.tag).filter(tag => selected.includes(tag));
+  const [prefix, setPrefix] = useState('');
+  const [recorded, setRecorded] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const configured = new Set(tags.map(item => item.tag));
+  const latest = new Map(recorded?.items.map(item => [item.tag, item.latest]) ?? []);
+  const choices = [...new Set([...configured, ...latest.keys(), ...selected])];
+
+  async function findRecorded(after = null) {
+    setSearching(true);
+    setSearchError('');
+    const search = prefix.trim();
+    try {
+      const query = new URLSearchParams({ prefix: search, project_instance: projectInstance });
+      if (after !== null) query.set('after', after);
+      const data = await api('/api/history/tags?' + query);
+      setRecorded({ ...data, prefix: search });
+    } catch (error) {
+      setSearchError(error.message);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   async function exportHistory(event) {
     event.preventDefault();
     setBusy(true);
     setMessage('');
     try {
-      const query = new URLSearchParams({ tags: names.join(',') });
+      const query = new URLSearchParams({ tags: selected.join(',') });
       const finish = end ? exportEpoch(end, zone, 'end') : null;
       if (finish !== null) query.set('end', String(finish));
       if (range === 'custom') {
@@ -109,11 +131,27 @@ function HistoryExport({ tags, projectInstance }) {
   return <form onSubmit={exportHistory}>
     <fieldset disabled={busy}><legend>Export recorded data</legend>
       <p>Choose up to 12 tags. The CSV includes values, quality, and timestamps from the project database.</p>
-      {!tags.length && <p>Add history tags and apply the draft to begin recording.</p>}
-      {tags.map(({ tag }) => <label key={tag}><input type="checkbox" checked={names.includes(tag)}
-        disabled={names.length >= 12 && !names.includes(tag)}
-        onChange={event => setSelected(event.target.checked ? [...names, tag] : names.filter(name => name !== tag))} />
-        Include {tag}</label>)}
+      {!tags.length && <p>Add history tags and apply the draft to begin recording new samples.</p>}
+      <div>
+        <label>Recorded tag prefix<input value={prefix} maxLength={200} onChange={event => setPrefix(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (!searching) findRecorded();
+            }
+          }} /></label>
+        <button type="button" disabled={searching} onClick={() => findRecorded()}>Find recorded tags</button>
+        {recorded?.next_after != null && recorded.prefix === prefix.trim() &&
+          <button type="button" disabled={searching} onClick={() => findRecorded(recorded.next_after)}>Next recorded tags</button>}
+        {(searching || searchError || recorded) && <p role="status" aria-label="Recorded tag search status">
+          {searching ? 'Searching…' : searchError || (recorded.items.length
+            ? `${recorded.items.length} recorded tags on this page.` : 'No recorded tags found.')}
+        </p>}
+      </div>
+      {choices.map(tag => <label key={tag} title={latest.has(tag) ? `Latest record: ${new Date(latest.get(tag)).toLocaleString()}` : undefined}>
+        <input type="checkbox" checked={selected.includes(tag)} disabled={selected.length >= 12 && !selected.includes(tag)}
+          onChange={event => setSelected(event.target.checked ? [...selected, tag] : selected.filter(name => name !== tag))} />
+        Include {tag}{!configured.has(tag) && <small> · Not in draft</small>}</label>)}
       <div>
         <label>Export time range<select value={range} onChange={event => setRange(event.target.value)}>
           <option value="60">1 minute</option><option value="3600">1 hour</option>
@@ -131,8 +169,8 @@ function HistoryExport({ tags, projectInstance }) {
       <p>Leave the end time blank to export through now.</p>
       <label><input type="checkbox" checked={complete} onChange={event => setComplete(event.target.checked)} />
         Export all retained rows in this range</label>
-      <button type="submit" disabled={!names.length}>{busy ? 'Exporting…' : 'Download history CSV'}</button>
-      <p role="status">{message}</p>
+      <button type="submit" disabled={!selected.length}>{busy ? 'Exporting…' : 'Download history CSV'}</button>
+      <p role="status" aria-label="History export status">{message}</p>
     </fieldset>
   </form>;
 }

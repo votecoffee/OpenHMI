@@ -66,6 +66,17 @@ test('History panel exports recorded tags without a trend control', async ({ pag
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const state = await (await page.request.get('/api/project')).json();
     expect(state.active.historian.tags.find(item => item.tag === 'MotorRunning').mode).toBe('change');
+    await page.getByRole('button', { name: 'Remove TankLevel', exact: true }).click();
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    await page.reload();
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await expect(panel.getByRole('checkbox', { name: /^Include TankLevel/ })).toHaveCount(0);
+    await panel.getByLabel('Recorded tag prefix', { exact: true }).fill('Tank');
+    await panel.getByRole('button', { name: 'Find recorded tags', exact: true }).click();
+    await panel.getByRole('checkbox', { name: 'Include TankLevel · Not in draft', exact: true }).check();
+    const [retiredFile] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), button.click()]);
+    expect(await readFile(await retiredFile.path(), 'utf8')).toContain('TankLevel,');
   } finally {
     await save(original.active, true);
     await save(original.draft, false);
