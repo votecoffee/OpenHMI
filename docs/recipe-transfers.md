@@ -125,6 +125,11 @@ status read fails. Further transfers wait for a successful status refresh and
 the target's normal unresolved-transfer checks.
 Operators with runtime operation permission can open the exact command
 transaction from the receipt or a transfer history row.
+Use **Download recipe transfer JSON** under **Transfer details** to save the
+captured recipe, mapped values, hashes and recorded command events. The export
+includes the project ID and export time. It reads stored evidence and includes
+recipe parameters and an image reference, so keep it with private commissioning
+records.
 
 Local/Windows HMI users need recipe operator/engineer authority and runtime
 operation permission, plus configured command groups. Legacy recipe accounts

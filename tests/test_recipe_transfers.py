@@ -164,6 +164,21 @@ class RecipeTransferTests(unittest.TestCase):
         running = deepcopy(self.values(app)['Running'])
         self.assertTrue(running['RecipeProductionApproved'])
         self.assertTrue(app.state.recipe_transfers.get(first['id'])['snapshot']['production_approved'])
+        endpoint = f"/api/recipe-transfers/{first['id']}"
+        anonymous = TestClient(app)
+        self.addCleanup(anonymous.close)
+        self.assertEqual(anonymous.get(endpoint, params={'download': True}).status_code, 401)
+        with patch.object(app.state.driver, 'read_command_root') as read:
+            export = client.get(endpoint, params={'download': True})
+            read.assert_not_called()
+        self.assertEqual(export.status_code, 200, export.text)
+        self.assertEqual(export.headers['Content-Disposition'], f'attachment; filename="openhmi-recipe-transfer-{first["id"]}.json"')
+        evidence = export.json()
+        self.assertEqual((evidence['format'], evidence['version']), ('openhmi.recipe-transfer', 1))
+        self.assertEqual(evidence['project_id'], client.get('/api/project').json()['project_id'])
+        self.assertEqual(evidence['transfer'], client.get(endpoint).json())
+        self.assertTrue(evidence['transfer']['envelope']['values']['RecipeProductionApproved'])
+        self.assertEqual(evidence['transfer']['transaction']['state'], 'completed')
         second = self.dispatch(client, withdrawn)['transfer']
         self.assertFalse(second['snapshot']['production_approved'])
         self.assertNotEqual(first['transfer_hash'], second['transfer_hash'])

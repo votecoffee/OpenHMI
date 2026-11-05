@@ -187,7 +187,8 @@ Use **PLC recipes** for dedicated recipe transfer profiles and complete paramete
 mapping, then **Transfer revision to PLC** in the recipe viewer/editor. Reselect
 the transfer target after a live project revision change. The panel keeps the
 transaction ID visible if the status refresh fails. Operators with runtime
-operation permission can open that transaction directly. The PLC
+operation permission can open that transaction directly. Use **Transfer details**
+to download the captured recipe transfer and command evidence as JSON. The PLC
 keeps its running copy; test recipes carry production status false. See the
 [recipe transfer contract and workflow](docs/recipe-transfers.md).
 

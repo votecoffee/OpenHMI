@@ -73,7 +73,9 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
         {canInspectCommand ? <a href={`/commands?transaction=${item.id}`}>Transfer #{item.id}</a> : `Transfer #${item.id}`} · sequence {item.transaction.sequence}</td>
       <td>{item.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}<br />{item.snapshot.approved_by && `Approved by ${item.snapshot.approved_by}`}</td>
       <td>{item.transaction.state}{item.transaction.result_code !== null ? ` · result ${item.transaction.result_code}` : ''}</td>
-      <td><details><summary>Transfer details</summary><p>Requested by {item.snapshot.transferred_by}: {item.snapshot.transfer_reason}</p><p>{item.transaction.error}</p>{item.transaction.events.map((event, i) => <p key={i}>{event.state}: {event.detail}</p>)}<p>Content hash: {item.snapshot.content_hash}</p><p>Transfer hash: {item.transfer_hash}</p><a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
+      <td><details><summary>Transfer details</summary><p>Requested by {item.snapshot.transferred_by}: {item.snapshot.transfer_reason}</p><p>{item.transaction.error}</p>{item.transaction.events.map((event, i) => <p key={i}>{event.state}: {event.detail}</p>)}<p>Content hash: {item.snapshot.content_hash}</p><p>Transfer hash: {item.transfer_hash}</p>
+        <p><a href={`/api/recipe-transfers/${item.id}?download=true`}>Download recipe transfer JSON</a></p>
+        <a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
     </tr>)}</tbody></table>
     <button onClick={() => setBefore(null)}>Newest transfers</button> <button disabled={!data.has_more} onClick={() => setBefore(data.next_before_id)}>Older transfers</button>
   </section>;

@@ -1,8 +1,10 @@
 """Recipe HTTP adapter. Identity and policy checks stay on the server."""
 
 from fastapi import HTTPException, Request, Response, Query, Path
+from fastapi.responses import JSONResponse
 from types import SimpleNamespace
 from pydantic import Field
+from .alarms import utc_now
 from .projects import StrictModel
 from .recipe_auth import RecipeAuth
 from .recipe_models import ChangeReason, RecipeCreate, RecipeSave, RecipeTransition, RecipeSelect, RecipeTransfer, PolicyChange, SimulationPermit
@@ -103,11 +105,21 @@ def add_recipe_routes(app, store, application, users=None, security=None, comman
         return transfers.recent(limit, before_id)
 
     @app.get('/api/recipe-transfers/{identifier}')
-    def transfer_record(request: Request, identifier: int = Path(ge=1, le=9223372036854775807)):
+    def transfer_record(request: Request, identifier: int = Path(ge=1, le=9223372036854775807), download: bool = False):
         current = user(request)
         if not current.roles:
             raise HTTPException(403, 'Recipe permission is required')
-        return transfers.get(identifier)
+        record = transfers.get(identifier)
+        if not download:
+            return record
+        return JSONResponse({
+            'format': 'openhmi.recipe-transfer',
+            'version': 1,
+            'project_id': store.snapshot()['project_id'],
+            'exported_at': utc_now(),
+            'transfer': record,
+        }, headers={'Content-Disposition': f'attachment; filename="openhmi-recipe-transfer-{identifier}.json"',
+                    'Cache-Control': 'no-store'})
 
     @app.post('/api/recipe-transfers/{profile_id}/dispatch')
     def transfer(profile_id: str, body: RecipeTransfer, request: Request):

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 
 test.use({ actionTimeout: 15000 });
 test('recipe transfer designer mapping, approved/test PLC copies, image and history', async ({ page }) => {
@@ -139,6 +140,13 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.Running.RecipeProductionApproved']).toBe(false);
   await viewer.locator('tbody tr').first().getByText('Transfer details', { exact: true }).click();
   await expect(viewer.locator('tbody tr').first()).toContainText('production BOOL verified');
+  const [download] = await Promise.all([page.waitForEvent('download'),
+    viewer.getByRole('link', { name: 'Download recipe transfer JSON', exact: true }).click()]);
+  const evidence = JSON.parse(await readFile(await download.path(), 'utf8'));
+  expect(download.suggestedFilename()).toBe(`openhmi-recipe-transfer-${evidence.transfer.id}.json`);
+  expect(evidence.transfer.snapshot).toMatchObject({ code: 'TRANSFER-DEMO', production_approved: false });
+  expect(evidence.transfer.envelope.values.RecipeProductionApproved).toBe(false);
+  expect(evidence.transfer.transaction).toMatchObject({ command_id: 'recipe_cycle', state: 'completed' });
   if (process.env.OPENHMI_RECIPE_TRANSFER_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_RECIPE_TRANSFER_SCREENSHOT, fullPage: true });
   expect(errors).toEqual([]);
   await apply(original);
