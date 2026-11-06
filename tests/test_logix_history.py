@@ -339,6 +339,48 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.leases['viewer-0'][2], 'MotorA')
         self.assertEqual(driver.demands(4)['MotorA'], 500)
 
+    def test_scan_preserves_each_batch_receipt_time_and_invalidates_partial_failure(self):
+        clock = 100
+        fail_last = False
+
+        class BatchedPLC(FakePLC):
+            def read(self, *addresses):
+                nonlocal clock
+                self.reads.append(addresses)
+                clock += 1 if len(addresses) == 200 else 5
+                if fail_last and len(addresses) == 1:
+                    raise TimeoutError('Synthetic second batch timeout')
+                return [SimpleNamespace(value=30.0, error=None) for _ in addresses]
+
+        project = logix_project()
+        names = [f'BatchLevel{index}' for index in range(201)]
+        project['tags'] = [{**project['tags'][1], 'name': name, 'address': name} for name in names]
+        project['screens'] = []
+        driver = RuntimeDriver(BatchedPLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.trend_demands = dict.fromkeys(names, 1000)
+        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock)), patch(
+            'openhmi.logix.utc_now', side_effect=lambda: f'2026-01-01T00:00:{clock - 100:02}+00:00',
+        ):
+            driver.poll()
+            samples = driver.sample_snapshot()
+            early, late = samples[names[0]], samples[names[-1]]
+            self.assertEqual(early['quality'], 'stale')
+            self.assertEqual(early['age_seconds'], 5)
+            self.assertEqual(early['timestamp'], '2026-01-01T00:00:01+00:00')
+            self.assertEqual(late['quality'], 'good')
+            self.assertEqual(late['age_seconds'], 0)
+            self.assertEqual(late['timestamp'], '2026-01-01T00:00:06+00:00')
+
+            clock += 1
+            fail_last = True
+            driver.poll()
+            samples = driver.sample_snapshot()
+            self.assertEqual(samples[names[0]]['quality_reason'], 'disconnected')
+            self.assertEqual(samples[names[0]]['timestamp'], early['timestamp'])
+            self.assertEqual(samples[names[-1]]['quality_reason'], 'disconnected')
+
     def test_scan_isolates_a_malformed_slot_and_rejects_misaddressed_batches(self):
         driver = RuntimeDriver(FakePLC)
         self.addCleanup(driver.close)

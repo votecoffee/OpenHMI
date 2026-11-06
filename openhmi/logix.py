@@ -247,7 +247,7 @@ class LogixConnection:
         self.retry_at = now + min(30, 2 ** min(self.failures - 1, 5))
         self.close()
 
-    def read(self, addresses, now=None):
+    def read(self, addresses, now=None, *, with_receipts=False):
         real_clock = now is None
         with self.lock:
             now = time.monotonic() if real_clock else now
@@ -262,14 +262,18 @@ class LogixConnection:
                     try:
                         returned = self.client.read(*batch)
                     finally:
-                        self.timings.record('adapter_read', time.monotonic() - started)
+                        received = time.monotonic()
+                        self.timings.record('adapter_read', received - started)
+                    acquired = received if real_clock else now
+                    timestamp = utc_now() if with_receipts else None
                     returned = returned if isinstance(returned, list) else [returned]
                     if len(returned) != len(batch):
                         raise ConnectionError('PLC returned an incomplete tag batch')
                     for address, result in zip(batch, returned):
                         verify_result_address(address, result)
                         # A malformed slot still leaves the other batch positions intact.
-                        results.append(result if hasattr(result, 'error') and hasattr(result, 'value') else None)
+                        value = result if hasattr(result, 'error') and hasattr(result, 'value') else None
+                        results.append((value, acquired, timestamp) if with_receipts else value)
                     self.read_calls += 1
                     self.tags_read += len(batch)
                 self.error, self.failures = None, 0
@@ -512,24 +516,23 @@ class RuntimeDriver(SimulatorDriver):
             if deadline is not None:
                 connection.timings.record('scan_lateness', scan_start - deadline)
             try:
-                results = connection.read(due, now)
+                results = connection.read(due, now, with_receipts=True)
             except Exception:
                 # A route failure invalidates its entire cache in sample_snapshot.
                 return
             finally:
                 finished = time.monotonic()
                 connection.timings.record('scan', finished - started)
-            acquired = finished if now is None else now
-            timestamp = utc_now()
+            scan_finished = finished if now is None else now
             with self.lock:
                 if self._closing or self.project is not project:
                     return
-                for address, result in zip(due, results):
+                for address, (result, acquired, timestamp) in zip(due, results):
                     key = (identifier, address)
                     rate = self.last_rates.get(key)
                     if rate is None:
                         continue
-                    self.deadlines[key] = acquired + rate / 1000
+                    self.deadlines[key] = scan_finished + rate / 1000
                     for alias, tag, member in self.address_aliases[key]:
                         try:
                             if result is None or result.error:
@@ -547,7 +550,7 @@ class RuntimeDriver(SimulatorDriver):
                                     raise ValueError('Scaled PLC value is not finite')
                             sample = {'value': value, 'quality': 'good', 'error': None}
                             if connection.outage_started is not None:
-                                connection.timings.record('recovery', acquired - connection.outage_started)
+                                connection.timings.record('recovery', scan_finished - connection.outage_started)
                                 connection.outage_started = None
                         except (ValueError, KeyError, TypeError, IndexError) as failure:
                             sample = {'value': None, 'quality': 'bad', 'error': str(failure)}

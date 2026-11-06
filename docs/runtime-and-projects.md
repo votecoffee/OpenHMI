@@ -148,7 +148,8 @@ values continue updating from the runtime even when the plot shows a historical
 window. Each plotted tag needs a **History** entry for persistent traces.
 
 Operators can choose a time range/end time or return to live viewing. Acquisition
-timestamps reflect when Python receives the values. Queries retain the newest
+timestamps reflect when Python receives each PLC read batch. If a later batch
+fails, the scan does not publish a partial update. Queries retain the newest
 bounded results and report truncation. Observed ranges use those returned points.
 If a history request fails or returns malformed data, the trend marks the last
 received window with its end time. It keeps live tag readouts separate and
