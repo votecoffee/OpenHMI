@@ -46,7 +46,7 @@ function plcBinding(project, tag) {
   };
 }
 
-export function Quality({ problem, tag, text, sample: suppliedSample }) {
+export function Quality({ problem, tag, text, sample: suppliedSample, showAge }) {
   const live = useContext(Live);
   const { language } = useLocalization() || { language: { code: 'en' } };
   const ui = useUi();
@@ -59,15 +59,17 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   const timeText = sourceTime && Number.isFinite(sourceTime.getTime()) ? formatLocalDateTime(sourceTime, language.code) : '';
   const label = text ?? ui(problem);
   const title = [label, reason, ageText, timeText].filter(Boolean).join(' · ');
-  const badge = <><span aria-hidden="true">×</span> {label}
-    {problem === 'tagStale' && ageText && <small>{ageText}</small>}
+  const good = problem === 'tagGood';
+  const badgeClass = good ? 'hmi-quality hmi-quality-good' : 'hmi-quality';
+  const badge = <><span aria-hidden="true">{good ? '✓' : '×'}</span> {label}
+    {(showAge ?? (problem === 'tagStale')) && ageText && <small>{ageText}</small>}
   </>;
-  if (!tag) return <span className="hmi-quality" title={title}>{badge}</span>;
+  if (!tag) return <span className={badgeClass} title={title}>{badge}</span>;
   const source = opener ? plcBinding(live.project, tag) : null;
   const diagnosticQuery = source && live.diagnosticsPermitted
     ? new URLSearchParams({ search: tag.slice(0, 100), connection: source.id }) : null;
   return <>
-    <button type="button" className="hmi-quality hmi-quality-inspect" title={title}
+    <button type="button" className={badgeClass + ' hmi-quality-inspect'} title={title}
       aria-label={ui('tagInspectQuality', { tag, label })} aria-haspopup="dialog"
       onClick={event => setOpener(event.currentTarget)}>{badge}</button>
     {opener && <Popup title={ui('tagQualityDetails')} opener={opener} close={() => setOpener(null)}>

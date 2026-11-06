@@ -278,6 +278,7 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     controls: [
       { id: 'level', kind: 'numeric', label: 'Line level', tag: 'LineLevel', decimals: 1 },
       { id: 'running', kind: 'indicator', label: 'Line running', tag: 'LineRunning' },
+      { id: 'level_quality', kind: 'tag_quality', label: 'Level signal status', tag: 'LineLevel' },
     ],
   };
 
@@ -288,6 +289,8 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     const numeric = page.locator('[data-control="numeric"]').filter({ hasText: 'Line level' });
     const indicator = page.locator('[data-control="indicator"]');
     const badge = numeric.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true });
+    const status = page.locator('[data-control="tag_quality"]');
+    await expect(status.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true })).toBeVisible();
     await expect(indicator).toContainText('ON');
     await expect(header).toContainText('PLC routes connected (1/1)');
     await badge.click();
@@ -326,6 +329,13 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     project.tags[0].address = 'Level';
     await save(project);
     await expect(numeric).toContainText('30.0');
+    const good = status.getByRole('button', { name: 'Inspect LineLevel quality (Good data)', exact: true });
+    await expect(good).toContainText(/\d+\.\d s old/);
+    await good.click();
+    await expect(details.getByText('Level', { exact: true })).toBeVisible();
+    await expect(details).toContainText('Good data');
+    await page.keyboard.press('Escape');
+    await expect(good).toBeFocused();
     await expect(badge).toHaveCount(0);
     await expect(indicator).toContainText('ON');
     await expect(header).toContainText('PLC routes connected (1/1)');
@@ -351,6 +361,7 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   ];
   function withRoutes(project) {
     project.connections = configs;
+    project.controls.push({ id: 'tank_quality', kind: 'tag_quality', label: 'Tank signal quality', tag: 'TankLevel', show_age: false });
     const button = project.controls.find(control => control.id === 'toggle');
     Object.assign(button, { mode: 'toggle', target: 'MotorRunning', enabled_tag: 'ActionEnable' });
   }
@@ -442,6 +453,9 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await expect(header.getByText('Line PLC · Connected / no usable data', { exact: true })).toBeVisible();
   await expect(numeric).toContainText('STALE DATA');
   await expect(numeric.getByText('3.3 s old', { exact: true })).toBeVisible();
+  const tagStatus = page.locator('[data-control="tag_quality"]');
+  await expect(tagStatus).toContainText('STALE DATA');
+  await expect(tagStatus).not.toContainText('3.3 s old');
   const quality = numeric.getByRole('button', { name: 'Inspect TankLevel quality (STALE DATA)' });
   await expect(quality).toHaveAttribute('title', /PLC sample is stale/);
   await quality.press('Enter');

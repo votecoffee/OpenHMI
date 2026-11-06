@@ -269,6 +269,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if not target or not target.writable or kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Control requires a configured writable tag of type {' or '.join(expected)}: {control['tag']}")
                 continue
+            if control['kind'] == 'tag_quality':
+                if control['tag'] not in kinds:
+                    raise HTTPException(422, 'Tag quality requires an existing tag')
+                continue
             if control['kind'] == 'date_time_display':
                 if kinds.get(control['tag']) != 'integer':
                     raise HTTPException(422, 'Date/time display requires an unscaled integer tag')

@@ -74,6 +74,16 @@ function LedDisplay({ id, label, tag, unit, digits, decimals, puck }) {
   </article>;
 }
 
+function TagQuality({ id, label, tag, show_age, puck }) {
+  const { problem } = useValue(tag);
+  const { text } = useLocalization();
+  return <article className="hmi-control" data-control="tag_quality">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    <Quality problem={problem || 'tagGood'} tag={tag} showAge={show_age} />
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
 function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, language } = useLocalization();
@@ -445,7 +455,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -569,6 +579,12 @@ export function createConfig(catalog) {
       Checkbox: discrete('checkbox', 'Checkbox', writableBoolean),
       ToggleSwitch: discrete('toggle_switch', 'Toggle switch', writableBoolean),
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
+      TagQuality: { label: 'Tag quality', fields: {
+        label: labelField, tag: browserTag('Tag', 'Choose a tag', () => true),
+        show_age: { type: 'select', label: 'Show sample age', options: [
+          { label: 'Yes', value: true }, { label: 'No', value: false },
+        ] },
+      }, defaultProps: { label: 'Tag status', tag: 'TankLevel', show_age: true }, render: TagQuality },
       LedDisplay: { label: 'Numeric LED display', fields: { ...numericFields,
         digits: { type: 'number', label: 'Digit positions', min: 2, max: 12 },
       }, defaultProps: { ...numericDefaults, label: 'Numeric readout', digits: 5 }, render: LedDisplay },

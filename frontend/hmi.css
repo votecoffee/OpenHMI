@@ -66,6 +66,7 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .hmi-state.is-on .binary-symbol, .binary-symbol.legend-on { background: #666; border: 1px solid #333; }
 .hmi-quality { display: inline-flex; align-items: center; gap: 5px; padding: 3px 5px; background: #333; color: white; border: 1px dashed white; font: bold 11.46px "OpenHMI Noto", Arial, sans-serif; overflow-wrap: anywhere; }
 .hmi-quality > span { font-size: 17.19px; line-height: 15px; }
+.hmi-quality-good { background: #eee; color: #333; border: 1px solid #777; }
 .hmi-quality-inspect { cursor: pointer; text-align: start; }
 .quality-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; }
 .quality-details dt { font-weight: bold; }

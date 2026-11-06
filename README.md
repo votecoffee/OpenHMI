@@ -287,6 +287,9 @@ A **Numeric LED display** renders a tag in 2 to 12 seven-segment positions.
 Set the decimal places and units in the designer. A minus sign uses one
 position. If the rounded value overflows, the control shows the actual value
 as text with an overflow indication.
+A **Tag quality** control shows the selected tag's acquisition status and
+optional sample age. Select the badge to inspect the source, timestamp and
+any available error details. Authorized users can open the tag in Diagnostics.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,
