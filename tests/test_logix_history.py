@@ -236,6 +236,37 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(status['timings']['recovery']['last_ms'], 1375)
         self.assertNotIn('timings', driver.status()[0])
 
+    def test_connected_route_waits_for_first_usable_scan_with_demand(self):
+        class InvalidValuePLC(FakePLC):
+            def __init__(self, path, **kwargs):
+                super().__init__(path, **kwargs)
+                self.values['Level'] = 'invalid level'
+
+        driver = RuntimeDriver(InvalidValuePLC)
+        self.addCleanup(driver.close)
+        project = logix_project()
+        project['screens'][1]['controls'] = project['screens'][1]['controls'][1:]
+        driver.configure(project)
+
+        driver.poll(0)
+        status = driver.status()[0]
+        self.assertTrue(status['connected'])
+        self.assertFalse(status['awaiting_data'])
+        self.assertEqual(driver.connections['plc'].client.reads, [])
+
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        status = driver.status()[0]
+        self.assertTrue(status['connected'])
+        self.assertTrue(status['awaiting_data'])
+        self.assertFalse(status['recovering'])
+        self.assertEqual(driver.sample_snapshot(1)['LevelA']['quality'], 'bad')
+
+        driver.connections['plc'].client.values['Level'] = 42.0
+        driver.poll(2)
+        self.assertFalse(driver.status()[0]['awaiting_data'])
+        self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'good')
+
     def test_route_recovery_waits_for_usable_data_after_reconnect(self):
         reject = False
 

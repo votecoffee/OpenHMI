@@ -113,6 +113,7 @@ class LogixConnection:
         self.retry_at, self.failures = 0, 0
         self.failure_generation = self.scan_generation = 0
         self.outage_started = None
+        self.has_usable_sample = False
         self.timings = ScanTimings()
         self.metadata = {}
         self.read_calls = self.tags_read = 0
@@ -586,10 +587,11 @@ class RuntimeDriver(SimulatorDriver):
                                 if not math.isfinite(value):
                                     raise ValueError('Scaled PLC value is not finite')
                             sample = {'value': value, 'quality': 'good', 'error': None}
-                            if (connection.outage_started is not None
-                                    and scan_finished - acquired <= freshness_seconds(rate)):
-                                connection.timings.record('recovery', scan_finished - connection.outage_started)
-                                connection.outage_started = None
+                            if scan_finished - acquired <= freshness_seconds(rate):
+                                connection.has_usable_sample = True
+                                if connection.outage_started is not None:
+                                    connection.timings.record('recovery', scan_finished - connection.outage_started)
+                                    connection.outage_started = None
                         except (ValueError, KeyError, TypeError, IndexError) as failure:
                             sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
                         self.samples[alias] = {
@@ -774,10 +776,13 @@ class RuntimeDriver(SimulatorDriver):
                 for (route, address), rate in self.last_rates.items():
                     if route == identifier:
                         groups.setdefault(rate, []).append(address)
+                active = connection.connected and bool(groups)
+                recovering = active and connection.outage_started is not None
                 routes.append({'id': identifier, 'connected': connection.connected, 'error': connection.error,
                                'connection_instance': connection.instance,
                                'scan_age_seconds': age,
-                               'recovering': connection.connected and connection.outage_started is not None and bool(groups),
+                               'recovering': recovering,
+                               'awaiting_data': active and not recovering and not connection.has_usable_sample,
                                'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
                                'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
                                'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)} for rate, addresses in sorted(groups.items())],

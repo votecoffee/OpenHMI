@@ -278,7 +278,8 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   const values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false, ActionEnable: true };
   const online = [{ id: 'line', connected: true }, { id: 'utility', connected: true }];
   let reachable = true;
-  let live = { values, connections: online, samples: { TankLevel: good, MotorRunning: good } };
+  let live = { values, connections: [{ ...online[0], awaiting_data: true }, online[1]],
+    samples: { TankLevel: good, MotorRunning: { quality: 'pending' } } };
   await page.route('**/api/tags', route => reachable ? route.fulfill({ json: live }) : route.abort());
   await page.goto('/runtime');
   const header = page.locator('.app-header .connection');
@@ -286,6 +287,12 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   const numeric = page.locator('[data-control="numeric"]');
   const indicator = page.locator('[data-control="indicator"]');
   const button = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
+  await expect(header).toContainText('Waiting for initial PLC data');
+  await header.locator('summary').click();
+  await expect(header.getByText('Line PLC · Connected / waiting for first good data', { exact: true })).toBeVisible();
+  await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
+  await header.locator('summary').click();
+  live = { values, connections: online, samples: { TankLevel: good, MotorRunning: good } };
   await expect(header).toContainText('PLC routes connected (2/2)');
   await expect(button).toBeEnabled();
 

@@ -269,10 +269,10 @@ Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;
 its operation IDs also appear in API response headers. **Diagnostics** shows
 connection/scan counters, tag quality/age and errors without requesting new scan
-tags or writing equipment. Per-route timing separates worker queue delay, route
-lock wait, adapter reads, scan start lateness and recovery. Diagnostics also
-shows background worker health and retry
-state. Grant `activity.view` / `diagnostics.view` through HMI
+tags or writing equipment. The runtime header and Diagnostics identify routes
+waiting for their first usable PLC sample. Per-route timing separates worker
+queue delay, route lock wait, adapter reads, scan start lateness and recovery.
+Diagnostics also shows background worker health and retry state. Grant `activity.view` / `diagnostics.view` through HMI
 groups; security administrators can inspect both. See
 [journal behavior, recovery and retention](docs/activity-and-diagnostics.md).
 
