@@ -56,7 +56,7 @@ class IdentityPublisher:
     def key(token):
         return hashlib.sha256((token or '').encode()).digest()
 
-    def claim(self, request, client):
+    def claim(self, request, client, *, renew=False):
         principal = self.security.require(request, 'identity.publish')
         if not principal:
             raise HTTPException(401, 'A signed-in HMI user is required to claim publication')
@@ -65,12 +65,17 @@ class IdentityPublisher:
         if not (self.driver.project or {}).get('identity_publication', {}).get('enabled'):
             raise HTTPException(409, 'Identity publication is disabled in the active project')
         with self.lock:
-            if self.owner and self.deadline > time.monotonic() and self.owner != (key, client):
+            now = time.monotonic()
+            leased = self.owner is not None and self.deadline > now
+            owns_lease = leased and self.owner == (key, client)
+            if renew and not owns_lease:
+                raise HTTPException(409, 'Station lease lost. Claim publication explicitly to resume.')
+            if leased and not owns_lease:
                 raise HTTPException(409, 'Another station owns PLC identity publication')
-            if self.owner != (key, client) or self.deadline <= time.monotonic():
+            if not owns_lease:
                 self.state = {'status': 'pending', 'error': None}
             self.owner = (key, client)
-            self.deadline = time.monotonic() + 15
+            self.deadline = now + 15
         return self.snapshot()
 
     def release(self, request, client):
@@ -186,8 +191,8 @@ def add_identity_routes(app, publisher):
         return publisher.snapshot()
 
     @app.post('/api/security/publication/claim')
-    def claim(body: StationClaim, request: Request):
-        return publisher.claim(request, body.client)
+    def claim(body: StationClaim, request: Request, renew: bool = False):
+        return publisher.claim(request, body.client, renew=renew)
 
     @app.post('/api/security/publication/release')
     def release(body: StationClaim, request: Request):

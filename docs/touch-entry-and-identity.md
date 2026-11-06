@@ -97,8 +97,12 @@ owns publication; a second station receives a conflict rather than replacing it.
 An owning station can change authenticated users through the login dialog.
 Other HMI clients keep their own sessions and permissions.
 
-The browser renews a 15-second station lease every two seconds. The service
-reevaluates the session, groups and permissions before publication. Logout,
+The browser renews a 15-second station lease every two seconds. A heartbeat
+can extend an existing lease. An expired lease requires an explicit claim.
+If the browser loses renewal status, it pauses automatic renewal and checks
+ownership by reading status. Once status returns, choose **Publish this station
+login** to resume or **Stop publishing this station** to release a lease the
+station still owns. The service reevaluates the session, groups and permissions before publication. Logout,
 session expiry, lease expiry or loss of publishing permission requests an empty
 username and zero privileges. Publication is held for imported projects until
 the configured PLC connections are deliberately released through Apply live.

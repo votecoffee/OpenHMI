@@ -153,6 +153,19 @@ class TouchSecurityTests(unittest.TestCase):
         state['draft']['identity_publication']['username_bytes'] = 100
         self.assertEqual(self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': state['draft']}).status_code, 403)
 
+    def test_publication_renewal_cannot_reclaim_an_expired_lease(self):
+        publisher = self.setup_publication()
+        endpoint = '/api/security/publication/claim'
+        station = {'client': 'station-a'}
+        self.assertEqual(self.client.post(endpoint + '?renew=true', json=station).status_code, 409)
+        self.client.post(endpoint, json=station).raise_for_status()
+        self.client.post(endpoint + '?renew=true', json=station).raise_for_status()
+        with publisher.lock:
+            publisher.deadline = 0
+        self.assertEqual(self.client.post(endpoint + '?renew=true', json=station).status_code, 409)
+        self.assertIsNone(self.client.get('/api/security/publication').json()['owner'])
+        self.assertEqual(self.client.post(endpoint, json=station).json()['owner'], 'station-a')
+
     def test_claim_publish_word_order_signed_bit31_and_logout(self):
         publisher = self.setup_publication()
         publisher.poll()
