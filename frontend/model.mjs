@@ -1,6 +1,6 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
-  analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
+  analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
@@ -35,6 +35,9 @@ export function toProject(data, settings = {}) {
       if (type === 'WebBrowser') return { ...base, scheme: props.scheme || 'https', hosts: props.hosts || '',
         port: props.port === '' || props.port == null ? null : Number(props.port), path: props.path ?? '/',
         address_tag: props.address_tag || '', refresh_tag: props.refresh_tag || '' };
+      if (type === 'XYChart') return { ...base, series: props.series, decimals: Number(props.decimals),
+        x_minimum: Number(props.x_minimum), x_maximum: Number(props.x_maximum), x_unit: props.x_unit,
+        y_minimum: Number(props.y_minimum), y_maximum: Number(props.y_maximum), y_unit: props.y_unit };
       if (type === 'PieChart') return { ...base, series: props.series, unit: props.unit };
       if (type === 'RadarChart') return { ...base, series: props.series };
       if (type === 'BarGraph') return { ...base, series: props.series, unit: props.unit,

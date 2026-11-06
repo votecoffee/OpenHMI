@@ -101,7 +101,7 @@ function RadarPlot({ rows, label }) {
   </svg>;
 }
 
-const pieColors = ['#364e64', '#694d35', '#3b6055', '#5b4d70', '#765355', '#435965', '#655b36', '#495947'];
+const chartColors = ['#364e64', '#694d35', '#3b6055', '#5b4d70', '#765355', '#435965', '#655b36', '#495947'];
 
 function PiePlot({ shares, label }) {
   const point = (fraction, radius) => {
@@ -115,7 +115,7 @@ function PiePlot({ shares, label }) {
       const start = edge;
       edge += share;
       const [x, y] = point(start + share / 2, share === 1 ? 0 : 29);
-      return <g key={index} data-pie-slice={index + 1} fill={pieColors[index]}>
+      return <g key={index} data-pie-slice={index + 1} fill={chartColors[index]}>
         {share === 1 ? <circle cx="50" cy="50" r="44" /> : <path d={
           `M50,50 L${point(start, 44)} A44,44 0 ${share > 0.5 ? 1 : 0} 1 ${point(edge, 44)} Z`
         } />}
@@ -143,18 +143,94 @@ export function PieChart({ id, label, series = [], unit, puck }) {
   return <article className="hmi-control hmi-chart" data-control="pie">
     <span className="hmi-label">{title}</span>
     {!shares.length && <small role="status">{ui(complete ? 'pieZero' : 'pieUnavailable')}</small>}
-    <div className="radar-content">
+    <div className="chart-plot-content">
       {!!shares.length && <PiePlot shares={shares} label={ui('piePlot', { label: title })} />}
       <ul className="chart-series">
         {rows.map((row, index) => <li key={index} data-chart-tag={row.tag}>
           <div className="chart-row">
-            <span><span className="pie-key" style={{ backgroundColor: pieColors[index] }}>{index + 1}</span> {row.label}</span>
+            <span><span className="chart-key" style={{ backgroundColor: chartColors[index] }}>{index + 1}</span> {row.label}</span>
             {row.valid ? <strong className="chart-value">{readout(row.value, row.decimals, language.code)} {units}</strong>
               : <Quality problem={row.problem} tag={row.tag} />}
             {shares.length > 0 && <span className="pie-share">{readout(shares[index] * 100, 1, language.code)}%</span>}
           </div>
           {row.valid && row.value < 0 && <strong className="range-deviation">{ui('pieNegative')}</strong>}
           {puck?.isEditing && <span className="hmi-source">{row.tag}</span>}
+        </li>)}
+      </ul>
+    </div>
+  </article>;
+}
+
+export function XYFields({ value = [], onChange, catalog }) {
+  const tags = catalog.tags.filter(tag => tag.type === 'number');
+  const update = (index, field, next) => onChange(value.map((row, i) => i === index ? { ...row, [field]: next } : row));
+  return <fieldset className="chart-fields"><legend>XY series</legend>
+    {value.map((row, index) => <fieldset key={index}><legend>Point {index + 1}</legend>
+      {[['x_tag', 'X tag'], ['y_tag', 'Y tag']].map(([field, label]) => <label key={field}>{label}
+        <select value={row[field]} onChange={event => update(index, field, event.target.value)}>
+          {!tags.some(tag => tag.name === row[field]) && <option value={row[field]}>{row[field]}</option>}
+          {tags.map(tag => <option key={tag.name} value={tag.name}>{tag.name}</option>)}
+        </select>
+      </label>)}
+      <label>Series label<input maxLength={100} value={row.label}
+        onChange={event => update(index, 'label', event.target.value)} /></label>
+      <button type="button" disabled={value.length <= 1} onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove point</button>
+    </fieldset>)}
+    <button type="button" disabled={value.length >= 8 || !tags.length}
+      onClick={() => onChange([...value, { x_tag: tags[0].name, y_tag: (tags[1] || tags[0]).name, label: '' }])}>Add point</button>
+  </fieldset>;
+}
+
+export function XYChart({ id, label, series = [], decimals, x_minimum, x_maximum, x_unit, y_minimum, y_maximum, y_unit }) {
+  const live = useContext(Live);
+  const { text, ui, language } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const xUnit = text(`control.${id}.x_unit`, x_unit);
+  const yUnit = text(`control.${id}.y_unit`, y_unit);
+  const scaleOK = validRange(x_minimum, x_maximum) && validRange(y_minimum, y_maximum);
+  const rows = series.map((item, index) => {
+    const x = tagValue(live, item.x_tag, 'number');
+    const y = tagValue(live, item.y_tag, 'number');
+    const outside = scaleOK && (x.valid && (x.value < x_minimum || x.value > x_maximum)
+      || y.valid && (y.value < y_minimum || y.value > y_maximum));
+    return { ...item, x, y, outside, label: text(`control.${id}.series.${index}.label`, item.label || item.x_tag + ' / ' + item.y_tag) };
+  });
+  const axisScale = (axis, unit, minimum, maximum) => ui('xyAxisScale', {
+    axis: unit ? `${axis} (${unit})` : axis, minimum, maximum,
+  });
+  const reading = (state, tag, unit) => state.valid
+    ? <strong className="chart-value">{readout(state.value, decimals, language.code)} {unit}</strong>
+    : <Quality problem={state.problem} tag={tag} />;
+  return <article className="hmi-control hmi-chart" data-control="xy">
+    <span className="hmi-label">{title}</span>
+    {!scaleOK && <Quality problem="badRange" />}
+    <div className="chart-plot-content">
+      {scaleOK && <div className="xy-plot">
+        <svg role="img" aria-label={ui('xyPlot', { label: title })} viewBox="0 0 160 124" dir="ltr">
+          <path className="xy-grid" d="M50 12V112 M80 12V112 M110 12V112 M20 37H140 M20 62H140 M20 87H140" />
+          <rect className="xy-axis" x="20" y="12" width="120" height="100" />
+          <text className="xy-axis-label" x="148" y="114">X</text><text className="xy-axis-label" x="8" y="13">Y</text>
+          {rows.map((row, index) => {
+            if (row.outside || !row.x.valid || !row.y.valid) return null;
+            const x = 20 + 1.2 * percentage(row.x.value, x_minimum, x_maximum);
+            const y = 112 - percentage(row.y.value, y_minimum, y_maximum);
+            return <g key={index} data-xy-point={index + 1}>
+              <circle cx={x} cy={y} r="6" fill={chartColors[index]} />
+              <text x={x} y={y} textAnchor="middle" dominantBaseline="central">{index + 1}</text>
+            </g>;
+          })}
+        </svg>
+        <small>{axisScale('X', xUnit, x_minimum, x_maximum)}</small>
+        <small>{axisScale('Y', yUnit, y_minimum, y_maximum)}</small>
+      </div>}
+      <ul className="chart-series">
+        {rows.map((row, index) => <li key={index} data-xy-series={index + 1}>
+          <div className="chart-row">
+            <span><span className="chart-key" style={{ backgroundColor: chartColors[index] }}>{index + 1}</span> {row.label}</span>
+            <span>X {reading(row.x, row.x_tag, xUnit)}</span>
+            <span>Y {reading(row.y, row.y_tag, yUnit)}</span>
+          </div>
+          {row.outside && <strong className="range-deviation">{ui('outOfScale')}</strong>}
         </li>)}
       </ul>
     </div>
@@ -198,7 +274,7 @@ export function ProcessChart({ id, label, series = [], minimum, maximum, unit, r
   return <article className="hmi-control hmi-chart" data-control={radar ? 'radar' : 'bar'}>
     <span className="hmi-label">{title}</span>
     {!scaleOK && <Quality problem="badRange" />}
-    {radar ? <div className="radar-content"><RadarPlot rows={rows} label={title} />{legend}</div> : legend}
+    {radar ? <div className="chart-plot-content"><RadarPlot rows={rows} label={title} />{legend}</div> : legend}
     {!radar && scaleOK && <div className="analog-scale" dir="ltr">
       <span>{minimum}</span><span>{text(`control.${id}.unit`, unit)}</span><span>{maximum}</span>
     </div>}

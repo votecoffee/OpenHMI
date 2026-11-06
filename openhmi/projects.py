@@ -198,6 +198,32 @@ class PieControl(ControlBase):
         return self
 
 
+class XYSeries(StrictModel):
+    x_tag: str = Field(min_length=1, max_length=200)
+    y_tag: str = Field(min_length=1, max_length=200)
+    label: str = Field(default='', max_length=100)
+
+
+class XYControl(ControlBase):
+    kind: Literal['xy']
+    series: list[XYSeries] = Field(min_length=1, max_length=8)
+    x_minimum: float = Field(default=0.0, allow_inf_nan=False)
+    x_maximum: float = Field(default=100.0, allow_inf_nan=False)
+    y_minimum: float = Field(default=0.0, allow_inf_nan=False)
+    y_maximum: float = Field(default=100.0, allow_inf_nan=False)
+    x_unit: str = Field(default='', max_length=30)
+    y_unit: str = Field(default='', max_length=30)
+    decimals: int = Field(default=1, ge=0, le=4)
+
+    @model_validator(mode='after')
+    def ordered_axes(self):
+        if not all(0 < span < math.inf for span in (
+            self.x_maximum - self.x_minimum, self.y_maximum - self.y_minimum
+        )):
+            raise ValueError('XY scales require positive finite spans')
+        return self
+
+
 class AlarmControl(ControlBase):
     kind: Literal["alarm"]
     tag: str = Field(min_length=1, max_length=200)
@@ -393,7 +419,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

@@ -49,6 +49,7 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
 | Radial gauge | Dial with normal band, engineering readout, and a needle that disappears when the value is unavailable |
 | Bar graph | Compare up to 12 numeric tags with a shared engineering scale and units. Bars extend from zero when zero is in range, or from the endpoint nearest zero |
+| XY chart | Plot up to 8 live numeric tag pairs on independent scales with numbered points and per-axis quality |
 | Pie chart | Compare shares of a total across 2 to 8 nonnegative numeric tags with a numbered legend and explicit incomplete-data status |
 | Radar chart | Plot 3 to 8 numeric tags around a shared profile, with engineering units and scaling set independently per axis |
 | Alarm indicator | Explicit Boolean alarm binding, active/inactive text and numbered priority shape; no implicit alarm from a running/stopped bit |

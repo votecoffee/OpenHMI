@@ -13,7 +13,7 @@ import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Sparkline, Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
-import { ChartFields, GaugeGraphic, PieChart, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
+import { ChartFields, GaugeGraphic, PieChart, ProcessChart, TankGraphic, XYChart, XYFields, chartSeries } from './charts.jsx';
 
 export const ScreenControls = createContext([]);
 
@@ -381,7 +381,7 @@ export function createConfig(catalog) {
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline'];
-  const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart'];
+  const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
@@ -489,6 +489,16 @@ export function createConfig(catalog) {
       BarGraph: { label: 'Bar graph', fields: { label: labelField, ...scaleFields, unit: numericFields.unit, series: chartField('bar') },
         defaultProps: { label: 'Process comparison', minimum: 0, maximum: 100, unit: '', series: [chartSeries('TankLevel', false)] },
         render: LiveChart },
+      XYChart: { label: 'XY chart', fields: {
+        label: labelField, decimals: numericFields.decimals,
+        x_minimum: { type: 'number', label: 'X minimum' }, x_maximum: { type: 'number', label: 'X maximum' },
+        y_minimum: { type: 'number', label: 'Y minimum' }, y_maximum: { type: 'number', label: 'Y maximum' },
+        x_unit: { type: 'text', label: 'X units' }, y_unit: { type: 'text', label: 'Y units' },
+        series: { type: 'custom', render: ({ value, onChange }) =>
+          <XYFields value={value} onChange={onChange} catalog={catalog} /> },
+      }, defaultProps: { label: 'Live XY values', decimals: 1, x_minimum: 0, x_maximum: 100, x_unit: '',
+        y_minimum: 0, y_maximum: 100, y_unit: '', series: [{ x_tag: 'TankLevel', y_tag: 'AlarmWord', label: '' }] },
+      render: props => <XYChart {...props} /> },
       PieChart: { label: 'Pie chart', fields: { label: labelField, unit: numericFields.unit, series: chartField('pie') },
         defaultProps: { label: 'Part totals', unit: '', series: ['TankLevel', 'RecipeRevision'].map(tag => chartSeries(tag, false)) },
         render: props => <PieChart {...props} /> },
@@ -539,8 +549,14 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config, enable
     if (resolved.checks) resolved.checks = resolved.checks.map(check =>
       check.tag.startsWith('$.') ? { ...check, tag: root_tag + check.tag.slice(1) } : check);
     if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
-    if (Array.isArray(resolved.series)) resolved.series = resolved.series.map(item =>
-      item.tag.startsWith('$.') ? { ...item, tag: root_tag + item.tag.slice(1) } : item);
+    if (Array.isArray(resolved.series)) {
+      const fields = resolved.kind === 'xy' ? ['x_tag', 'y_tag'] : ['tag'];
+      resolved.series = resolved.series.map(item => {
+        const series = { ...item };
+        for (const field of fields) if (series[field].startsWith('$.')) series[field] = root_tag + series[field].slice(1);
+        return series;
+      });
+    }
     return <React.Fragment key={control.id}>{config.components[controlTypes[control.kind]].render(resolved)}</React.Fragment>;
   })}</div></article>;
 }

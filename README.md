@@ -241,6 +241,9 @@ keeps its running copy; test recipes carry production status false. See the
 A **Pie chart** compares 2 to 8 distinct numeric tags in the same units. Each
 slice shows its value and share. Missing, stale, or negative inputs suppress
 the pie and its percentages. An all-zero set shows a separate empty state.
+An **XY chart** plots the latest readings from 1 to 8 numeric tag pairs on
+independent X and Y scales. Each point has a label and numeric readout. A point
+is omitted when either tag is unavailable or either reading is out of scale.
 
 Use **Multi-state indicator** to map an integer tag to named states with a symbol
 and color. **Permissive / interlock list** shows which Boolean checks are ready,

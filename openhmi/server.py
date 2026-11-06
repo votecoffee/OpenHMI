@@ -22,7 +22,7 @@ from .runtime_workers import RuntimeWorkers
 from .historian import Historian
 from .history_export import CSV_COLUMNS, complete_history_csv, csv_row
 from .trend_recording import TrendRecorder, add_trend_routes
-from .screens import expanded_controls, screen_map, enabled
+from .screens import CHART_TAG_FIELDS, chart_tags, expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
 from .alarm_routes import add_alarm_routes
 from .edit_limits import LIMIT_TAGS, TEXT_INPUTS, edit_limits, validate_entry
@@ -294,8 +294,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if control['refresh_tag'] and kinds.get(control['refresh_tag']) not in ('boolean', 'integer'):
                     raise HTTPException(422, 'Web Browser refresh requires a BOOL or integer tag')
                 continue
-            if control['kind'] in ('bar', 'radar', 'pie'):
-                tags = [series['tag'] for series in control['series']]
+            if control['kind'] in CHART_TAG_FIELDS:
+                tags = chart_tags(control)
                 if any(kinds.get(tag) not in ('number', 'integer') for tag in tags):
                     raise HTTPException(422, 'Live charts require numeric tags')
                 if control['kind'] == 'pie' and len(set(tags)) != len(tags):

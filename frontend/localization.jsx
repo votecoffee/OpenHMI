@@ -20,6 +20,7 @@ export const uiText = {
   trendSelectTags: 'Select trend tags.',
   trendNoSamples: 'No recorded good samples in this window. Check acquisition settings and tag quality.',
   pieUnavailable: 'Pie unavailable. Check slice values.', pieNegative: 'Negative slice value', pieZero: 'All slice values are zero',
+  xyPlot: '{label} XY plot', xyAxisScale: '{axis} scale {minimum} to {maximum}',
   piePlot: '{label} proportions',
   sparklineEmpty: 'No recent good samples', sparklineWindow: 'Last {count} s',
   sparklinePlot: '{label}, last {count} seconds',

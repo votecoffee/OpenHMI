@@ -30,13 +30,13 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
     const key = `control.${id}`;
     return [
       [key + '.label', control.label],
-      ...('unit' in control ? [[key + '.unit', control.unit]] : []),
+      ...['unit', 'x_unit', 'y_unit'].filter(field => field in control).map(field => [key + '.' + field, control[field]]),
       ...(control.kind === 'indicator' ? [[key + '.on_text', control.on_text || 'ON'], [key + '.off_text', control.off_text || 'OFF']] : []),
       ...(control.states || []).map(state => [`${key}.state.${state.value}`, state.label]),
       ...(control.options || []).map((option, index) => [`${key}.choice.${index}`, option.label]),
       ...(control.checks || []).map((check, index) => [`${key}.check.${index}`, check.label]),
       ...(Array.isArray(control.series) ? control.series.flatMap((series, index) => [
-        [`${key}.series.${index}.label`, series.label || series.tag],
+        [`${key}.series.${index}.label`, series.label || series.tag || `${series.x_tag} / ${series.y_tag}`],
         ...('unit' in series ? [[`${key}.series.${index}.unit`, series.unit]] : []),
       ]) : []),
     ];

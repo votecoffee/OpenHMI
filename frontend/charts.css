@@ -8,12 +8,18 @@
 .bar-track.chart-invalid { border-style: dashed; }
 .bar-fill, .bar-zero { position: absolute; height: 100%; background: var(--hmi-live); }
 .bar-zero { width: 1px; background: #555; }
-.radar-content { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; width: 100%; }
-.radar-content .chart-series { flex: 1 1 180px; min-width: 0; }
+.chart-plot-content { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; width: 100%; }
+.chart-plot-content .chart-series { flex: 1 1 180px; min-width: 0; }
 .pie-plot { display: block; width: min(100%, 160px); margin-inline: auto; }
 .pie-plot path, .pie-plot circle { stroke: var(--hmi-background); stroke-width: 1; }
 .pie-plot text { fill: #fff; font: bold 8px sans-serif; }
-.pie-key { display: inline-block; min-width: 1.5em; text-align: center; color: #fff; }
+.chart-key { display: inline-block; min-width: 1.5em; text-align: center; color: #fff; }
+.xy-plot { display: grid; gap: 2px; width: min(100%, 184px); margin-inline: auto; overflow-wrap: anywhere; }
+.xy-plot svg { display: block; width: 100%; }
+.xy-grid, .xy-axis { fill: none; stroke: #999; }
+.xy-axis { stroke: #555; }
+.xy-axis-label { fill: #333; font: 10px sans-serif; }
+.xy-plot [data-xy-point] text { fill: #fff; font: bold 8px sans-serif; }
 .pie-share { font-variant-numeric: tabular-nums; }
 .radar-plot { display: block; width: min(100%, 240px); margin-inline: auto; }
 .radar-plot text { font: 13px sans-serif; fill: #333; }
