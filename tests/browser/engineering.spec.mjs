@@ -163,8 +163,18 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     instance.enabled_tag = 'FaceplatePermit';
     latest.tags.push({ name: 'FaceplatePermit', type: 'boolean', initial: false, writable: true },
       { name: 'FaceplateOutput', type: 'boolean', initial: false, writable: true });
-    latest.faceplates[0].controls.push({ id: 'unitOutput', kind: 'button', label: 'Toggle unit output',
-      mode: 'toggle', target: 'FaceplateOutput' });
+    const unit = latest.tags.find(tag => tag.name === 'UnitA');
+    const template = latest.faceplates[0];
+    const editMembers = { SpeedLow: 'number', SpeedHigh: 'number', Caption: 'string', CaptionLow: 'integer', CaptionHigh: 'integer' };
+    Object.assign(unit.members, editMembers);
+    Object.assign(template.members, editMembers);
+    Object.assign(unit.initial, { SpeedLow: 10, SpeedHigh: 20, Caption: 'OK', CaptionLow: 2, CaptionHigh: 4 });
+    template.controls.push(
+      { id: 'unitOutput', kind: 'button', label: 'Toggle unit output', mode: 'toggle', target: 'FaceplateOutput' },
+      { id: 'setpoint', kind: 'input', label: 'Unit setpoint', tag: '$.Speed', minimum_tag: '$.SpeedLow', maximum_tag: '$.SpeedHigh' },
+      { id: 'caption', kind: 'text_input', label: 'Unit caption', tag: '$.Caption',
+        min_length_tag: '$.CaptionLow', max_length_tag: '$.CaptionHigh' },
+    );
     latest.screens[0].controls.push({ id: 'enableFaceplate', kind: 'button', label: 'Enable unit controls',
       mode: 'set', target: 'FaceplatePermit', value: true });
     latest.screens.push({ id: 'details', title: 'Details', popup: true, update_ms: 1000, columns: 1, controls: [{ id: 'trend', kind: 'trend', label: 'Speed history', tags: ['UnitA.Speed', 'PLCLevel', 'MotorRunning'], seconds: 60 }] });
@@ -203,6 +213,22 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await expect(output).toBeEnabled();
     await output.click();
     await expect.poll(async () => (await (await viewer.request.get('/api/tags')).json()).values.FaceplateOutput).toBe(true);
+
+    const setpoint = viewer.locator('[data-control="input"]').filter({ hasText: 'Unit setpoint' });
+    const caption = viewer.locator('[data-control="text_input"]').filter({ hasText: 'Unit caption' });
+    await expect(setpoint).toContainText('Range: 10 – 20');
+    await expect(caption).toContainText('Length: 2 – 4');
+    const rejected = await viewer.request.put(`/api/controls/equipment__${instance.id}__setpoint/value`, { data: { value: 25 } });
+    expect(rejected.status()).toBe(422);
+    await setpoint.getByLabel('Unit setpoint new value', { exact: true }).fill('15');
+    await setpoint.getByRole('button', { name: 'Write value', exact: true }).click();
+    await caption.getByLabel('Unit caption new value', { exact: true }).fill('RUN');
+    await caption.getByRole('button', { name: 'Write value', exact: true }).click();
+    await expect.poll(async () => {
+      const values = (await (await viewer.request.get('/api/tags')).json()).values;
+      return [values['UnitA.Speed'], values['UnitA.Caption']];
+    }).toEqual([15, 'RUN']);
+
     const open = viewer.getByRole('button', { name: 'Open details', exact: true });
     await open.press('Enter');
     const details = viewer.getByRole('dialog', { name: 'Details', exact: true });

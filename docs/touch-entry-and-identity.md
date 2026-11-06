@@ -9,7 +9,8 @@ configured tag overrides its corresponding fixed value. Text edits provide
 minimum/maximum character counts and optional numeric tag bindings for either
 length limit. Text length tags must contain integers from 0 through 4096.
 
-Limit tags use the screen's shared scan demand, including UDT-relative bindings.
+Limit tags use the screen's shared scan demand. A faceplate resolves relative
+limits such as `$.SpeedHigh` against the UDT bound to that instance.
 The display uses good-quality cached values; stale, missing, nonnumeric or
 reversed limits block entry. An edit identifies a bad limit or enable binding
 with an inspectable quality badge. A healthy enable tag that is off or an
