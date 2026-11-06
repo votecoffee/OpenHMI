@@ -358,6 +358,48 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(plc.reads, [('Motor', 'Level'), ('Motor', 'Level')])
         self.assertEqual(driver.sample_snapshot(3)['LevelA']['value'], 85.0)
 
+    def test_reopening_during_a_scan_waits_for_a_sample_from_the_new_demand(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        original = driver.sample_snapshot(1)['LevelA']
+        connection = driver.connections['plc']
+        read = connection.read
+        received, release = Event(), Event()
+        self.addCleanup(release.set)
+
+        def delay_commit(*args, **kwargs):
+            result = read(*args, **kwargs)
+            received.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release the scan')
+            return result
+
+        connection.client.values['Level'] = 40.0
+        with patch.object(connection, 'read', side_effect=delay_commit):
+            driver.poll(2, wait=False)
+            self.assertTrue(received.wait(5))
+            scan = driver._scans['plc']
+            driver.lease('viewer', [], 2.01)
+            driver.poll(2.01, wait=False)
+            driver.lease('viewer', ['slow'], 2.02)
+            driver.poll(2.02, wait=False)
+            self.assertIs(driver._scans['plc'], scan)
+            pending = driver.sample_snapshot(2.02)['LevelA']
+            self.assertEqual(pending['quality'], 'pending')
+            self.assertIsNone(pending['value'])
+            self.assertEqual(pending['timestamp'], original['timestamp'])
+            release.set()
+            scan.result(timeout=5)
+
+        self.assertEqual(driver.sample_snapshot(2.03)['LevelA']['quality'], 'pending')
+        connection.client.values['Level'] = 50.0
+        driver.poll(2.03)
+        self.assertEqual(driver.sample_snapshot(2.03)['LevelA']['value'], 105.0)
+        self.assertEqual(len(connection.client.reads), 3)
+
     def test_lease_cap_ignores_releases_and_keeps_renewed_viewers(self):
         driver = RuntimeDriver(FakePLC)
         self.addCleanup(driver.close)

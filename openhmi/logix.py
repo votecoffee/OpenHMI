@@ -326,6 +326,7 @@ class RuntimeDriver(SimulatorDriver):
         self._screen_demands = {}
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
+        self._refresh_after = {}
         self._lease_sequences = {}
         self.local_names = set()
         self.plc_hold = False
@@ -459,8 +460,11 @@ class RuntimeDriver(SimulatorDriver):
                 rate = grouped.get(key)
                 if rate is None:
                     self.deadlines.pop(key, None)
+                    self._refresh_after.pop(key, None)
                 elif rate < previous_rate:
                     self.deadlines[key] = now
+            for key in grouped.keys() - self.last_rates.keys():
+                self._refresh_after[key] = now
             self.last_rates = grouped
 
             for identifier, connection in self.connections.items():
@@ -532,6 +536,12 @@ class RuntimeDriver(SimulatorDriver):
                     rate = self.last_rates.get(key)
                     if rate is None:
                         continue
+                    refresh_after = self._refresh_after.get(key)
+                    if refresh_after is not None:
+                        # Discard a reply received before this address came back into demand.
+                        if acquired < refresh_after:
+                            continue
+                        del self._refresh_after[key]
                     pending_deadline = self.deadlines.get(key)
                     # A sample received before a faster demand arrived cannot satisfy its refresh.
                     if pending_deadline is None or pending_deadline <= acquired:
@@ -591,6 +601,8 @@ class RuntimeDriver(SimulatorDriver):
                 elif alias in self.samples and generation != connection.failure_generation:
                     sample.update(value=None, quality='bad', quality_reason='recovering',
                                   error='Waiting for a fresh PLC sample after connection loss')
+                elif (tag['connection'], tag['address']) in self._refresh_after:
+                    sample.update(value=None, quality='pending', error='Waiting for a PLC sample for renewed demand')
                 elif sample['quality'] == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
                     sample.update(quality='stale', error='PLC sample is stale')
                 sample.pop('monotonic', None)
@@ -762,5 +774,6 @@ class RuntimeDriver(SimulatorDriver):
                     self._scan_started.clear()
                     self.samples.clear()
                     self.deadlines.clear()
+                    self._refresh_after.clear()
                     self._scan_pool = None
                     self._closing = False

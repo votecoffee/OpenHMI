@@ -55,8 +55,9 @@ Browser requests carry a sequence
 number so a delayed heartbeat cannot replace a newer request for the same
 viewer. The runtime remembers the last sequence for its 2,000 most recently
 updated sequenced clients, including released viewers. When demand for an
-address ends, the driver drops its next scan deadline. A new request can
-refresh the address on the next scheduler tick. The server merges demand
+address ends, the driver drops its next scan deadline. When the scheduler
+sees demand return, the address waits for a fresh receipt. A reply received
+before demand resumed cannot satisfy the reopened screen. The server merges demand
 across viewers and selects the fastest requested rate for each source
 address. Multiple UDT members are acquired through a single root
 UDT read. Alarm tags demand 250 ms; historian tags demand their sampling interval,
