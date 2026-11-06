@@ -333,47 +333,50 @@ function App({ initial, catalog }) {
     };
   }, [leasedScreens, editorSubscription.root, runtime]);
   useEffect(() => {
-    let stopped = false;
-    let timer;
-    async function tick() {
-      try {
-        const tags = await api('/api/tags');
-        if (!stopped) setLive(previous => ({ ...previous, values: tags.values || {}, samples: tags.samples || {}, connected: true,
-          connections: tags.connections || [], plcHold: !!tags.plc_hold }));
-      } catch {
-        if (!stopped) setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false,
-          connections: [], plcHold: false }));
-      }
-      if (!stopped) timer = setTimeout(tick, updateRate.current);
-    }
-    tick();
-    return () => { stopped = true; clearTimeout(timer); };
-  }, [runtime]);
-  useEffect(() => {
-    let stopped = false, timer;
-    async function tick() {
-      const [alarms, recipe, identity] = await Promise.allSettled([api('/api/alarms'), api('/api/recipes/selected'), api('/api/security/session')]);
-      if (!stopped) {
-        setIdentityAvailable(identity.status === 'fulfilled');
-        if (identity.status === 'fulfilled') setSession(identity.value);
-      }
-      if (!stopped) setLive(previous => ({ ...previous,
-        alarms: alarms.status === 'fulfilled' ? alarms.value : previous.alarms, alarmConnected: alarms.status === 'fulfilled',
-        recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' }));
-      {
+    function poll(path, onSuccess, onFailure) {
+      let stopped = false, timer;
+      async function tick() {
         try {
-          const next = await api('/api/project/active');
-          if (next.project_instance && next.project_instance !== initial.project_instance) {
-            if (runtime) { location.replace(location.pathname === '/projects' ? '/' : location.href); return; }
-            else setProjectChanged(true);
-          }
-          if (!stopped) { setActive(previous => previous.revision === next.revision ? previous : next); setScreenConnected(true); }
-        } catch { if (!stopped) setScreenConnected(false); }
+          const data = await api(path);
+          if (!stopped) onSuccess(data);
+        } catch {
+          if (!stopped) onFailure();
+        }
+        if (!stopped) timer = setTimeout(tick, updateRate.current);
       }
-      if (!stopped) timer = setTimeout(tick, updateRate.current);
+      tick();
+      return () => { stopped = true; clearTimeout(timer); };
     }
-    tick();
-    return () => { stopped = true; clearTimeout(timer); };
+
+    const stopTags = poll('/api/tags', tags => {
+      setLive(previous => ({ ...previous, values: tags.values || {}, samples: tags.samples || {}, connected: true,
+        connections: tags.connections || [], plcHold: !!tags.plc_hold }));
+    }, () => {
+      setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false, connections: [], plcHold: false }));
+    });
+    const stopAlarms = poll('/api/alarms', alarms => {
+      setLive(previous => ({ ...previous, alarms, alarmConnected: true }));
+    }, () => {
+      setLive(previous => ({ ...previous, alarmConnected: false }));
+    });
+    const stopRecipe = poll('/api/recipes/selected', recipeSelection => {
+      setLive(previous => ({ ...previous, recipeSelection, recipeConnected: true }));
+    }, () => {
+      setLive(previous => ({ ...previous, recipeSelection: null, recipeConnected: false }));
+    });
+    const stopIdentity = poll('/api/security/session', identity => {
+      setSession(identity);
+      setIdentityAvailable(true);
+    }, () => setIdentityAvailable(false));
+    const stopProject = poll('/api/project/active', next => {
+      if (next.project_instance && next.project_instance !== initial.project_instance) {
+        if (runtime) { location.replace(location.pathname === '/projects' ? '/' : location.href); return; }
+        setProjectChanged(true);
+      }
+      setActive(previous => previous.revision === next.revision ? previous : next);
+      setScreenConnected(true);
+    }, () => setScreenConnected(false));
+    return () => { stopTags(); stopAlarms(); stopRecipe(); stopIdentity(); stopProject(); };
   }, [runtime]);
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
   const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision }}>

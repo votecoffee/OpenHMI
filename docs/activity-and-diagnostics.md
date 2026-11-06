@@ -96,6 +96,11 @@ a retry delay of 250 ms, increasing to at most five seconds on repeated
 failures. Successful ticks reset that delay. PLC route and feature-specific
 status still describe their underlying data and transaction state.
 
+The browser polls tags, alarms, recipe selection, identity and the applied
+layout independently. Each poll finishes or times out before the next request
+for that endpoint starts. A delayed response leaves the other status updates
+and their recovery indicators running.
+
 Tag rows show logical source/type, quality, observation timestamp, age and error.
 A tag-level read error or malformed result in a known batch position marks
 that tag bad and records the failed observation time. A wrong result address

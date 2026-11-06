@@ -116,6 +116,41 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(unavailable).toHaveCount(0);
 });
 
+test('a stalled recipe status request does not delay alarms, layout or identity', async ({ page }) => {
+  let releaseRecipe;
+  const recipePending = new Promise(resolve => { releaseRecipe = resolve; });
+  let startedRecipe;
+  const recipeStarted = new Promise(resolve => { startedRecipe = resolve; });
+  await page.route('**/api/recipes/selected', async route => {
+    startedRecipe();
+    await recipePending;
+    await route.continue();
+  });
+  const { active_revision: revision } = await (await page.request.get('/api/project')).json();
+  const alarms = { sampled_revision: revision, states: { process_alarm: { quality: 'good', condition: 0 } },
+    outstanding: [], active_count: 0, unacknowledged_count: 0 };
+  let reachable = false;
+  await page.route('**/api/alarms', route => reachable ? route.fulfill({ json: alarms }) : route.abort());
+  await page.route('**/api/project/active', route => reachable ? route.continue() : route.abort());
+  await page.route('**/api/security/session', route => reachable ? route.continue() : route.abort());
+  try {
+    await page.goto('/runtime');
+    await recipeStarted;
+    const banner = page.getByLabel('Screen alarm status');
+    const layout = page.getByText('Screen updates unavailable. Showing the last applied layout.');
+    const identity = page.getByText('HMI identity status unavailable.', { exact: false });
+    await expect(layout).toBeVisible({ timeout: 3000 });
+    await expect(identity).toBeVisible({ timeout: 3000 });
+    await expect(banner).toContainText('ALARM MONITOR UNAVAILABLE');
+    reachable = true;
+    await expect(banner).toContainText('No active or unacknowledged alarms', { timeout: 3000 });
+    await expect(layout).toBeHidden();
+    await expect(identity).toBeHidden();
+  } finally {
+    releaseRecipe();
+  }
+});
+
 test('PLC route status and binding quality distinguish loss, stale data and recovery', async ({ page }) => {
   const configs = [
     { id: 'line', name: 'Line PLC', enabled: true },
@@ -132,11 +167,9 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
     withRoutes(data.active);
     await route.fulfill({ response, json: data });
   });
-  await page.route('**/api/project/active', async route => {
-    const response = await route.fetch(), data = await response.json();
-    withRoutes(data.project);
-    await route.fulfill({ response, json: data });
-  });
+  const activeProject = await (await page.request.get('/api/project/active')).json();
+  withRoutes(activeProject.project);
+  await page.route('**/api/project/active', route => route.fulfill({ json: activeProject }));
 
   const good = { quality: 'good' };
   const old = { timestamp: '2026-01-01T12:00:00Z', age_seconds: 3.25 };
