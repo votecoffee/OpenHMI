@@ -63,6 +63,11 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   </>;
 }
 
+export function alarmMonitorProblem(live) {
+  if (!live.alarmConnected || live.alarms?.error) return 'alarmUnavailable';
+  return live.alarms?.evaluation_stale ? 'alarmEvaluationStale' : null;
+}
+
 function alarmSnapshotMatchesProject(live) {
   const sampled = live.alarms?.sampled_revision;
   return sampled === undefined || live.activeRevision == null || sampled === live.activeRevision;

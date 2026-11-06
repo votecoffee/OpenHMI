@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './controls.jsx';
-import { Live, Quality, sampleQualityProblem, tagQuality, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
+import { Live, Quality, sampleQualityProblem, tagQuality, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
@@ -42,7 +42,8 @@ export function AlarmConsole() {
   const [note, setNote] = useState(''), [notesBefore, setNotesBefore] = useState(null), [notes, setNotes] = useState(null);
   const [generation, setGeneration] = useState(0);
   const alarms = live.alarms || {};
-  const monitorAvailable = live.alarmConnected && !alarms.error;
+  const monitorProblem = alarmMonitorProblem(live);
+  const monitorAvailable = !monitorProblem;
   const unavailable = monitorAvailable ? unavailableAlarmTriggers(live) : [];
   const waiting = monitorAvailable && alarmEvaluationPending(live);
   useEffect(() => {
@@ -103,7 +104,9 @@ export function AlarmConsole() {
   function inspect(id) { setIdentifier(id); setDetail(null); setNotes(null); setNotesBefore(null); setDetailError(''); setNote(''); }
   return <section className="alarm-console" aria-label="Alarm console">
     <div className="alarm-console-heading"><h1>{ui('alarmStatus')}</h1><LanguageSelector /></div>
-    {!monitorAvailable ? <p role="alert">{ui('alarmUnavailable')}</p> : <p>{ui('activeAlarms', { active: alarms.active_count, unack: alarms.unacknowledged_count })}</p>}
+    {monitorProblem && <p role="alert">{ui(monitorProblem)}</p>}
+    {live.alarms && <p>{ui(monitorProblem ? 'lastRecordedAlarmCounts' : 'activeAlarms',
+      { active: alarms.active_count, unack: alarms.unacknowledged_count })}</p>}
     {waiting && <p role="status">{ui('alarmEvaluationWaiting')}</p>}
     {unavailable.length > 0 && <section aria-label={ui('alarmUnavailableTriggers')}>
       <h2>{ui('alarmUnavailableTriggers')}</h2>
@@ -113,7 +116,7 @@ export function AlarmConsole() {
       </li>)}</ul>
     </section>}
     <p>{ui('alarmCountsHint')}</p>
-    {!!alarms.shelved_count && <p>{ui('shelvedSummary', { count: alarms.shelved_count })}</p>}
+    {monitorAvailable && !!alarms.shelved_count && <p>{ui('shelvedSummary', { count: alarms.shelved_count })}</p>}
     <form className="alarm-filters" onSubmit={event => { event.preventDefault(); setApplied({ ...filters }); setBefore(null); setEventBefore(null); setSelected([]); }}>
       <label>{ui('alarmSearch')}<input aria-label={ui('alarmSearch')} value={filters.search} maxLength={200} onChange={event => setFilters({ ...filters, search: event.target.value })} /></label>
       <label>{ui('priority')}<select aria-label={ui('priority')} value={filters.priority} onChange={event => setFilters({ ...filters, priority: event.target.value })}><option value="0">{ui('allPriorities')}</option>{[1, 2, 3, 4].map(value => <option key={value} value={value}>P{value}</option>)}</select></label>
@@ -126,7 +129,7 @@ export function AlarmConsole() {
     <div className="alarm-actions"><label>{ui('acknowledgementComment')}<input aria-label={ui('acknowledgementComment')} value={comment} maxLength={1000} onChange={event => setComment(event.target.value)} /></label>
       <button disabled={busy || !!error || !canAcknowledge || !rows?.items.some(item => !item.acknowledged_at)} onClick={() => setSelected(rows.items.filter(item => !item.acknowledged_at).map(item => item.occurrence_id))}>{ui('selectAlarmPage')}</button>
       <span>{ui('selectedCount', { count: selected.length })}</span><button disabled={busy || !!error || !canAcknowledge || !selected.length} onClick={() => acknowledge(null, true)}>{ui('acknowledgeSelected')}</button>
-      <button disabled={busy || !!error || !canAcknowledge || !alarms.unacknowledged_count} onClick={() => acknowledge(null)}>{ui('acknowledgeAll')}</button></div>
+      <button disabled={busy || !!error || !monitorAvailable || !canAcknowledge || !alarms.unacknowledged_count} onClick={() => acknowledge(null)}>{ui('acknowledgeAll')}</button></div>
     <p role="status" aria-label="Alarm operation">{feedback}</p>
     <table className="alarm-occurrences"><thead><tr><th /><th>{ui('priority')}</th><th>{ui('message')}</th><th>{ui('status')}</th><th>{ui('raised')}</th><th /></tr></thead>
       <tbody>{rows?.items.map(alarm => <tr key={alarm.occurrence_id}><td><input type="checkbox" aria-label={ui('selectAlarm', { id: alarm.occurrence_id })} disabled={busy || !!error || !canAcknowledge || !!alarm.acknowledged_at} checked={selected.includes(alarm.occurrence_id)} onChange={event => setSelected(previous => event.target.checked ? [...previous, alarm.occurrence_id] : previous.filter(id => id !== alarm.occurrence_id))} /></td>

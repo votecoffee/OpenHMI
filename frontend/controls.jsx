@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Live, useValue, tagValue, Quality, ConnectionStatus, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
+import { Live, useValue, tagValue, Quality, ConnectionStatus, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, useUi, LanguageSelector, alarmMessage } from './localization.jsx';
@@ -194,9 +194,10 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
   const active = [...(monitor?.annunciated_outstanding || monitor?.outstanding || [])].sort((a, b) => a.priority - b.priority);
   const headline = active[0];
   const headlineMessage = headline && `P${headline.priority} ${alarmMessage(headline, language)}`;
-  const unknown = !live.alarmConnected || monitor?.error;
-  const waiting = alarmEvaluationPending(live) && <Quality text={ui('alarmEvaluationWaiting')} />;
-  const unavailableCount = unavailableAlarmTriggers(live).length;
+  const monitorProblem = alarmMonitorProblem(live);
+  const monitorWarning = monitorProblem && <Quality text={ui(monitorProblem)} />;
+  const waiting = !monitorProblem && alarmEvaluationPending(live) && <Quality text={ui('alarmEvaluationWaiting')} />;
+  const unavailableCount = monitorProblem ? 0 : unavailableAlarmTriggers(live).length;
   const triggerWarning = unavailableCount > 0 && (puck?.isEditing
     ? <Quality text={ui('alarmUnavailableTriggersCount', { count: unavailableCount })} />
     : <a className="hmi-quality" href="/alarms">
@@ -205,15 +206,15 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
   return <section className="hmi-screen">
     <header className="station-header">
       <div className="station-identity"><strong>OpenHMI</strong><span>{ui('localStation')}</span></div>
-      <div className="station-title"><div className={`screen-alarm-banner ${!unknown && active.length ? 'has-alarm' : ''}`} aria-label="Screen alarm status">
-        {unknown ? <Quality text={ui('alarmUnavailable')} /> : headline ? <><PrioritySymbol priority={headline.priority} />
+      <div className="station-title"><div className={`screen-alarm-banner ${headline ? 'has-alarm' : ''}`} aria-label="Screen alarm status">
+        {headline ? <><PrioritySymbol priority={headline.priority} />
           <strong>{!puck?.isEditing && headline.occurrence_id
             ? <a className="alarm-headline-link" href={`/alarms?occurrence=${headline.occurrence_id}`}
               aria-label={ui('openAlarmDetails', { message: headlineMessage })}>{headlineMessage}</a>
-            : headlineMessage} · {ui('activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
-          {triggerWarning}{waiting}</> : (triggerWarning || waiting) ? <>{triggerWarning}{waiting}</> :
+            : headlineMessage} · {ui(monitorProblem ? 'lastRecordedAlarmCounts' : 'activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
+          {monitorWarning}{triggerWarning}{waiting}</> : (monitorWarning || triggerWarning || waiting) ? <>{monitorWarning}{triggerWarning}{waiting}</> :
           (monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms'))}
-          {!!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}
+          {!monitorProblem && !!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}
       </div><h1>{text(screen_id === 'overview' ? 'screen.title' : `screen.${screen_id}.title`, title)}</h1></div>
       <div className="station-mode"><LanguageSelector /><strong>{plcConfigured ? 'PLC' : ui('simulation')}</strong><ConnectionStatus /></div>
     </header>

@@ -54,7 +54,8 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   let alarms = { sampled_revision: revision, states: {}, outstanding: [], active_count: 0, unacknowledged_count: 0 };
   let samples = {};
   await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values, samples } }));
-  await page.route('**/api/alarms', route => route.fulfill({ json: alarms }));
+  let alarmReachable = true;
+  await page.route('**/api/alarms', route => alarmReachable ? route.fulfill({ json: alarms }) : route.abort());
   await page.goto('/runtime');
   await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
   const banner = page.getByLabel('Screen alarm status');
@@ -73,6 +74,17 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(page.locator('[data-control="alarm"] svg text')).toHaveText('2');
   await expect(page.locator('[data-control="indicator"]')).toContainText('OFF');
   if (process.env.OPENHMI_ALARM_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_ALARM_SCREENSHOT, fullPage: true });
+  alarms = { ...alarms, evaluation_stale: true };
+  await expect(banner).toContainText('Alarm evaluation is stale');
+  await expect(banner).toContainText('P2 Process alarm');
+  await expect(banner).toContainText('Last recorded: 1 active / 1 unacknowledged');
+  alarmReachable = false;
+  await expect(banner).toContainText('ALARM MONITOR UNAVAILABLE');
+  await expect(banner).toContainText('P2 Process alarm');
+  alarmReachable = true;
+  alarms = { ...alarms, evaluation_stale: false };
+  await expect(banner).not.toContainText('Last recorded');
+
   values = { TankLevel: 'bad', MotorRunning: null, ProcessAlarm: null };
   alarms = { ...alarms, states: { process_alarm: { quality: 'bad' } } };
   await expect(page.locator('[data-control="analog"]')).toContainText('BAD DATA');

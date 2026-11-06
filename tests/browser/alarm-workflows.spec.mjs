@@ -37,6 +37,15 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
     await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
+    await page.route('**/api/alarms', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...await response.json(), evaluation_stale: true } });
+    });
+    await expect(page.getByText('Last recorded: 2 active / 2 unacknowledged', { exact: true })).toBeVisible();
+    const ackAll = page.getByRole('button', { name: 'Acknowledge all', exact: true });
+    await expect(ackAll).toBeDisabled();
+    await page.unroute('**/api/alarms');
+    await expect(ackAll).toBeEnabled();
     await page.route('**/api/alarms/occurrences/*', async route => {
       const response = await route.fetch();
       const state = await response.json();

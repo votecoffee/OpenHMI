@@ -358,7 +358,7 @@ function App({ initial, catalog }) {
         if (identity.status === 'fulfilled') setSession(identity.value);
       }
       if (!stopped) setLive(previous => ({ ...previous,
-        alarms: alarms.status === 'fulfilled' ? alarms.value : null, alarmConnected: alarms.status === 'fulfilled',
+        alarms: alarms.status === 'fulfilled' ? alarms.value : previous.alarms, alarmConnected: alarms.status === 'fulfilled',
         recipeSelection: recipe.status === 'fulfilled' ? recipe.value : null, recipeConnected: recipe.status === 'fulfilled' }));
       {
         try {

@@ -45,7 +45,11 @@ If a trigger cannot be evaluated, the banner links to the affected definitions
 in the alarm console, including triggers that have no recorded occurrence.
 The banner shows that evaluation is pending until the monitor has sampled
 the applied revision and evaluated its enabled triggers. Known alarm
-occurrences remain visible during that interval.
+occurrences remain visible during that interval. If five seconds pass after
+the last completed evaluation, the monitor reports stale evaluation. The banner
+keeps the last recorded headline and counts visible with a warning, including
+when the alarm status request fails after a prior successful response. The
+console disables Acknowledge all while the status is stale or unavailable.
 
 **Alarm details** shows the captured cause and recovery steps, related-screen navigation,
 first acknowledgement and append-only operator notes. Trigger quality/time comes

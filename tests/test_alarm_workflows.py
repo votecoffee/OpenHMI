@@ -36,6 +36,18 @@ class AlarmWorkflowTests(unittest.TestCase):
         saved = self.app.state.store.save(SaveRequest(expected_revision=state['draft_revision'], project=project))
         self.app.state.store.apply(RevisionRequest(expected_revision=saved['draft_revision']))
 
+    def test_alarm_snapshot_marks_overdue_evaluation_and_recovers(self):
+        with patch('openhmi.alarms.monotonic', return_value=100.0) as clock:
+            identifier = self.raise_alarm()
+            clock.return_value = 104.9
+            self.assertFalse(self.client.get('/api/alarms').json()['evaluation_stale'])
+            clock.return_value = 105.0
+            stale = self.client.get('/api/alarms').json()
+            self.assertTrue(stale['evaluation_stale'])
+            self.assertEqual(stale['outstanding'][0]['occurrence_id'], identifier)
+            self.monitor.sample()
+            self.assertFalse(self.client.get('/api/alarms').json()['evaluation_stale'])
+
     def test_alarm_snapshot_identifies_the_revision_last_evaluated(self):
         first = self.app.state.store.snapshot()['active_revision']
         self.assertEqual(self.client.get('/api/alarms').json()['sampled_revision'], first)

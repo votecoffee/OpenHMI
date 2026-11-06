@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import math
 from threading import RLock
+from time import monotonic
 
 from .projects import Project, ProjectStore
 
@@ -30,6 +31,7 @@ class AlarmMonitor:
         self.store, self.sample_values = store, sample_values
         self.lock = RLock()
         self.last_sample_at = None
+        self._last_sample_monotonic = None
         self.sampled_revision = None
         self.error = None
         with store.transaction() as db:
@@ -104,6 +106,7 @@ class AlarmMonitor:
                 db.execute('DELETE FROM alarm_note WHERE occurrence_id NOT IN (SELECT id FROM alarm_occurrence)')
                 db.execute('DELETE FROM alarm_event_context WHERE event_id NOT IN (SELECT id FROM alarm_event)')
             self.last_sample_at, self.sampled_revision, self.error = now, active["active_revision"], None
+            self._last_sample_monotonic = monotonic()
 
     @staticmethod
     def _signature(definition):
@@ -159,7 +162,9 @@ class AlarmMonitor:
                 row['shelf'] = self.shelves.for_occurrence(row, shelves)
             annunciated = [row for row in outstanding if not row['shelf']]
             history = [{"id": row[0], "occurrence_id": row[1], "alarm_id": row[2], "event": row[3], "timestamp": row[4]} for row in db.execute("SELECT * FROM alarm_event ORDER BY id DESC")]
-            return {"last_sample_at": self.last_sample_at, "sampled_revision": self.sampled_revision, "error": self.error, "states": states,
+            stale = self._last_sample_monotonic is not None and monotonic() - self._last_sample_monotonic >= 5
+            return {"last_sample_at": self.last_sample_at, "sampled_revision": self.sampled_revision,
+                    "evaluation_stale": stale, "error": self.error, "states": states,
                     "active_count": sum(row["active"] for row in outstanding),
                     "unacknowledged_count": sum(row["acknowledged_at"] is None for row in outstanding),
                     'shelved_count': len(shelves), 'shelved_occurrence_count': len(outstanding) - len(annunciated),
