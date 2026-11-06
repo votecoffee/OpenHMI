@@ -34,6 +34,49 @@ class ControlBase(StrictModel):
     active_color: str = Field(default='#002878', pattern=r'^#[a-fA-F0-9]{6}$')
 
 
+StateCode = Annotated[int, Field(ge=-(2**53 - 1), le=2**53 - 1)]
+
+
+class MachineState(StrictModel):
+    value: StateCode
+    label: str = Field(min_length=1, max_length=100)
+    symbol: Literal['circle', 'square', 'triangle', 'diamond'] = 'circle'
+    color: str = Field(default='#333333', pattern=r'^#[a-fA-F0-9]{6}$')
+
+
+class StateControl(ControlBase):
+    tag: str = Field(min_length=1, max_length=200)
+    states: list[MachineState] = Field(min_length=2, max_length=32)
+
+    @model_validator(mode='after')
+    def unique_states(self):
+        if len({state.value for state in self.states}) != len(self.states):
+            raise ValueError('Machine state codes must be unique')
+        return self
+
+
+class MultiStateControl(StateControl):
+    kind: Literal['multi_state']
+
+
+class ModeSelectorControl(StateControl):
+    kind: Literal['mode_selector']
+    confirmed_tag: str = Field(min_length=1, max_length=200)
+    presentation: Literal['dropdown', 'segments'] = 'dropdown'
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+
+class PermissiveRow(StrictModel):
+    tag: str = Field(min_length=1, max_length=200)
+    label: str = Field(min_length=1, max_length=100)
+    expected: bool = True
+
+
+class PermissiveControl(ControlBase):
+    kind: Literal['permissives']
+    checks: list[PermissiveRow] = Field(min_length=1, max_length=32)
+
+
 class NumericControl(ControlBase):
     kind: Literal["numeric"]
     tag: str = Field(min_length=1, max_length=200)
@@ -276,7 +319,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

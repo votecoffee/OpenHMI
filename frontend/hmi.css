@@ -65,6 +65,11 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .quality-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; }
 .quality-details dt { font-weight: bold; }
 .quality-details dd { margin: 0; overflow-wrap: anywhere; }
+.machine-state-value { display: inline-flex; gap: .4em; align-items: baseline; }
+.machine-mode-options, .machine-mode-segments { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.machine-mode-segments [aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: -2px; }
+.machine-permissives { list-style: none; padding: 0; margin: 0; width: 100%; }
+.machine-permissives li { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; padding: 4px 0; border-top: 1px solid #ccc; }
 .hmi-action { color: white; background: var(--hmi-command); border: 1px solid #333; border-radius: 0; padding: 10px 12px; min-height: 44px; font: bold 12.41px "OpenHMI Noto", Arial, sans-serif; cursor: pointer; }
 .hmi-action:disabled { color: #666; background: #c6c6c6; border-color: #999; opacity: 1; cursor: default; }
 .command-feedback { min-height: 13px; color: #555; font-size: 10.50px; }

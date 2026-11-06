@@ -2,6 +2,82 @@ import { test, expect } from '@playwright/test';
 
 test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true });
 
+test('machine state, mode selection and permissives use live quality and separate feedback', async ({ page }) => {
+  const login = await page.request.post('/api/security/login', {
+    data: { name: 'admin', password: 'SecurityTestOnly-2026!' },
+  });
+  expect(login.ok()).toBe(true);
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply = true) {
+    const current = await (await page.request.get('/api/project')).json();
+    const saved = await page.request.put('/api/project/draft', { data: { project, expected_revision: current.draft_revision } });
+    expect(saved.ok(), await saved.text()).toBe(true);
+    if (apply) {
+      const applied = await page.request.post('/api/project/apply', { data: { expected_revision: (await saved.json()).draft_revision } });
+      expect(applied.ok(), await applied.text()).toBe(true);
+    }
+  }
+  const states = [
+    { value: 0, label: 'Manual', symbol: 'square', color: '#555555' },
+    { value: 1, label: 'Auto', symbol: 'circle', color: '#333333' },
+  ];
+  const project = {
+    title: 'Machine state station',
+    tags: [
+      { name: 'ModeRequest', type: 'integer', initial: 0, writable: true },
+      { name: 'ModeFeedback', type: 'integer', initial: 0 },
+      { name: 'PilotMotorRunning', type: 'boolean', initial: true },
+      { name: 'PilotFaulted', type: 'boolean', initial: false },
+    ],
+    controls: [
+      { id: 'state', kind: 'multi_state', label: 'Actual machine state', tag: 'ModeFeedback', states },
+      { id: 'mode', kind: 'mode_selector', label: 'Operating mode', tag: 'ModeRequest', confirmed_tag: 'ModeFeedback',
+        states, presentation: 'segments', security_groups: ['Administrators'] },
+      { id: 'checks', kind: 'permissives', label: 'Start permissives', checks: [
+        { tag: 'PilotMotorRunning', label: 'Motor must be stopped', expected: false },
+        { tag: 'PilotFaulted', label: 'No process alarm', expected: false },
+      ] },
+    ],
+  };
+  try {
+    await save(project);
+    await page.goto('/');
+    await page.locator('[data-control="mode_selector"] .hmi-label').click();
+    await expect(page.getByRole('combobox', { name: 'Mode request tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeRequest' }));
+    await expect(page.getByRole('combobox', { name: 'PLC confirmed mode tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeFeedback' }));
+
+    await page.goto('/runtime');
+    const state = page.locator('[data-control="multi_state"]');
+    const mode = page.locator('[data-control="mode_selector"]');
+    const permissives = page.locator('[data-control="permissives"]');
+    await expect(state).toContainText('Manual');
+    await expect(permissives.getByRole('listitem').filter({ hasText: 'Motor must be stopped' })).toContainText('Blocked');
+    await expect(permissives.getByRole('listitem').filter({ hasText: 'No process alarm' })).toContainText('Ready');
+    await mode.getByRole('button', { name: 'Auto', exact: true }).click();
+    await expect(mode.getByRole('button', { name: 'Auto', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect((await (await page.request.get('/api/tags')).json()).values.ModeRequest).toBe(0);
+    await mode.getByRole('button', { name: 'Request mode', exact: true }).click();
+    await expect(mode).toContainText('Waiting for PLC confirmation');
+    const values = (await (await page.request.get('/api/tags')).json()).values;
+    expect([values.ModeRequest, values.ModeFeedback]).toEqual([1, 0]);
+    await expect(state).toContainText('Manual');
+
+    await page.route('**/api/tags', async route => {
+      const response = await route.fetch();
+      const data = await response.json();
+      data.samples.ModeFeedback = { quality: 'stale', age_seconds: 4, error: 'Test feedback aged out' };
+      data.samples.PilotMotorRunning = { quality: 'bad', error: 'Test permissive unavailable' };
+      await route.fulfill({ response, json: data });
+    });
+    await expect(state).toContainText('STALE DATA');
+    await expect(mode.getByRole('button', { name: 'Manual', exact: true })).toBeDisabled();
+    await expect(permissives.getByRole('listitem').filter({ hasText: 'Motor must be stopped' })).toContainText('BAD DATA');
+  } finally {
+    await save(original.active);
+    if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
+  }
+});
+
 test('runtime language applies to login, keypad, and Unicode text entry', async ({ page }) => {
   test.setTimeout(60000);
   const password = 'SecurityTestOnly-2026!';

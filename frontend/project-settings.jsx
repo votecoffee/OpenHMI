@@ -32,6 +32,8 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
       [key + '.label', control.label],
       ...('unit' in control ? [[key + '.unit', control.unit]] : []),
       ...(control.kind === 'indicator' ? [[key + '.on_text', control.on_text || 'ON'], [key + '.off_text', control.off_text || 'OFF']] : []),
+      ...(control.states || []).map(state => [`${key}.state.${state.value}`, state.label]),
+      ...(control.checks || []).map((check, index) => [`${key}.check.${index}`, check.label]),
       ...(Array.isArray(control.series) ? control.series.flatMap((series, index) => [
         [`${key}.series.${index}.label`, series.label || series.tag],
         ...('unit' in series ? [[`${key}.series.${index}.unit`, series.unit]] : []),

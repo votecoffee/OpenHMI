@@ -16,10 +16,11 @@ function structureInitial(members, values) {
 export function engineeringCatalog(catalog, settings, template = null) {
   const tags = [...catalog.tags.filter(tag => !settings.tags?.some(item => item.name === tag.name || tag.name.startsWith(item.name + '.')))];
   for (const tag of settings.tags || []) {
-    tags.push({ name: tag.name, type: tag.type === 'integer' ? 'number' : tag.type, integer: tag.type === 'integer' });
-    for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer' });
+    tags.push({ name: tag.name, type: tag.type === 'integer' ? 'number' : tag.type, integer: tag.type === 'integer',
+      writable: tag.writable === true, unscaled: (tag.scale ?? 1) === 1 && (tag.offset ?? 0) === 0 });
+    for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer', writable: tag.writable === true });
   }
-  if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer' });
+  if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer', writable: true });
   return { ...catalog, tags, commands: settings.commands || [], faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
 }
 

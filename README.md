@@ -236,6 +236,17 @@ keeps its running copy; test recipes carry production status false. See the
    one scale, or a **Radar chart** with independently scaled axes. Set tags,
    labels, units and precision in the designer. See the [control catalog](docs/hmi-style-guide.md#initial-catalog).
 
+Use **Multi-state indicator** to map an integer tag to named states with a symbol
+and color. **Permissive / interlock list** shows which Boolean checks are ready,
+blocked, or unavailable. Each row can require true or false.
+
+A **Mode selector** uses a writable integer request tag and a separate
+PLC-confirmed integer tag. Configure the allowed mode codes and choose a dropdown
+or segmented buttons. Select a mode, then press **Request mode** to write the
+request. The control shows both tags and waits for PLC confirmation when they
+differ. Mode requests use the existing edit permissions, optional HMI groups,
+audit trail and write verification. The PLC controls whether to accept a mode.
+
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See
 [runtime, UDT and history semantics](docs/runtime-and-projects.md) for quality,

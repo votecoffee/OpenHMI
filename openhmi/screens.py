@@ -29,7 +29,7 @@ def expanded_controls(project, screen_id=None):
                 item = deepcopy(member)
                 item['id'] = f'{base["id"]}__{member["id"]}'
                 item['_screen'] = identifier
-                for field in ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag'):
+                for field in ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag'):
                     if item.get(field, '').startswith('$.'):
                         item[field] = control['root_tag'] + item[field][1:]
                 if item.get('tags'):
@@ -45,6 +45,9 @@ def expanded_controls(project, screen_id=None):
                     for series in item['series']:
                         if series['tag'].startswith('$.'):
                             series['tag'] = control['root_tag'] + series['tag'][1:]
+                for check in item.get('checks', []):
+                    if check['tag'].startswith('$.'):
+                        check['tag'] = control['root_tag'] + check['tag'][1:]
                 # Instance visibility/enable conditions apply in addition to member conditions.
                 item['_parent_visible'] = base.get('visible_tag', '')
                 item['_parent_enabled'] = base.get('enabled_tag', '')
@@ -53,9 +56,10 @@ def expanded_controls(project, screen_id=None):
 
 
 def referenced_tags(control):
-    fields = ('tag', 'visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag')
+    fields = ('tag', 'visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag')
     result = {control[field] for field in fields if control.get(field)}
     result.update(control.get('tags', []))
+    result.update(check['tag'] for check in control.get('checks', []))
     if control['kind'] in ('bar', 'radar'):
         result.update(series['tag'] for series in control['series'])
     if control.get('mode') in ('set', 'toggle') and control.get('target'):

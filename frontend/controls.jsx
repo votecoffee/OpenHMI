@@ -9,6 +9,7 @@ import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.
 
 import { WebBrowser } from './web-browser.jsx';
 import { EditControl } from './edit-control.jsx';
+import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
 import { ChartFields, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
@@ -287,6 +288,13 @@ export function createConfig(catalog) {
   ] });
   const limitTag = label => ({ type: 'select', label, options: [{ label: 'Fixed HMI value', value: '' }, ...catalog.tags.filter(tag => tag.type === 'number').map(tag => ({ label: tag.name, value: tag.name }))] });
   const labelField = { type: 'text', label: 'Label' };
+  const integerTag = tag => tag.integer && tag.unscaled !== false;
+  const requestedTag = tag => integerTag(tag) && tag.writable;
+  const statesField = { type: 'custom', render: ({ value, onChange }) => <StateFields value={value} onChange={onChange} /> };
+  const defaultStates = [
+    { value: 0, label: 'Stopped', symbol: 'square', color: '#555555' },
+    { value: 1, label: 'Running', symbol: 'circle', color: '#333333' },
+  ];
   const numericFields = { label: labelField, tag: tagField('number'), unit: { type: 'text', label: 'Units' },
     decimals: { type: 'select', label: 'Decimal places', options: [0, 1, 2, 3, 4].map(value => ({ label: String(value), value })) } };
   const numericDefaults = { label: 'Tank level', tag: 'TankLevel', unit: '%', decimals: 1 };
@@ -330,6 +338,24 @@ export function createConfig(catalog) {
       Faceplate: { label: 'UDT faceplate', fields: { label: labelField, template: { type: 'select', label: 'Definition', options: (catalog.faceplates || []).map(item => ({ label: item.name, value: item.id })) }, root_tag: tagField('struct') },
         defaultProps: { label: 'Equipment', template: catalog.faceplates?.[0]?.id || '', root_tag: catalog.tags.find(tag => tag.type === 'struct')?.name || '' },
         render: props => <FaceplateInstance {...props} config={config} /> },
+      MultiState: { label: 'Multi-state indicator', fields: {
+        label: labelField, tag: browserTag('State tag', 'Choose an integer tag', integerTag), states: statesField,
+      }, defaultProps: { label: 'Machine state', tag: 'AlarmWord', states: defaultStates }, render: MultiState },
+      ModeSelector: { label: 'Mode selector', fields: {
+        label: labelField, tag: browserTag('Mode request tag', 'Choose a writable integer tag', requestedTag),
+        confirmed_tag: browserTag('PLC confirmed mode tag', 'Choose a separate integer tag', integerTag),
+        states: statesField, security_groups: groupsField,
+        presentation: { type: 'select', label: 'Presentation', options: [
+          { label: 'Dropdown', value: 'dropdown' }, { label: 'Segmented buttons', value: 'segments' },
+        ] },
+      }, defaultProps: { label: 'Machine mode', tag: catalog.tags.find(requestedTag)?.name || '', confirmed_tag: '',
+        states: [{ ...defaultStates[0], label: 'Manual' }, { ...defaultStates[1], label: 'Auto' }],
+        presentation: 'dropdown', security_groups: [] }, render: ModeSelector },
+      PermissiveList: { label: 'Permissive / interlock list', fields: {
+        label: labelField, checks: { type: 'custom', render: ({ value, onChange }) =>
+          <PermissiveFields value={value} onChange={onChange} catalog={catalog} /> },
+      }, defaultProps: { label: 'Start permissives', checks: [{ tag: 'MotorRunning', label: 'Motor running', expected: false }] },
+      render: PermissiveList },
       NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, minimum_tag: limitTag('Minimum from tag'), maximum_tag: limitTag('Maximum from tag'), security_groups: groupsField },
         defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
@@ -390,9 +416,11 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config, enable
   return <article className="hmi-faceplate" data-control="faceplate"><strong>{text(`control.${id}.label`, label)}</strong><div className="faceplate-grid">{definition.controls.map(control => {
     const resolved = { ...control, id: `${id}__${control.id}`, puck, instance_enabled_tag: enabled_tag };
     for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag',
-      'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag']) {
+      'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag']) {
       if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
     }
+    if (resolved.checks) resolved.checks = resolved.checks.map(check =>
+      check.tag.startsWith('$.') ? { ...check, tag: root_tag + check.tag.slice(1) } : check);
     if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
     if (Array.isArray(resolved.series)) resolved.series = resolved.series.map(item =>
       item.tag.startsWith('$.') ? { ...item, tag: root_tag + item.tag.slice(1) } : item);

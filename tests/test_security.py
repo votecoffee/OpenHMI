@@ -4,6 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from openhmi.server import create_app
 from openhmi.security_routes import SecurityChange
@@ -50,6 +51,54 @@ class SecurityTests(unittest.TestCase):
     def user(self, name, groups):
         result = self.change('user', name=name, groups=groups, password=PASSWORD)
         self.assertEqual(result.status_code, 200, result.text)
+
+    def test_mode_requests_use_the_applied_allowlist_and_separate_feedback(self):
+        state = self.client.get('/api/project').json()
+        draft = state['draft']
+        draft['tags'] += [
+            {'name': 'ModeRequest', 'type': 'integer', 'initial': 0, 'writable': True},
+            {'name': 'ModeFeedback', 'type': 'integer', 'initial': 0},
+            {'name': 'ModePermit', 'type': 'boolean', 'initial': True, 'writable': True},
+        ]
+        modes = [{'value': 0, 'label': 'Manual'}, {'value': 1, 'label': 'Auto'}]
+        selector = {'id': 'mode', 'kind': 'mode_selector', 'label': 'Machine mode',
+                    'tag': 'ModeRequest', 'confirmed_tag': 'ModeFeedback', 'states': modes,
+                    'enabled_tag': 'ModePermit', 'security_groups': ['Administrators']}
+        draft['controls'] += [
+            selector, {'id': 'state', 'kind': 'multi_state', 'label': 'State', 'tag': 'ModeFeedback', 'states': modes},
+            {'id': 'permissives', 'kind': 'permissives', 'label': 'Permissives',
+             'checks': [{'tag': 'ModePermit', 'label': 'Mode change allowed'}]},
+        ]
+        selector['confirmed_tag'] = 'ModeRequest'
+        rejected = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': draft})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertIn('separate tags', rejected.text)
+        selector['confirmed_tag'] = 'ModeFeedback'
+        saved = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': draft})
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        revision = applied.json()['active_revision']
+        url = '/api/controls/mode/value'
+        self.assertEqual(self.client.put(url, json={'value': 1}).status_code, 422)
+        self.assertEqual(self.client.put(url, json={'value': 3, 'expected_revision': revision}).status_code, 422)
+        self.assertEqual(self.client.put(url, json={'value': 1, 'expected_revision': revision - 1}).status_code, 409)
+
+        driver = self.app.state.driver
+        driver.write('ModePermit', [False])
+        request = {'value': 1, 'expected_revision': revision}
+        self.assertEqual(self.client.put(url, json=request).status_code, 423)
+        driver.write('ModePermit', [True])
+        values = driver.snapshot()
+        values.pop('ModeFeedback')
+        with patch.object(driver, 'snapshot', return_value=values):
+            self.assertEqual(self.client.put(url, json=request).status_code, 409)
+        self.client.put(url, json=request).raise_for_status()
+        self.assertEqual(driver.read('ModeRequest'), [1])
+        self.assertEqual(driver.read('ModeFeedback'), [0])
+
+        self.client.post('/api/security/logout').raise_for_status()
+        self.assertEqual(self.client.put(url, json=request).status_code, 401)
 
     def controls(self):
         state = self.client.get('/api/project').json()

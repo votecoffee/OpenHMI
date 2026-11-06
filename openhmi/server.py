@@ -173,16 +173,20 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         tags = SimulatorDriver().snapshot()
-        kinds = {name: 'boolean' if type(value) is bool else 'string' if type(value) is str else 'number' for name, value in tags.items()}
+        kinds = {name: 'boolean' if type(value) is bool else 'string' if type(value) is str else 'integer' if type(value) is int else 'number' for name, value in tags.items()}
+        sources = {}
+        routes = {route.id: route.path.rstrip('/').casefold() for route in project.connections}
         for tag in project.tags:
             if tag.name in kinds:
                 raise HTTPException(422, 'Built-in simulation/recipe tags cannot be redefined')
             kinds[tag.name] = 'number' if tag.type == 'integer' and (tag.scale != 1 or tag.offset != 0) else tag.type
+            sources[tag.name] = (tag, '')
             for member, kind in tag.members.items():
                 alias = tag.name + '.' + member
                 if alias in kinds:
                     raise HTTPException(422, 'Tag aliases collide')
                 kinds[alias] = kind
+                sources[alias] = (tag, '.' + member)
         publication = project.identity_publication
         if publication.enabled:
             from .security import PERMISSIONS
@@ -234,7 +238,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(422, 'Expanded control IDs collide; rename the screen, control or faceplate member control')
         known_groups = {group['name'] for group in security.snapshot()['groups']}
         for control in controls:
-            if publication.enabled and ((control['kind'] in ('input', 'text_input') and control.get('tag') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag)) or (control['kind'] == 'button' and control.get('mode') in ('set', 'toggle') and control.get('target') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag))):
+            if publication.enabled and ((control['kind'] in ('input', 'text_input', 'mode_selector') and control.get('tag') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag)) or (control['kind'] == 'button' and control.get('mode') in ('set', 'toggle') and control.get('target') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag))):
                 raise HTTPException(422, 'Identity publication tags cannot be edit or button write targets')
             for field in LIMIT_TAGS:
                 if control.get(field) and kinds.get(control[field]) not in ('number', 'integer'):
@@ -246,6 +250,27 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if not set(required) <= known_groups:
                 raise HTTPException(422, 'Control references an unknown HMI security group')
             if control['kind'] in ('recipe', 'current_user'):
+                continue
+            if control['kind'] in ('multi_state', 'mode_selector'):
+                if kinds.get(control['tag']) != 'integer':
+                    raise HTTPException(422, 'Machine states require an unscaled integer tag')
+                if control['kind'] == 'mode_selector':
+                    request_tag, request_member = sources.get(control['tag'], (None, ''))
+                    confirmed, confirmed_member = sources.get(control['confirmed_tag'], (None, ''))
+                    if not request_tag or not request_tag.writable:
+                        raise HTTPException(422, 'Mode selector requires a configured writable integer request tag')
+                    if kinds.get(control['confirmed_tag']) != 'integer':
+                        raise HTTPException(422, 'Mode confirmation requires an unscaled integer tag')
+                    same_address = (request_tag.connection and confirmed and confirmed.connection
+                                    and routes[request_tag.connection] == routes[confirmed.connection]
+                                    and (request_tag.address + request_member).casefold()
+                                    == (confirmed.address + confirmed_member).casefold())
+                    if control['tag'] == control['confirmed_tag'] or same_address:
+                        raise HTTPException(422, 'Mode request and confirmation must use separate tags')
+                continue
+            if control['kind'] == 'permissives':
+                if any(kinds.get(check['tag']) != 'boolean' for check in control['checks']):
+                    raise HTTPException(422, 'Permissive checks require Boolean tags')
                 continue
             if control['kind'] == 'web_browser':
                 if control['address_tag'] and kinds.get(control['address_tag']) != 'string':
@@ -302,12 +327,13 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     @app.get("/api/catalog")
     def catalog() -> dict:
         project = Project.model_validate(store.snapshot()['draft'])
-        tag_types = {name: 'boolean' if type(value) is bool else 'string' if type(value) is str else 'number' for name, value in SimulatorDriver().snapshot().items()}
+        builtins = SimulatorDriver().snapshot()
+        tag_types = {name: 'boolean' if type(value) is bool else 'string' if type(value) is str else 'number' for name, value in builtins.items()}
         for tag in project.tags:
             tag_types[tag.name] = 'number' if tag.type == 'integer' else tag.type
             tag_types.update({tag.name + '.' + member: 'number' if kind == 'integer' else kind for member, kind in tag.members.items()})
         return {
-            'tags': [{'name': name, 'type': kind} for name, kind in tag_types.items()],
+            'tags': [{'name': name, 'type': kind, 'integer': type(builtins.get(name)) is int} for name, kind in tag_types.items()],
             "actions": application.actions(),
             "flags": sorted(path.stem for path in (web / "assets" / "flags").glob("*.svg")),
             "security_permissions": security.snapshot()["permissions"],
@@ -436,7 +462,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             state = store.snapshot()
             stale = body.expected_revision is not None and body.expected_revision != state['active_revision']
             control = None if stale else next((item for item in expanded_controls(state['active'])
-                                               if item['id'] == control_id and item['kind'] in ('input', 'text_input')), None)
+                                               if item['id'] == control_id and item['kind'] in ('input', 'text_input', 'mode_selector')), None)
             context = {'requested_value': body.value, 'control_id': control_id,
                        'expected_revision': body.expected_revision, 'active_revision': state['active_revision'],
                        'tag': control.get('tag') if control else None, 'screen': control.get('_screen') if control else None}
@@ -451,18 +477,27 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if not control:
                 raise HTTPException(404, 'Active edit control not found')
             security.require(http, 'runtime.write', control.get('security_groups', []))
-            if not enabled(control, application.driver.snapshot()):
+            values = application.driver.snapshot()
+            if not enabled(control, values):
                 raise HTTPException(423, 'Control is disabled by its tag bindings')
-            if control['tag'] not in application.driver.snapshot():
+            if control['tag'] not in values:
                 raise HTTPException(409, 'Input tag has no good-quality value')
-            try:
-                limits = edit_limits(control, application.driver.snapshot())
-            except ValueError as error:
-                raise HTTPException(409, str(error)) from error
-            try:
-                validate_entry(control, body.value, limits)
-            except ValueError as error:
-                raise HTTPException(422, str(error)) from error
+            if control['kind'] == 'mode_selector':
+                if body.expected_revision is None:
+                    raise HTTPException(422, 'Mode requests require the applied project revision')
+                if control['confirmed_tag'] not in values:
+                    raise HTTPException(409, 'Mode confirmation tag has no good-quality value')
+                if type(body.value) is not int or body.value not in {state['value'] for state in control['states']}:
+                    raise HTTPException(422, 'Unknown machine mode')
+            else:
+                try:
+                    limits = edit_limits(control, values)
+                except ValueError as error:
+                    raise HTTPException(409, str(error)) from error
+                try:
+                    validate_entry(control, body.value, limits)
+                except ValueError as error:
+                    raise HTTPException(422, str(error)) from error
             value = application.driver.coerce_number(control['tag'], body.value) if control['kind'] == 'input' else body.value
             ticket.dispatch(tag=control['tag'], screen=control['_screen'], before=application.driver.sample_snapshot().get(control['tag']), requested_value=value)
             try:
