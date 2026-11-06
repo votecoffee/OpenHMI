@@ -1,6 +1,74 @@
 import { test, expect } from '@playwright/test';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
+test('malformed identity status preserves the last confirmed sign-in and recovers', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const signedOut = await (await page.request.get('/api/security/session')).json();
+  let malformed = true;
+  let status = {};
+  let holdPoll = false;
+  let confirmed;
+  let markHeld, releaseHeld;
+  const pollHeld = new Promise(resolve => { markHeld = resolve; });
+  const heldReply = new Promise(resolve => { releaseHeld = resolve; });
+  const sessionEndpoint = '**/api/security/session';
+  await page.route(sessionEndpoint, async route => {
+    if (holdPoll) {
+      holdPoll = false;
+      markHeld();
+      await heldReply;
+      return route.fulfill({ json: confirmed });
+    }
+    return malformed ? route.fulfill({ json: status }) : route.continue();
+  });
+  await page.goto('/runtime');
+  const bar = page.locator('.security-bar');
+  const action = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
+  const warning = page.getByText('HMI identity status unavailable.', { exact: false });
+  await expect(warning).toBeVisible();
+  await expect(action).toBeDisabled();
+  await expect(bar).toContainText('Login status unavailable');
+
+  malformed = false;
+  await expect(warning).toBeHidden();
+  const response = await page.request.post('/api/security/login', { data: { name: 'admin', password: 'SecurityTestOnly-2026!' } });
+  expect(response.ok()).toBe(true);
+  await expect(bar).toContainText('Signed in: admin');
+  await expect(action).toBeEnabled();
+  confirmed = await (await page.request.get('/api/security/session')).json();
+  status = { ...confirmed, user: { ...confirmed.user, permissions: {} } };
+  malformed = true;
+  await expect(warning).toBeVisible();
+  await expect(bar).toContainText('Signed in: admin');
+  const { values } = await (await page.request.get('/api/tags')).json();
+  await expect(page.locator('[data-control="numeric"]')).toContainText(values.TankLevel.toFixed(1));
+
+  holdPoll = true;
+  try {
+    await pollHeld;
+    const refresh = page.waitForResponse(sessionEndpoint);
+    await bar.getByRole('button', { name: 'Sign out of HMI' }).click();
+    await refresh;
+    await expect(bar).toContainText('Login status unavailable');
+    await expect(action).toBeDisabled();
+    expect((await (await page.request.get('/api/security/session')).json()).user).toBeNull();
+    // Finish the pre-logout poll and wait for its successor before checking the UI.
+    const nextPoll = page.waitForRequest(sessionEndpoint);
+    releaseHeld();
+    await nextPoll;
+    await expect(bar).toContainText('Login status unavailable');
+    await expect(action).toBeDisabled();
+  } finally {
+    releaseHeld();
+  }
+  status = signedOut;
+  await expect(bar).toContainText('Signed out');
+  await expect(warning).toBeHidden();
+  await expect(action).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
 test('HMI groups administer and enforce button and numeric input access', async ({ page }) => {
   test.setTimeout(90000);
   const errors = [];

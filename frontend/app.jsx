@@ -34,6 +34,22 @@ function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function requireIdentitySnapshot(identity) {
+  const strings = values => Array.isArray(values) && values.every(value => typeof value === 'string');
+  const { configured, windows_enabled, windows_available, user, groups } = identity ?? {};
+  const validGroup = group => isRecord(group) && typeof group.name === 'string'
+    && typeof group.color === 'string' && strings(group.permissions);
+  const validUser = user === null || (isRecord(user) && typeof user.name === 'string'
+    && ['local', 'windows'].includes(user.provider) && strings(user.groups)
+    && strings(user.permissions) && strings(user.roles));
+  if (typeof configured !== 'boolean' || typeof windows_enabled !== 'boolean'
+    || typeof windows_available !== 'boolean' || !Array.isArray(groups) || !groups.every(validGroup)
+    || !validUser || (!configured && user !== null)) {
+    throw new Error('Invalid HMI identity status response');
+  }
+  return identity;
+}
+
 function isAlarmSnapshot(alarms) {
   if (!isRecord(alarms)) return false;
   const { states, outstanding, annunciated_outstanding: annunciated = outstanding,
@@ -332,7 +348,19 @@ function App({ initial, catalog }) {
   const [identityAvailable, setIdentityAvailable] = useState(true);
   const editorStarted = useRef(false);
   if (allowed(session, 'project.edit')) editorStarted.current = true;
-  async function refreshSession() { try { setSession(await api('/api/security/session')); } catch { setSession(null); } }
+  const identityGeneration = useRef(0);
+  async function refreshSession() {
+    const generation = ++identityGeneration.current;
+    setSession(null);
+    setIdentityAvailable(false);
+    try {
+      const identity = requireIdentitySnapshot(await api('/api/security/session'));
+      if (generation === identityGeneration.current) {
+        setSession(identity);
+        setIdentityAvailable(true);
+      }
+    } catch { /* The next poll can confirm the new session. */ }
+  }
   useEffect(() => {
     function navigate(event) {
       const { mode, screen, opener } = event.detail;
@@ -386,14 +414,15 @@ function App({ initial, catalog }) {
     };
   }, [leasedScreens, editorSubscription.root, runtime]);
   useEffect(() => {
-    function poll(path, onSuccess, onFailure) {
+    function poll(path, onSuccess, onFailure, generation) {
       let stopped = false, timer;
       async function tick() {
+        const started = generation?.current;
         try {
           const data = await api(path);
-          if (!stopped) onSuccess(data);
+          if (!stopped && started === generation?.current) onSuccess(data);
         } catch {
-          if (!stopped) onFailure();
+          if (!stopped && started === generation?.current) onFailure();
         }
         if (!stopped) timer = setTimeout(tick, updateRate.current);
       }
@@ -424,9 +453,9 @@ function App({ initial, catalog }) {
       setLive(previous => ({ ...previous, recipeSelection: null, recipeConnected: false }));
     });
     const stopIdentity = poll('/api/security/session', identity => {
-      setSession(identity);
+      setSession(requireIdentitySnapshot(identity));
       setIdentityAvailable(true);
-    }, () => setIdentityAvailable(false));
+    }, () => setIdentityAvailable(false), identityGeneration);
     const stopProject = poll('/api/project/active', next => {
       if (!isAppliedProjectSnapshot(next)) throw new Error('Invalid applied project response');
       if (next.project_instance !== initial.project_instance) {

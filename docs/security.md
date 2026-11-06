@@ -92,8 +92,12 @@ the group requirement when they have the operation permission.
 For example, create **Maintenance**, grant it `runtime.operate` and
 `runtime.write`, assign technicians to it and select it on protected controls.
 Other operators can still see the current value, but their input and button are
-disabled. The Python API enforces the same rule on every operation. Unavailable
-login status, expired sessions and missing memberships lock the controls.
+disabled. The Python API checks the current session on every operation. The
+browser keeps the last confirmed sign-in and warns when a routine status poll
+fails or returns an invalid response. If no sign-in status can be confirmed at
+startup or after signing in or out, the browser locks protected controls until
+a valid response arrives. A confirmed expired session or missing permission
+also leaves protected controls locked.
 
 Numeric inputs bind to existing numeric logical tags, including UDT members, and have server
 validated minimum/maximum values. Writes are accepted only through an active

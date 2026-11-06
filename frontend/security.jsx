@@ -9,7 +9,7 @@ export function openLogin() { window.dispatchEvent(new Event('openhmi-login')); 
 export function CurrentUser({ label = 'Current user' }) {
   const { session } = useContext(SecurityContext) || {};
   const ui = useUi();
-  return <article className="hmi-control hmi-current-user" data-control="current_user"><span>{label}</span><strong>{session?.user?.name || (session?.configured ? ui('hmiSignedOut') : 'Unsecured simulation')}</strong><button onClick={openLogin}>{ui('openHmiLogin')}</button></article>;
+  return <article className="hmi-control hmi-current-user" data-control="current_user"><span>{label}</span><strong>{session ? (session.user?.name || (session.configured ? ui('hmiSignedOut') : 'Unsecured simulation')) : ui('loginStatusUnavailable')}</strong><button onClick={openLogin}>{ui('openHmiLogin')}</button></article>;
 }
 
 export function SecurityLock({ label, permission, groups = [], additionalGroups = [] }) {

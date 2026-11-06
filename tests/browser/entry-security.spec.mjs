@@ -196,7 +196,7 @@ test('touch entry, colored lock legend, login popup and explicit PLC identity st
     await quality.getByRole('button', { name: 'Close Tag quality details' }).tap();
     permitBad = true;
     await expect(page.getByRole('button', { name: 'Inspect TouchPermit quality (Enable tag · PLC COMM LOSS)', exact: true })).toBeEnabled();
-    await page.unroute('**/api/tags');
+    await page.unrouteAll({ behavior: 'wait' });
     await expect(keypad).toBeEnabled();
     await keypad.click();
     const numeric = page.getByRole('dialog', { name: 'Numeric entry: Touch number', exact: true });
@@ -216,7 +216,7 @@ test('touch entry, colored lock legend, login popup and explicit PLC identity st
     await expect(numeric.getByRole('status')).toHaveText('Maximum TouchHigh · STALE DATA');
     await expect(accept).toBeDisabled();
     await expect(entry).toHaveValue('25');
-    await page.unroute('**/api/tags');
+    await page.unrouteAll({ behavior: 'wait' });
     await expect(accept).toBeEnabled();
     await expect(entry).toHaveValue('25');
     await accept.click();
