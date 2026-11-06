@@ -73,6 +73,7 @@ class CanvasImages:
     def __init__(self, store):
         self.store = store
         with store.transaction() as db:
+            db.create_function('openhmi_image_casefold', 1, str.casefold, deterministic=True)
             db.execute('''CREATE TABLE IF NOT EXISTS canvas_image (
                 id TEXT PRIMARY KEY, media_type TEXT NOT NULL, data BLOB NOT NULL, name TEXT NOT NULL DEFAULT ''
             )''')
@@ -108,12 +109,19 @@ class CanvasImages:
                        (identifier, 'image/webp', data, filename))
         return identifier
 
-    def list(self, before, limit):
+    def list(self, before, limit, search=''):
+        conditions, parameters = [], []
+        if before is not None:
+            conditions.append('rowid < ?')
+            parameters.append(before)
+        term = search.strip().casefold()
+        if term:
+            conditions.append('(instr(openhmi_image_casefold(name), ?) > 0 OR instr(id, ?) = 1)')
+            parameters.extend((term, term))
+        where = ' WHERE ' + ' AND '.join(conditions) if conditions else ''
         with self.store._lock:
-            query = 'SELECT rowid, id, name FROM canvas_image'
-            where, parameters = ('', ()) if before is None else (' WHERE rowid < ?', (before,))
-            rows = self.store._db.execute(query + where + ' ORDER BY rowid DESC LIMIT ?',
-                                          (*parameters, limit + 1)).fetchall()
+            rows = self.store._db.execute('SELECT rowid, id, name FROM canvas_image' + where
+                                          + ' ORDER BY rowid DESC LIMIT ?', (*parameters, limit + 1)).fetchall()
         return {'items': [{'id': identifier, 'name': name} for _, identifier, name in rows[:limit]],
                 'next_before': rows[limit - 1][0] if len(rows) > limit else None}
 
@@ -159,9 +167,9 @@ def add_canvas_routes(app, images, security):
 
     @app.get('/api/canvas-images')
     def list_images(request: Request, before: int | None = Query(default=None, ge=1, le=9223372036854775807),
-                    limit: int = Query(default=12, ge=1, le=32)):
+                    limit: int = Query(default=12, ge=1, le=32), search: str = Query(default='', max_length=100)):
         security.require(request, 'project.edit')
-        return images.list(before, limit)
+        return images.list(before, limit, search)
 
     @app.get('/api/canvas-images/{identifier}')
     def image(identifier: str):

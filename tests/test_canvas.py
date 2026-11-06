@@ -39,16 +39,25 @@ class CanvasBackupTests(unittest.TestCase):
         identifier = image.json()['id']
         off = BytesIO()
         Image.new('RGB', (40, 30), '#123456').save(off, format='PNG')
-        off_image = client.post('/api/canvas-images', content=off.getvalue(), params={'name': 'Closed.png'})
+        off_image = client.post('/api/canvas-images', content=off.getvalue(), params={'name': 'Straße.png'})
         self.assertEqual(off_image.status_code, 200, off_image.text)
         off_id = off_image.json()['id']
         duplicate = client.post('/api/canvas-images', content=off.getvalue(), params={'name': 'Copy.png'})
         self.assertEqual(duplicate.json()['id'], off_id)
         newest = client.get('/api/canvas-images', params={'limit': 1}).json()
-        self.assertEqual(newest['items'], [{'id': off_id, 'name': 'Closed.png'}])
+        self.assertEqual(newest['items'], [{'id': off_id, 'name': 'Straße.png'}])
         older = client.get('/api/canvas-images', params={'before': newest['next_before']}).json()
         self.assertEqual(older['items'], [{'id': identifier, 'name': 'Background.png'}, {'id': legacy_id, 'name': ''}])
         self.assertIsNone(older['next_before'])
+        match = client.get('/api/canvas-images', params={'search': ' STRASSE '}).json()
+        self.assertEqual(match['items'], [{'id': off_id, 'name': 'Straße.png'}])
+        by_id = client.get('/api/canvas-images', params={'search': legacy_id[:8].upper()}).json()
+        self.assertEqual(by_id['items'], [{'id': legacy_id, 'name': ''}])
+        filtered = client.get('/api/canvas-images', params={'search': 'PNG', 'limit': 1}).json()
+        self.assertEqual(filtered['items'], newest['items'])
+        next_page = client.get('/api/canvas-images', params={'search': 'PNG', 'before': filtered['next_before']}).json()
+        self.assertEqual(next_page['items'], [{'id': identifier, 'name': 'Background.png'}])
+        self.assertIsNone(next_page['next_before'])
         state_image = {'id': 'valve', 'kind': 'state_image', 'label': 'Valve', 'tag': 'MotorRunning',
                        'on_image': identifier, 'off_image': 'f' * 64}
         positions = {'id': 'positions', 'kind': 'multi_state_image', 'label': 'Positions', 'tag': 'AlarmWord',

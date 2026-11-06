@@ -286,7 +286,18 @@ test('project image picker reuses assets in controls and freeform layers', async
     });
     await upload.getByRole('button', { name: 'Choose from project', exact: true }).click();
     const picker = page.getByRole('dialog', { name: 'Project images', exact: true });
-    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    const search = picker.getByRole('searchbox', { name: 'Search project images', exact: true });
+    const submitSearch = picker.getByRole('button', { name: 'Search', exact: true });
+    const equipment = picker.getByRole('button', { name: `Use Equipment.png (${id.slice(0, 8)})`, exact: true });
+    await search.fill('no-such-asset');
+    await submitSearch.click();
+    await expect(picker.getByText('No matching project images')).toBeVisible();
+    await picker.getByRole('button', { name: 'Clear search', exact: true }).click();
+    await expect(equipment).toBeVisible();
+    await search.fill('EQUIP');
+    await search.press('Enter');
+    await expect(picker.locator('.project-image-list button')).toHaveCount(1);
+    await equipment.click();
     expect(uploads).toBe(0);
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
@@ -316,12 +327,15 @@ test('project image picker reuses assets in controls and freeform layers', async
     await expect(background).toBeFocused();
     await pan.click();
     await background.click();
-    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    await search.fill(id.slice(0, 8).toUpperCase());
+    await submitSearch.click();
+    await expect(picker.locator('.project-image-list button')).toHaveCount(1);
+    await equipment.click();
     await expect(background).toBeFocused();
     await expect(canvas.locator('.canvas-background')).toHaveAttribute('src', '/api/canvas-images/' + id);
 
     await page.getByRole('button', { name: 'Choose image object from project', exact: true }).click();
-    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    await equipment.click();
     await expect(canvas.locator('.canvas-selected .canvas-decoration-art')).toHaveAttribute('src', '/api/canvas-images/' + id);
     await page.getByRole('button', { name: 'Lock as background', exact: true }).click();
     await expect(canvas.locator('[data-background-locked] .canvas-decoration-art')).toHaveAttribute('src', '/api/canvas-images/' + id);
