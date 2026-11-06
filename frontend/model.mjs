@@ -3,7 +3,7 @@ export const controlTypes = {
   analog: 'AnalogRange', tank: 'TankLevel', bar: 'BarGraph', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe',
   input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
-  text_input: 'TextInput', text_area: 'TextArea', current_user: 'CurrentUser',
+  text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', web_browser: 'WebBrowser',
   multi_state: 'MultiState', mode_selector: 'ModeSelector', permissives: 'PermissiveList',
@@ -46,7 +46,7 @@ export function toProject(data, settings = {}) {
       if (type === 'TextDisplay') return { ...base, tag: props.tag };
       if (type === 'Dropdown' || type === 'RadioGroup') return { ...base, tag: props.tag, options: props.options, security_groups: props.security_groups || [] };
       if (type === 'Checkbox' || type === 'ToggleSwitch') return { ...base, tag: props.tag, security_groups: props.security_groups || [] };
-      if (type === 'TextInput' || type === 'TextArea') return { ...base, tag: props.tag, min_length: Number(props.min_length ?? 0), max_length: Number(props.max_length ?? 82), min_length_tag: props.min_length_tag || '', max_length_tag: props.max_length_tag || '', security_groups: props.security_groups || [] };
+      if (['TextInput', 'TextArea', 'BarcodeInput'].includes(type)) return { ...base, tag: props.tag, min_length: Number(props.min_length ?? 0), max_length: Number(props.max_length ?? 82), min_length_tag: props.min_length_tag || '', max_length_tag: props.max_length_tag || '', security_groups: props.security_groups || [] };
       if (type === 'ActionButton') return { ...base, action: props.action || '', mode: props.mode || 'python', command: props.command || '', target: props.target || '', value: props.value ?? false, screen: props.screen || 'overview', security_groups: props.security_groups || [] };
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
       if (type === 'Indicator') return { ...base, tag: props.tag, on_text: props.on_text ?? 'ON', off_text: props.off_text ?? 'OFF' };

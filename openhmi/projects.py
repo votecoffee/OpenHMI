@@ -202,7 +202,7 @@ class RecipeSelectionControl(ControlBase):
 
 
 class TextInputControl(ControlBase):
-    kind: Literal['text_input', 'text_area']
+    kind: Literal['text_input', 'text_area', 'barcode_input']
     tag: str = Field(min_length=1, max_length=200)
     min_length: int = Field(default=0, ge=0, le=4096)
     max_length: int = Field(default=82, ge=0, le=4096)

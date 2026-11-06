@@ -227,6 +227,7 @@ function ActionButton({ id, label, action, mode = 'python', command = '', target
 function NumericInput(props) { return <EditControl {...props} />; }
 function TextInput(props) { return <EditControl {...props} text />; }
 function TextArea(props) { return <EditControl {...props} text multiline />; }
+function BarcodeInput(props) { return <EditControl {...props} text barcode />; }
 
 function SelectedRecipe({ id, label }) {
   const { text } = useLocalization();
@@ -352,7 +353,7 @@ export function createConfig(catalog) {
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
-  const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
+  const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
       fields: { title: { type: 'text', label: 'Screen name' }, columns: { type: 'select', label: 'Columns',
@@ -417,6 +418,8 @@ export function createConfig(catalog) {
       TextInput: { label: 'Text input', fields: textFields, defaultProps: textDefaults, render: TextInput },
       TextArea: { label: 'Text area', fields: { ...textFields, tag: browserTag('Tag', 'Choose a writable text tag', writableText) },
         defaultProps: { ...textDefaults, label: 'Operator notes', tag: catalog.tags.find(writableText)?.name || '' }, render: TextArea },
+      BarcodeInput: { label: 'Barcode scanner input', fields: { ...textFields, tag: browserTag('Tag', 'Choose a writable text tag', writableText) },
+        defaultProps: { ...textDefaults, label: 'Barcode', tag: catalog.tags.find(writableText)?.name || '', min_length: 1 }, render: BarcodeInput },
       Dropdown: discrete('dropdown', 'Dropdown', writableChoice, true),
       RadioGroup: discrete('radio_group', 'Radio group', writableChoice, true),
       Checkbox: discrete('checkbox', 'Checkbox', writableBoolean),
@@ -458,7 +461,7 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === ActionButton || component === config.components.Slider;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === BarcodeInput || renderer === ActionButton || component === config.components.Slider;
     component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
       {renderer(props)}
     </Conditional>;

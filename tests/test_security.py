@@ -107,6 +107,7 @@ class SecurityTests(unittest.TestCase):
             {'name': 'Choice', 'type': 'integer', 'initial': 0, 'writable': True},
             {'name': 'Flag', 'type': 'boolean', 'initial': False, 'writable': True},
             {'name': 'Notes', 'type': 'string', 'initial': '', 'writable': True},
+            {'name': 'Scan', 'type': 'string', 'initial': '', 'writable': True},
         ]
         dropdown = {'id': 'choice', 'kind': 'dropdown', 'tag': 'Choice', 'label': 'Choice',
                     'options': [{'value': 0, 'label': 'Low'}, {'value': 1, 'label': 'High'}],
@@ -114,6 +115,7 @@ class SecurityTests(unittest.TestCase):
         draft['controls'] += [
             dropdown, {'id': 'flag', 'kind': 'toggle_switch', 'tag': 'Flag', 'label': 'Flag'},
             {'id': 'notes', 'kind': 'text_area', 'tag': 'Notes', 'label': 'Notes', 'max_length': 4},
+            {'id': 'scan', 'kind': 'barcode_input', 'tag': 'Scan', 'label': 'Scan', 'max_length': 6},
         ]
 
         def save():
@@ -122,9 +124,9 @@ class SecurityTests(unittest.TestCase):
         dropdown['tag'] = 'Flag'
         self.assertEqual(save().status_code, 422)
         dropdown['tag'] = 'Choice'
-        draft['tags'][-3]['writable'] = False
+        draft['tags'][-4]['writable'] = False
         self.assertEqual(save().status_code, 422)
-        draft['tags'][-3]['writable'] = True
+        draft['tags'][-4]['writable'] = True
         saved = save()
         saved.raise_for_status()
         applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -142,6 +144,10 @@ class SecurityTests(unittest.TestCase):
         for invalid in (True, 1.0, '1', 2):
             self.assertEqual(write('choice', invalid).status_code, 422)
         self.assertEqual(write('notes', 'AB\nCD').status_code, 422)
+        self.assertEqual(write('scan', '000123', None).status_code, 422)
+        for invalid in ('', 'A\rB', 'A\nB', 'A\x00B', '0001234'):
+            self.assertEqual(write('scan', invalid).status_code, 422)
+        write('scan', ' 0001 ').raise_for_status()
         driver = self.app.state.driver
         values = driver.snapshot()
         values.pop('Choice')
@@ -151,6 +157,7 @@ class SecurityTests(unittest.TestCase):
         write('notes', 'A\n文').raise_for_status()
         self.assertEqual(driver.read('Choice'), [1])
         self.assertEqual(driver.read('Notes'), ['A\n文'])
+        self.assertEqual(driver.read('Scan'), [' 0001 '])
         self.client.post('/api/security/logout').raise_for_status()
         self.assertEqual(write('choice', 0).status_code, 401)
 

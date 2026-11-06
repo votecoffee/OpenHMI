@@ -47,6 +47,8 @@ export const uiText = {
   actionCommandBinding: 'Command channel', actionTargetBinding: 'Target tag',
   editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',
   editRevisionChanged: 'The applied project changed. Reopen the keypad or clear and re-enter the value.',
+  barcodeEntry: '{label} scan entry', barcodeFocus: 'Focus this field, then scan or enter a code.',
+  barcodeSubmit: 'Submit code', barcodeClear: 'Clear code', barcodeSingleLine: 'Enter one nonempty barcode line.',
   sliderDraft: 'Proposed value: {value}',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',
   valueWritePending: 'Value written; activity finalization pending. Operation {id}',

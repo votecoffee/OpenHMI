@@ -25,7 +25,7 @@ from .trend_recording import TrendRecorder, add_trend_routes
 from .screens import expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
 from .alarm_routes import add_alarm_routes
-from .edit_limits import LIMIT_TAGS, edit_limits, validate_entry
+from .edit_limits import LIMIT_TAGS, TEXT_INPUTS, edit_limits, validate_entry
 from .identity_publish import IdentityPublisher, add_identity_routes
 from .recipe_routes import add_recipe_routes
 from .security import Security
@@ -54,7 +54,7 @@ class SubscriptionRequest(BaseModel):
 
 CHOICE_INPUTS = ('dropdown', 'radio_group')
 BOOLEAN_INPUTS = ('checkbox', 'toggle_switch')
-PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'slider')
+PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'barcode_input', 'slider')
 EDIT_INPUTS = ('input', 'text_input', 'mode_selector', *PALETTE_INPUTS)
 
 
@@ -259,7 +259,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 continue
             if control['kind'] in PALETTE_INPUTS:
                 target, _ = sources.get(control['tag'], (None, ''))
-                expected = ('string',) if control['kind'] == 'text_area' else ('boolean',)
+                expected = ('string',) if control['kind'] in TEXT_INPUTS else ('boolean',)
                 if control['kind'] in CHOICE_INPUTS:
                     expected = ('integer',) if type(control['options'][0]['value']) is int else ('string',)
                 if control['kind'] == 'slider':

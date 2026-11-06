@@ -258,6 +258,10 @@ A **Slider** previews a proposed numeric setpoint until you select **Write
 value**. It supports numeric tags, fixed or tag-driven limits, and the numeric
 keypad. Unscaled integer tags use whole-number positions. A read-only **Progress bar**
 shows the live value, configured scale, and out-of-scale or unavailable status.
+A **Barcode scanner input** binds to a writable text tag. Focus the field and
+scan with a keyboard-wedge scanner configured to append Enter, or enter a code
+manually and select **Submit code**. The input preserves leading zeros and
+spaces, applies the configured text limits, and clears after a verified write.
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

@@ -2,10 +2,11 @@
 import math
 
 LIMIT_TAGS = ('minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag')
+TEXT_INPUTS = ('text_input', 'text_area', 'barcode_input')
 
 
 def edit_limits(control, values):
-    text = control['kind'] in ('text_input', 'text_area')
+    text = control['kind'] in TEXT_INPUTS
     fields = ('min_length', 'max_length') if text else ('minimum', 'maximum')
     result = []
     for field in fields:
@@ -24,8 +25,10 @@ def edit_limits(control, values):
 
 
 def validate_entry(control, value, limits):
-    if control['kind'] in ('text_input', 'text_area'):
+    if control['kind'] in TEXT_INPUTS:
         if type(value) is not str or not limits[0] <= len(value) <= limits[1] or '\x00' in value:
             raise ValueError('Text length is outside the configured limits or contains a null character')
+        if control['kind'] == 'barcode_input' and (not value or '\r' in value or '\n' in value):
+            raise ValueError('Barcode input requires one nonempty line')
     elif type(value) not in (int, float) or not math.isfinite(value) or not limits[0] <= value <= limits[1]:
         raise ValueError('Value is outside the configured input limits')

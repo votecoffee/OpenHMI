@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Live, tagValue, Quality } from './live-quality.jsx';
 import { SecurityContext, allowed, SecurityLock } from './security.jsx';
 import { useLocalization } from './localization.jsx';
@@ -6,10 +6,11 @@ import { TouchEntry } from './touch-entry.jsx';
 import { api, json } from './api.mjs';
 
 export function EditControl(props) {
-  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, slider = false, sliderInteger = false } = props;
+  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, barcode = false, slider = false, sliderInteger = false } = props;
   const live = useContext(Live), { session } = useContext(SecurityContext) || {}, { text: translate, ui } = useLocalization();
   const label = translate(`control.${id}.label`, props.label);
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [touch, setTouch] = useState(null);
+  const barcodeField = useRef(null);
   const entry = draft?.value ?? '';
   const revision = live.activeRevision;
   const authorized = allowed(session, 'runtime.write', security_groups);
@@ -41,7 +42,7 @@ export function EditControl(props) {
   });
 
   function writeBlock(expectedRevision) {
-    if (slider && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
+    if ((slider || barcode) && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
     if (!authorized) return ui('editNotAuthorized');
     if (!valid) return namedProblem('editValueBinding', tag, problem);
     for (const [state, source, labelKey] of [
@@ -56,18 +57,32 @@ export function EditControl(props) {
     return limitProblem ? ui(limitProblem) : '';
   }
 
-  const disabled = puck?.isEditing || !!writeBlock(revision) || busy;
+  const writeUnavailable = puck?.isEditing || !!writeBlock(revision);
+  const disabled = writeUnavailable || busy;
   async function save(value, expectedRevision) {
     const blockedReason = writeBlock(expectedRevision);
     if (blockedReason) throw new Error(blockedReason);
+    if (barcode && (!value || /[\r\n]/.test(value))) throw new Error(ui('barcodeSingleLine'));
     const measured = text ? Array.from(value).length : value;
     if (!text && !Number.isFinite(value) || measured < low || measured > high) throw new Error(ui('editOutsideLimits'));
     setBusy(true);
     try { const result = await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value, expected_revision: expectedRevision })); setDraft(null); setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten')); }
     finally { setBusy(false); }
   }
-  async function submit(event) { event.preventDefault(); try { if (!text && !entry.trim()) throw new Error(ui('enterValue')); await save(text ? entry : Number(entry), draft?.revision ?? revision); } catch (error) { setMessage(error.message); } }
-  return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
+  async function submit(event) {
+    event.preventDefault();
+    if (barcode && (disabled || !entry)) return;
+    try {
+      if (!text && !entry.trim()) throw new Error(ui('enterValue'));
+      await save(text ? entry : Number(entry), draft?.revision ?? revision);
+    } catch (error) { setMessage(error.message); }
+  }
+  function clearBarcode() {
+    setDraft(null);
+    setMessage('');
+    barcodeField.current?.focus();
+  }
+  return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
     {valid ? <strong className="hmi-value">{text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong> : <Quality problem={problem} tag={tag} />}
     <small>{limits.valid ? ui(text ? 'textLength' : 'numericRange', limits) : ui(limitProblem)}</small>
     {limitBindings.filter(state => !state.valid).map(({ field, source, labelKey, problem }) =>
@@ -75,7 +90,28 @@ export function EditControl(props) {
     {enabled && !enabled.valid && <Quality tag={enabled_tag} problem={enabled.problem}
       text={bindingProblem('editEnableBinding', enabled.problem)} />}
     {enabled?.valid && !bindingEnabled && <small>{ui('editEnableOff', { tag: enabled_tag })}</small>}
-    {slider ? <form className="hmi-slider" onSubmit={submit}>
+    {barcode ? <form className="hmi-barcode" onSubmit={submit}>
+      <input ref={barcodeField} type="text" aria-label={ui('barcodeEntry', { label })}
+        placeholder={ui('barcodeFocus')} autoComplete="off" autoCapitalize="none" spellCheck={false}
+        value={entry} disabled={writeUnavailable} readOnly={busy}
+        onChange={event => {
+          const code = event.target.value;
+          setDraft(previous => code ? { value: code, revision: previous?.revision ?? revision } : null);
+          setMessage('');
+        }}
+        onPaste={event => {
+          if (/[\r\n]/.test(event.clipboardData.getData('text'))) {
+            event.preventDefault();
+            setDraft(null);
+            setMessage(ui('barcodeSingleLine'));
+          }
+        }}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && event.repeat) event.preventDefault();
+        }} />
+      <button disabled={disabled || !entry}>{ui('barcodeSubmit')}</button>
+      <button type="button" disabled={disabled || !entry} onClick={clearBarcode}>{ui('barcodeClear')}</button>
+    </form> : slider ? <form className="hmi-slider" onSubmit={submit}>
       {sliderRange && <input type="range" aria-label={ui('newControlValue', { label })}
         min={sliderLow} max={sliderHigh} step={sliderInteger ? 1 : 10 ** -(props.decimals ?? 1)}
         value={sliderDraftValid ? sliderDraft : valid ? value : sliderLow} disabled={disabled}
@@ -91,8 +127,8 @@ export function EditControl(props) {
         setDraft(previous => value ? { value, revision: previous?.revision ?? revision } : null);
       },
     })}<button disabled={disabled}>{ui('writeValue')}</button></form>}
-    <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>
-    <span className="command-feedback">{message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
+    <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : barcode ? '' : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>
+    <span className="command-feedback" role={barcode ? 'status' : undefined}>{barcode && busy ? ui('working') : message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
     {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} multiline={multiline} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
   </article>;
 }

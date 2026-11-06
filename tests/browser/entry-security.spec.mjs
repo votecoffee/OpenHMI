@@ -29,6 +29,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { name: 'Notes', type: 'string', initial: 'First', writable: true },
         { name: 'Travel', type: 'integer', initial: 2, writable: true },
         { name: 'TravelLimit', type: 'number', initial: 5.5 },
+        { name: 'Scan', type: 'string', initial: '', writable: true },
       ],
       controls: [
         { id: 'color', kind: 'radio_group', tag: 'ColorChoice', label: 'Color',
@@ -38,6 +39,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { id: 'notes', kind: 'text_area', tag: 'Notes', label: 'Notes' },
         { id: 'travel', kind: 'slider', tag: 'Travel', label: 'Travel', maximum_tag: 'TravelLimit' },
         { id: 'travel_progress', kind: 'progress', tag: 'Travel', label: 'Travel progress', minimum: 0, maximum: 4 },
+        { id: 'scan', kind: 'barcode_input', tag: 'Scan', label: 'Part scan', max_length: 8 },
       ],
     });
     await page.goto('/');
@@ -93,18 +95,47 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await expect(progress).toHaveAttribute('value', '1');
     await expect(page.locator('[data-control="progress"]')).toContainText('OUT OF SCALE');
 
+    const scan = page.getByRole('textbox', { name: 'Part scan scan entry' });
+    const scanControl = page.locator('[data-control="barcode_input"]');
+    await expect(scan).not.toBeFocused();
+    await scan.focus();
+    let writes = 0;
+    page.on('request', request => {
+      if (request.method() === 'PUT' && request.url().endsWith('/api/controls/scan/value')) writes += 1;
+    });
+    await page.keyboard.type(' 00042 ');
+    expect((await (await page.request.get('/api/tags')).json()).values.Scan).toBe('');
+    await page.keyboard.press('Enter');
+    await expect(scan).toHaveValue('');
+    await expect(scan).toBeFocused();
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('00043');
+    await page.keyboard.press('Enter');
+    await expect(scan).toHaveValue('');
+    await expect(scanControl).toContainText('00043');
+    expect(writes).toBe(2);
+    await scan.evaluate(input => {
+      const clipboard = new DataTransfer();
+      clipboard.setData('text/plain', '00044\n00045');
+      input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: clipboard, bubbles: true, cancelable: true }));
+    });
+    await expect(scanControl).toContainText('Enter one nonempty barcode line');
+    await expect(scan).toHaveValue('');
+
     const data = await (await page.request.get('/api/tags')).json();
     expect(data.values).toMatchObject({
-      SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na', Travel: 5,
+      SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na', Travel: 5, Scan: '00043',
     });
     data.samples.Checked = { quality: 'stale', age_seconds: 4 };
     data.samples.Travel = { quality: 'stale', age_seconds: 4 };
+    data.samples.Scan = { quality: 'stale', age_seconds: 4 };
     await page.route('**/api/tags', route => route.fulfill({ json: data }));
     await expect(page.locator('[data-control="checkbox"]')).toContainText('STALE DATA');
     await expect(checkbox).toBeHidden();
     await expect(toggle).toBeEnabled();
     await expect(slider).toBeDisabled();
     await expect(progress).toBeHidden();
+    await expect(scan).toBeDisabled();
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
