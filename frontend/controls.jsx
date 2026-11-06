@@ -47,6 +47,26 @@ function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   </article>;
 }
 
+function ProgressBar({ id, label, tag, unit, decimals, minimum, maximum, puck }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const reading = valid ? `${value.toFixed(decimals)} ${text(`control.${id}.unit`, unit)}`.trim() : '';
+  const span = maximum - minimum;
+  const outside = valid && (value < minimum || value > maximum);
+  return <article className="hmi-control hmi-progress" data-control="progress">
+    <span className="hmi-label">{title}</span>
+    {valid ? <strong className="hmi-value">{reading}</strong> : <Quality problem={problem} tag={tag} />}
+    {!(0 < span && Number.isFinite(span)) ? <Quality problem="badRange" /> : valid && <>
+      <progress aria-label={title} aria-valuetext={reading} max={1}
+        value={Math.max(0, Math.min(1, (value - minimum) / span))} />
+      <div className="analog-scale"><span>{minimum}</span>
+        {outside && <strong>{ui('outOfScale')}</strong>}<span>{maximum}</span></div>
+    </>}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
 function TextDisplay({ id, label, tag, puck }) {
   const { value, valid, problem } = useValue(tag, 'string');
   const { text } = useLocalization();
@@ -318,6 +338,10 @@ export function createConfig(catalog) {
     min_length: { type: 'number', label: 'Minimum length' }, max_length: { type: 'number', label: 'Maximum length' },
     min_length_tag: limitTag('Minimum length from tag'), max_length_tag: limitTag('Maximum length from tag'), security_groups: groupsField };
   const textDefaults = { label: 'Operator text', tag: 'OperatorText', min_length: 0, max_length: 82, security_groups: [] };
+  const numericEditFields = { ...numericFields, minimum: { type: 'number', label: 'Minimum' },
+    maximum: { type: 'number', label: 'Maximum' }, minimum_tag: limitTag('Minimum from tag'),
+    maximum_tag: limitTag('Maximum from tag'), security_groups: groupsField };
+  const sliderTag = tag => tag.type === 'number' && tag.writable && (!tag.integer || tag.unscaled !== false);
   const numericDefaults = { label: 'Tank level', tag: 'TankLevel', unit: '%', decimals: 1 };
   const scaleFields = { minimum: { type: 'number', label: 'Scale minimum' }, maximum: { type: 'number', label: 'Scale maximum' } };
   const analogFields = { ...numericFields, ...scaleFields,
@@ -328,7 +352,7 @@ export function createConfig(catalog) {
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
-  const inputTypes = ['NumericInput', 'TextInput', 'TextArea', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
+  const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
       fields: { title: { type: 'text', label: 'Screen name' }, columns: { type: 'select', label: 'Columns',
@@ -379,8 +403,14 @@ export function createConfig(catalog) {
           <PermissiveFields value={value} onChange={onChange} catalog={catalog} /> },
       }, defaultProps: { label: 'Start permissives', checks: [{ tag: 'MotorRunning', label: 'Motor running', expected: false }] },
       render: PermissiveList },
-      NumericInput: { label: 'Numeric input', fields: { ...numericFields, minimum: { type: 'number', label: 'Minimum' }, maximum: { type: 'number', label: 'Maximum' }, minimum_tag: limitTag('Minimum from tag'), maximum_tag: limitTag('Maximum from tag'), security_groups: groupsField },
+      NumericInput: { label: 'Numeric input', fields: numericEditFields,
         defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
+      Slider: { label: 'Slider', fields: { ...numericEditFields, tag: browserTag('Tag', 'Choose a writable numeric tag', sliderTag) },
+        defaultProps: { ...numericDefaults, label: 'Setpoint slider', unit: '', tag: catalog.tags.find(sliderTag)?.name || '',
+          minimum: 0, maximum: 100, security_groups: [] },
+        render: props => <EditControl {...props} slider sliderInteger={!!catalog.tags.find(tag => tag.name === props.tag)?.integer} /> },
+      ProgressBar: { label: 'Progress bar', fields: { ...numericFields, ...scaleFields },
+        defaultProps: { ...numericDefaults, label: 'Progress', minimum: 0, maximum: 100 }, render: ProgressBar },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
       TextDisplay: { label: 'Text display', fields: { label: labelField, tag: tagField('string') },
         defaultProps: { label: 'Status text', tag: 'OperatorText' }, render: TextDisplay },
@@ -428,7 +458,7 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === ActionButton;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === ActionButton || component === config.components.Slider;
     component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
       {renderer(props)}
     </Conditional>;

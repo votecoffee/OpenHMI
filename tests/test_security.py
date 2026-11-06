@@ -154,6 +154,37 @@ class SecurityTests(unittest.TestCase):
         self.client.post('/api/security/logout').raise_for_status()
         self.assertEqual(write('choice', 0).status_code, 401)
 
+    def test_slider_rechecks_live_limits_and_requires_an_applied_revision(self):
+        state = self.client.get('/api/project').json()
+        project = state['draft']
+        project['tags'] += [
+            {'name': 'Travel', 'type': 'integer', 'initial': 2, 'writable': True},
+            {'name': 'TravelLimit', 'type': 'number', 'initial': 7.5, 'writable': True},
+        ]
+        project['controls'] += [
+            {'id': 'travel', 'kind': 'slider', 'tag': 'Travel', 'label': 'Travel', 'maximum_tag': 'TravelLimit'},
+            {'id': 'travel_progress', 'kind': 'progress', 'tag': 'Travel', 'label': 'Travel progress'},
+        ]
+        saved = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': project})
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        revision = applied.json()['active_revision']
+        url = '/api/controls/travel/value'
+        self.assertEqual(self.client.put(url, json={'value': 5}).status_code, 422)
+        self.assertEqual(self.client.put(url, json={'value': 5, 'expected_revision': revision - 1}).status_code, 409)
+        self.assertEqual(self.client.put(url, json={'value': 8, 'expected_revision': revision}).status_code, 422)
+        self.client.put(url, json={'value': 5, 'expected_revision': revision}).raise_for_status()
+        driver = self.app.state.driver
+        self.assertEqual(driver.read('Travel'), [5])
+        driver.write('TravelLimit', [4.0])
+        self.assertEqual(self.client.put(url, json={'value': 6, 'expected_revision': revision}).status_code, 422)
+        driver.write('TravelLimit', [0.0])
+        self.assertEqual(self.client.put(url, json={'value': 0, 'expected_revision': revision}).status_code, 409)
+        self.assertEqual(self.client.put('/api/controls/travel_progress/value',
+                                         json={'value': 0, 'expected_revision': revision}).status_code, 404)
+        self.assertEqual(driver.read('Travel'), [5])
+
     def controls(self):
         state = self.client.get('/api/project').json()
         project = state['draft']

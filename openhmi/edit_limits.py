@@ -16,6 +16,8 @@ def edit_limits(control, values):
         if text and (value != int(value) or not 0 <= value <= 4096):
             raise ValueError('Text length limits must be integers between 0 and 4096')
         result.append(int(value) if text else value)
+    if control['kind'] == 'slider' and not 0 < result[1] - result[0] < math.inf:
+        raise ValueError('Slider range must have a positive, finite span')
     if result[0] > result[1]:
         raise ValueError('Edit minimum exceeds maximum')
     return result

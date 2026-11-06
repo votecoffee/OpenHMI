@@ -96,6 +96,18 @@ class IndicatorControl(ControlBase):
     off_text: str = Field(default="OFF", min_length=1, max_length=30)
 
 
+class ProgressControl(NumericControl):
+    kind: Literal['progress']
+    minimum: float = Field(default=0.0, allow_inf_nan=False)
+    maximum: float = Field(default=100.0, allow_inf_nan=False)
+
+    @model_validator(mode='after')
+    def ordered_scale(self):
+        if not 0 < self.maximum - self.minimum < math.inf:
+            raise ValueError('Progress scale must have a positive, finite span')
+        return self
+
+
 class AnalogControl(NumericControl):
     kind: Literal["analog"]
     minimum: float = Field(default=0.0, allow_inf_nan=False)
@@ -169,7 +181,7 @@ class ButtonControl(ControlBase):
 
 
 class NumericInputControl(NumericControl):
-    kind: Literal['input']
+    kind: Literal['input', 'slider']
     minimum: float = Field(default=0.0, allow_inf_nan=False)
     maximum: float = Field(default=100.0, allow_inf_nan=False)
     security_groups: list[str] = Field(default_factory=list, max_length=100)
@@ -180,6 +192,8 @@ class NumericInputControl(NumericControl):
     def ordered_limits(self):
         if self.minimum >= self.maximum:
             raise ValueError('Input minimum must be less than maximum')
+        if self.kind == 'slider' and not math.isfinite(self.maximum - self.minimum):
+            raise ValueError('Slider range must have a finite span')
         return self
 
 
@@ -344,7 +358,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

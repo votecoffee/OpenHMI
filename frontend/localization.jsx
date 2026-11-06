@@ -47,6 +47,7 @@ export const uiText = {
   actionCommandBinding: 'Command channel', actionTargetBinding: 'Target tag',
   editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',
   editRevisionChanged: 'The applied project changed. Reopen the keypad or clear and re-enter the value.',
+  sliderDraft: 'Proposed value: {value}',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',
   valueWritePending: 'Value written; activity finalization pending. Operation {id}',
   openTextKeyboard: 'Open keyboard for {label}', openNumericKeypad: 'Open numeric keypad for {label}',

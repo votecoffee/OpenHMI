@@ -2,7 +2,7 @@ export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', bar: 'BarGraph', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe',
-  input: 'NumericInput',
+  input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', web_browser: 'WebBrowser',
@@ -51,7 +51,8 @@ export function toProject(data, settings = {}) {
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
       if (type === 'Indicator') return { ...base, tag: props.tag, on_text: props.on_text ?? 'ON', off_text: props.off_text ?? 'OFF' };
       const numeric = { ...base, tag: props.tag, unit: props.unit, decimals: Number(props.decimals) };
-      if (type === 'NumericInput') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
+      if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
+      if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
       if (type === 'AnalogRange' || type === 'TankLevel') {
         return { ...numeric, ...Object.fromEntries(['minimum', 'maximum', 'normal_low', 'normal_high'].map(key => [key, Number(props[key])])) };
       }

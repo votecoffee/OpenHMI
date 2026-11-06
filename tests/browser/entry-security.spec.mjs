@@ -27,6 +27,8 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { name: 'Checked', type: 'boolean', initial: false, writable: true },
         { name: 'Toggled', type: 'boolean', initial: false, writable: true },
         { name: 'Notes', type: 'string', initial: 'First', writable: true },
+        { name: 'Travel', type: 'integer', initial: 2, writable: true },
+        { name: 'TravelLimit', type: 'number', initial: 5.5 },
       ],
       controls: [
         { id: 'color', kind: 'radio_group', tag: 'ColorChoice', label: 'Color',
@@ -34,6 +36,8 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { id: 'checked', kind: 'checkbox', tag: 'Checked', label: 'Check' },
         { id: 'toggled', kind: 'toggle_switch', tag: 'Toggled', label: 'Enable' },
         { id: 'notes', kind: 'text_area', tag: 'Notes', label: 'Notes' },
+        { id: 'travel', kind: 'slider', tag: 'Travel', label: 'Travel', maximum_tag: 'TravelLimit' },
+        { id: 'travel_progress', kind: 'progress', tag: 'Travel', label: 'Travel progress', minimum: 0, maximum: 4 },
       ],
     });
     await page.goto('/');
@@ -76,15 +80,31 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await expect(entry).toHaveValue('First\na');
     await dialog.getByRole('button', { name: 'Accept entry', exact: true }).click();
     await expect(dialog).toBeHidden();
+    const slider = page.getByRole('slider', { name: 'Travel new value' });
+    const progress = page.getByRole('progressbar', { name: 'Travel progress' });
+    const submit = page.locator('[data-control="slider"]').getByRole('button', { name: 'Write value', exact: true });
+    await expect(submit).toBeDisabled();
+    await expect(progress).toHaveAttribute('value', '0.5');
+    await slider.press('End');
+    await expect(slider).toHaveValue('5');
+    await expect(progress).toHaveAttribute('value', '0.5');
+    expect((await (await page.request.get('/api/tags')).json()).values.Travel).toBe(2);
+    await submit.click();
+    await expect(progress).toHaveAttribute('value', '1');
+    await expect(page.locator('[data-control="progress"]')).toContainText('OUT OF SCALE');
+
     const data = await (await page.request.get('/api/tags')).json();
     expect(data.values).toMatchObject({
-      SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na',
+      SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na', Travel: 5,
     });
     data.samples.Checked = { quality: 'stale', age_seconds: 4 };
+    data.samples.Travel = { quality: 'stale', age_seconds: 4 };
     await page.route('**/api/tags', route => route.fulfill({ json: data }));
     await expect(page.locator('[data-control="checkbox"]')).toContainText('STALE DATA');
     await expect(checkbox).toBeHidden();
     await expect(toggle).toBeEnabled();
+    await expect(slider).toBeDisabled();
+    await expect(progress).toBeHidden();
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);

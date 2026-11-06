@@ -254,6 +254,10 @@ Boolean tags. These controls write when the operator changes the selection and
 display the latest good tag value. Use **Text area** for multiline notes with
 fixed or tag-driven length limits and an optional touch keyboard with a
 **New line** key. Inputs support HMI group restrictions and audited writes.
+A **Slider** previews a proposed numeric setpoint until you select **Write
+value**. It supports numeric tags, fixed or tag-driven limits, and the numeric
+keypad. Unscaled integer tags use whole-number positions. A read-only **Progress bar**
+shows the live value, configured scale, and out-of-scale or unavailable status.
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

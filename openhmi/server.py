@@ -54,7 +54,7 @@ class SubscriptionRequest(BaseModel):
 
 CHOICE_INPUTS = ('dropdown', 'radio_group')
 BOOLEAN_INPUTS = ('checkbox', 'toggle_switch')
-PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area')
+PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'slider')
 EDIT_INPUTS = ('input', 'text_input', 'mode_selector', *PALETTE_INPUTS)
 
 
@@ -259,11 +259,13 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 continue
             if control['kind'] in PALETTE_INPUTS:
                 target, _ = sources.get(control['tag'], (None, ''))
-                expected = 'string' if control['kind'] == 'text_area' else 'boolean'
+                expected = ('string',) if control['kind'] == 'text_area' else ('boolean',)
                 if control['kind'] in CHOICE_INPUTS:
-                    expected = 'integer' if type(control['options'][0]['value']) is int else 'string'
-                if not target or not target.writable or kinds.get(control['tag']) != expected:
-                    raise HTTPException(422, f"Control requires a configured writable {expected} tag: {control['tag']}")
+                    expected = ('integer',) if type(control['options'][0]['value']) is int else ('string',)
+                if control['kind'] == 'slider':
+                    expected = ('integer',) if target and target.type == 'integer' else ('integer', 'number')
+                if not target or not target.writable or kinds.get(control['tag']) not in expected:
+                    raise HTTPException(422, f"Control requires a configured writable tag of type {' or '.join(expected)}: {control['tag']}")
                 continue
             if control['kind'] in ('multi_state', 'mode_selector'):
                 if kinds.get(control['tag']) != 'integer':
@@ -322,7 +324,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if kind not in ('number', 'integer', 'boolean', 'string') or (mode == 'toggle' and kind != 'boolean'):
                         raise HTTPException(422, 'Action target type is incompatible')
             else:
-                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
+                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'progress', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
                 if kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 
@@ -520,7 +522,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     validate_entry(control, body.value, limits)
                 except ValueError as error:
                     raise HTTPException(422, str(error)) from error
-            value = application.driver.coerce_number(control['tag'], body.value) if control['kind'] == 'input' else body.value
+            value = application.driver.coerce_number(control['tag'], body.value) if kind in ('input', 'slider') else body.value
             ticket.dispatch(tag=control['tag'], screen=control['_screen'], before=application.driver.sample_snapshot().get(control['tag']), requested_value=value)
             try:
                 application.driver.write(control['tag'], [value])
