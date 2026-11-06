@@ -9,6 +9,7 @@ const plainPath = /^\/[a-zA-Z0-9._~/-]*$/;
 const fullAddress = /^(https?):\/\/([a-z0-9.-]+)(?::([1-9][0-9]{0,4}))?(\/[a-zA-Z0-9._~/-]*)?$/i;
 const defaultPort = { http: 80, https: 443 };
 const refreshIntervalMs = 1000;
+const openingTimeoutMs = 10000;
 
 function destination({ scheme, hosts, port, path }, address, hmiHost) {
   if (typeof hosts !== 'string' || typeof path !== 'string' || typeof scheme !== 'string'
@@ -54,6 +55,7 @@ function CameraPage({ url, label, refreshTag }) {
   const pending = useRef(null);
   const [generation, setGeneration] = useState(0);
   const [loaded, setLoaded] = useState(null);
+  const [timedOut, setTimedOut] = useState(null);
 
   function requestReload(source) {
     if (pending.current) {
@@ -82,6 +84,15 @@ function CameraPage({ url, label, refreshTag }) {
       : refreshValue !== undefined && refreshValue !== previous.value) requestReload('plc');
   }, [embed, refreshTag, refreshValue]);
   useEffect(() => () => clearTimeout(pending.current?.timer), []);
+  useEffect(() => {
+    if (!embed || loaded === generation) return;
+    const timer = setTimeout(() => setTimedOut(generation), openingTimeoutMs);
+    return () => clearTimeout(timer);
+  }, [embed, generation, loaded]);
+
+  const status = !embed ? (mixedContent ? 'cameraMixedContent' : 'cameraIsolationUnavailable')
+    : loaded === generation ? 'cameraUnverified'
+      : timedOut === generation ? 'cameraOpeningTimedOut' : 'cameraOpening';
 
   return <>
     <div className="camera-actions">
@@ -89,8 +100,7 @@ function CameraPage({ url, label, refreshTag }) {
       <button type="button" onClick={() => window.open(url.href, '_blank', 'noopener,noreferrer')}>{ui('cameraOpenTab')}</button>
       {trigger && refreshValue === undefined && <Quality problem={trigger.problem || 'badData'} tag={refreshTag} />}
     </div>
-    <small className="camera-status" role="status">{ui(!embed ? (mixedContent ? 'cameraMixedContent' : 'cameraIsolationUnavailable')
-      : loaded === generation ? 'cameraUnverified' : 'cameraOpening')}</small>
+    <small className="camera-status" role="status">{ui(status)}</small>
     {embed && <iframe key={generation} className="camera-frame" title={label} sandbox="allow-scripts"
       referrerPolicy="no-referrer" srcDoc={frameDocument(url)} onLoad={() => setLoaded(generation)} />}
   </>;

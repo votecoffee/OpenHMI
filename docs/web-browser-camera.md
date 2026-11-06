@@ -39,7 +39,10 @@ endpoint can redirect within that origin or load its own resources. Use a
 camera viewing endpoint whose content and redirects you control. OpenHMI
 blocks the HMI hostname as a camera destination.
 
-The status remains **Camera health unverified** after a browser load event.
+If an embedded page has no browser load event after ten seconds, the control
+reports that it is taking too long. Refresh and **Open camera in new tab** remain
+available. A late load or a successful retry changes the status to **Camera
+health unverified**.
 Frame restrictions, local-network permissions, TLS issues or an unreachable
 camera may produce a blank or blocked view. **Open camera in new tab** is a
 deliberate operator action and uses the station's regular browser session

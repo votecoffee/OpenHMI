@@ -26,12 +26,14 @@ test('configure a camera and exercise approved navigation, isolation and refresh
   ];
   const hits = {};
   let redirect = false;
+  let stalled = false;
   const headers = {};
   const server = createServer((request, response) => {
     const host = request.headers.host.split(':')[0], key = host + request.url;
     hits[key] = (hits[key] || 0) + 1;
     headers[key] = request.headers;
     response.setHeader('cache-control', 'no-store');
+    if (stalled && key === 'camera-b.localhost/view') return;
     if (redirect && key === 'camera-b.localhost/view') {
       response.writeHead(302, { location: 'http://camera-outside.localhost:' + port + '/view' }).end();
       return;
@@ -139,6 +141,21 @@ test('configure a camera and exercise approved navigation, isolation and refresh
     await expect(tab).toHaveURL(endpoint('camera-b.localhost'));
     expect(await tab.evaluate(() => window.opener === null)).toBe(true);
     await tab.close();
+
+    stalled = true;
+    const beforeStall = hits['camera-b.localhost/view'];
+    await manualRefresh.click();
+    await expect.poll(() => hits['camera-b.localhost/view']).toBe(beforeStall + 1);
+    const cameraStatus = bound.getByRole('status');
+    await expect(cameraStatus).toContainText('Opening embedded page');
+    await expect(cameraStatus).toContainText('Camera page is taking too long to open', { timeout: 13000 });
+    await expect(cameraHeading(fixed, 'camera-a.localhost/fixed')).toBeVisible();
+    await expect(bound.getByRole('button', { name: 'Open camera in new tab' })).toBeEnabled();
+    expect(hits['camera-b.localhost/view']).toBe(beforeStall + 1);
+    stalled = false;
+    await manualRefresh.click();
+    await expect(cameraHeading(bound, 'camera-b.localhost/view')).toBeVisible();
+    await expect(cameraStatus).toContainText('Camera health unverified');
 
     redirect = true;
     const before = hits['camera-b.localhost/view'];

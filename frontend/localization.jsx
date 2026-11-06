@@ -75,6 +75,7 @@ export const uiText = {
   cameraDesigner: 'Configure the approved endpoint here. Open the live screen to view it.',
   cameraAddressBlocked: 'CAMERA ADDRESS MISSING OR BLOCKED',
   cameraOpening: 'Opening embedded page. If it stays blank, use the new tab.',
+  cameraOpeningTimedOut: 'Camera page is taking too long to open. Refresh or use the new tab.',
   cameraUnverified: 'Camera health unverified. If the view is blank, use the new tab.',
   cameraMixedContent: 'HTTP camera embedding is blocked on an HTTPS station. Use the new tab.',
   cameraIsolationUnavailable: 'This browser cannot isolate the embedded camera. Use the new tab.',
