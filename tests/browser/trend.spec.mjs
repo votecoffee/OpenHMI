@@ -20,8 +20,9 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
       tags: ['TankLevel', 'MotorRunning'], seconds: 10 });
     await save(page, project);
     let windowOffset = 0;
+    let fault;
     await page.route(url => url.pathname === '/api/history' && url.searchParams.get('trend_context') === 'true',
-      route => route.fulfill({ json: {
+      route => route.fulfill(fault ?? { json: {
         start: 100 + windowOffset, end: 110 + windowOffset, truncated: false,
         samples: [{ tag: 'TankLevel', epoch: 108, value: 20, quality: 'good' }],
         change_context: {
@@ -66,6 +67,21 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
     await timeline.press('Escape');
     await expect(readout).toHaveCount(0);
     await expect(chart.getByRole('link', { name: 'Export history CSV' })).not.toHaveAttribute('href', /trend_context/);
+    const retained = await traces.nth(0).getAttribute('points');
+    const warning = chart.getByRole('status').filter({ hasText: 'History unavailable' });
+    fault = { json: { start: 101, end: 111, truncated: false, samples: [null] } };
+    await expect(warning).toContainText('Showing last received history ending');
+    await expect(traces.nth(0)).toHaveAttribute('points', retained);
+    await expect(chart.locator('.trend-time')).toContainText('End');
+    await expect(chart.locator('[data-trend-value="TankLevel"]')).toContainText('42.0');
+
+    await chart.getByLabel('On-change trend history end').fill('2026-01-01T08:00');
+    await expect(warning).toBeVisible();
+    await expect(warning).not.toContainText('Showing last received history ending');
+    await expect(traces).toHaveCount(0);
+    fault = undefined;
+    await expect(warning).toBeHidden();
+    await expect(traces.nth(0)).toHaveAttribute('points', retained);
   } finally {
     await save(page, original.active);
     await save(page, original.draft, false);

@@ -150,7 +150,10 @@ window. Each plotted tag needs a **History** entry for persistent traces.
 Operators can choose a time range/end time or return to live viewing. Acquisition
 timestamps reflect when Python receives the values. Queries retain the newest
 bounded results and report truncation. Observed ranges use those returned points.
-Export is limited to 20,000 records per requested tag.
+If a history request fails or returns malformed data, the trend marks the last
+received window with its end time. It keeps live tag readouts separate and
+retries the selected window. Changing the query clears the previous trace until
+the new window arrives. Export is limited to 20,000 records per requested tag.
 
 ### Saved trend captures
 

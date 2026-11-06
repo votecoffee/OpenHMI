@@ -82,6 +82,19 @@ function goodSample(row, digital) {
   return row?.quality === 'good' && (digital ? typeof row.value === 'boolean' : isAnalog(row.value));
 }
 
+function isTrendHistory(history) {
+  const { start, end, truncated, samples, change_context: context = {} } = history ?? {};
+  const readableSample = row => Number.isFinite(row?.epoch)
+    && ['good', 'bad', 'pending', 'stale'].includes(row.quality) && Object.hasOwn(row, 'value');
+  return Number.isFinite(start) && Number.isFinite(end) && end > start
+    && Number.isFinite(end - start) && Math.abs(end) <= 8.64e12 && Math.abs(start) <= 8.64e12
+    && typeof truncated === 'boolean' && Array.isArray(samples)
+    && samples.every(row => readableSample(row) && typeof row.tag === 'string' && row.epoch >= start && row.epoch <= end)
+    && context !== null && typeof context === 'object' && !Array.isArray(context)
+    && Object.values(context).every(item => Number.isFinite(item?.hold_seconds) && item.hold_seconds > 0
+      && (item.previous === null || (readableSample(item.previous) && item.previous.epoch < start)));
+}
+
 function holdChangeSamples(samples, context, start, end) {
   const rows = context.previous && samples[0]?.epoch !== start ? [context.previous, ...samples] : samples;
   const points = [];
@@ -228,13 +241,18 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     if (!query) return;
     let stopped = false, timer;
     async function refresh() {
+      let retry = follow;
       try {
         const data = await api(query);
+        if (!isTrendHistory(data)) throw new Error('Invalid trend history response');
         if (!stopped) setResponse({ query, data });
-      } catch {
-        if (!stopped) setResponse({ query, error: true });
+      } catch (problem) {
+        const discard = [401, 403, 404].includes(problem.status);
+        retry = true;
+        if (!stopped) setResponse(previous => ({ query, error: true,
+          data: !discard && previous?.query === query ? previous.data : null }));
       }
-      if (!stopped && follow) timer = setTimeout(refresh, 1000);
+      if (!stopped && retry) timer = setTimeout(refresh, 1000);
     }
     refresh();
     return () => { stopped = true; clearTimeout(timer); };
@@ -315,7 +333,7 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     </div>}
     {!puck?.isEditing && <CaptureTools state={captures} recording={recording} endTime={endTime} setEndTime={setEndTime} />}
     {plotted.length > 0 && <TrendPlot analog={analog} digital={digital} start={history?.start ?? 0}
-      seconds={history ? history.end - history.start : windowSeconds} historical={!follow} label={label}
+      seconds={history ? history.end - history.start : windowSeconds} historical={!follow || !!error} label={label}
       cursor={cursorFraction} pinned={cursorFraction !== null && cursor?.epoch !== undefined}
       setCursor={setCursor} hasHistory={!!history} />}
     {cursorDate && <div className="trend-cursor-readout"><span className="trend-cursor-time" data-trend-cursor-time="">
@@ -336,7 +354,8 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
             : ui(item.fixed ? 'trendInvalidRange' : 'trendWaiting')}</td>
       </tr>; })}</tbody>
     </table>}
-    {error ? <span className="hmi-quality">{ui('badData')} - {ui('trendHistoryUnavailable')}</span>
+    {error ? <p className="hmi-quality" role="status">{ui('trendHistoryUnavailable')}
+      {history && <> · {ui('trendLastHistory', { time: formatLocalDateTime(new Date(history.end * 1000), language.code) })}</>}</p>
       : !plotted.length ? <p>{ui('trendSelectTags')}</p>
         : history && !hasSamples ? <p>{ui('trendNoSamples')}</p> : null}
     {history?.truncated && <p>{ui('trendLimited')}</p>}
