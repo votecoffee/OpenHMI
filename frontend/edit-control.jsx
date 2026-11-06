@@ -5,8 +5,25 @@ import { useLocalization } from './localization.jsx';
 import { TouchEntry } from './touch-entry.jsx';
 import { api, json } from './api.mjs';
 
+export const MAX_UTC_EPOCH = 253402300799;
+const validUtcEpoch = epoch => Number.isSafeInteger(epoch) && epoch >= 0 && epoch <= MAX_UTC_EPOCH;
+const utcFieldValue = epoch => validUtcEpoch(epoch) ? new Date(epoch * 1000).toISOString().slice(0, 19) : '';
+const utcReadout = epoch => utcFieldValue(epoch).replace('T', ' ') + ' UTC';
+
+function readUtcField(value) {
+  if (!value) return null;
+  const epoch = Date.parse(value + 'Z') / 1000;
+  return validUtcEpoch(epoch) ? epoch : null;
+}
+
+export function DateTimeLimit({ label, value, onChange }) {
+  return <label>{label}<input type="datetime-local" step="1"
+    min={utcFieldValue(0)} max={utcFieldValue(MAX_UTC_EPOCH)} value={utcFieldValue(value)}
+    onChange={event => onChange(readUtcField(event.target.value))} /></label>;
+}
+
 export function EditControl(props) {
-  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, barcode = false, slider = false, sliderInteger = false } = props;
+  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, barcode = false, dateTime = false, slider = false, sliderInteger = false } = props;
   const live = useContext(Live), { session } = useContext(SecurityContext) || {}, { text: translate, ui } = useLocalization();
   const label = translate(`control.${id}.label`, props.label);
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [touch, setTouch] = useState(null);
@@ -27,7 +44,8 @@ export function EditControl(props) {
   });
   const [low, high] = limitBindings.map(state => state.valid ? state.value : undefined);
   const validRange = [low, high].every(Number.isFinite) && low <= high
-    && (!text || [low, high].every(value => Number.isInteger(value) && value >= 0 && value <= 4096));
+    && (!text || [low, high].every(value => Number.isInteger(value) && value >= 0 && value <= 4096))
+    && (!dateTime || [low, high].every(validUtcEpoch));
   const sliderLow = sliderInteger ? Math.ceil(low) : low;
   const sliderHigh = sliderInteger ? Math.floor(high) : high;
   const sliderRange = 0 < sliderHigh - sliderLow && Number.isFinite(sliderHigh - sliderLow);
@@ -42,7 +60,7 @@ export function EditControl(props) {
   });
 
   function writeBlock(expectedRevision) {
-    if ((slider || barcode) && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
+    if ((slider || barcode || dateTime) && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
     if (!authorized) return ui('editNotAuthorized');
     if (!valid) return namedProblem('editValueBinding', tag, problem);
     for (const [state, source, labelKey] of [
@@ -62,6 +80,7 @@ export function EditControl(props) {
   async function save(value, expectedRevision) {
     const blockedReason = writeBlock(expectedRevision);
     if (blockedReason) throw new Error(blockedReason);
+    if (dateTime && !validUtcEpoch(value)) throw new Error(ui('dateTimeInvalid'));
     if (barcode && (!value || /[\r\n]/.test(value))) throw new Error(ui('barcodeSingleLine'));
     const measured = text ? Array.from(value).length : value;
     if (!text && !Number.isFinite(value) || measured < low || measured > high) throw new Error(ui('editOutsideLimits'));
@@ -71,7 +90,7 @@ export function EditControl(props) {
   }
   async function submit(event) {
     event.preventDefault();
-    if (barcode && (disabled || !entry)) return;
+    if ((barcode || dateTime) && (disabled || !entry)) return;
     try {
       if (!text && !entry.trim()) throw new Error(ui('enterValue'));
       await save(text ? entry : Number(entry), draft?.revision ?? revision);
@@ -82,15 +101,28 @@ export function EditControl(props) {
     setMessage('');
     barcodeField.current?.focus();
   }
-  return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
-    {valid ? <strong className="hmi-value">{text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong> : <Quality problem={problem} tag={tag} />}
-    <small>{limits.valid ? ui(text ? 'textLength' : 'numericRange', limits) : ui(limitProblem)}</small>
+  return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : dateTime ? 'date_time' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
+    {!valid ? <Quality problem={problem} tag={tag} /> : dateTime && !validUtcEpoch(value)
+      ? <strong className="range-deviation">{ui('dateTimeInvalid')}</strong>
+      : <strong className="hmi-value">{dateTime ? utcReadout(value) : text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong>}
+    <small>{!limits.valid ? ui(limitProblem) : dateTime
+      ? ui('dateTimeRange', { low: utcFieldValue(low).replace('T', ' '), high: utcFieldValue(high).replace('T', ' ') })
+      : ui(text ? 'textLength' : 'numericRange', limits)}</small>
     {limitBindings.filter(state => !state.valid).map(({ field, source, labelKey, problem }) =>
       <Quality key={field} tag={source} problem={problem} text={bindingProblem(labelKey, problem)} />)}
     {enabled && !enabled.valid && <Quality tag={enabled_tag} problem={enabled.problem}
       text={bindingProblem('editEnableBinding', enabled.problem)} />}
     {enabled?.valid && !bindingEnabled && <small>{ui('editEnableOff', { tag: enabled_tag })}</small>}
-    {barcode ? <form className="hmi-barcode" onSubmit={submit}>
+    {dateTime ? <form className="hmi-date-time" onSubmit={submit}>
+      <input aria-label={ui('dateTimeEntry', { label })} type="datetime-local" step="1"
+        min={limits.valid ? utcFieldValue(low) : undefined} max={limits.valid ? utcFieldValue(high) : undefined}
+        value={entry ? utcFieldValue(Number(entry)) : ''} disabled={disabled}
+        onChange={event => {
+          const epoch = readUtcField(event.target.value);
+          setDraft(previous => epoch === null ? null : { value: String(epoch), revision: previous?.revision ?? revision });
+        }} />
+      <button disabled={disabled || !entry}>{ui('writeValue')}</button>
+    </form> : barcode ? <form className="hmi-barcode" onSubmit={submit}>
       <input ref={barcodeField} type="text" aria-label={ui('barcodeEntry', { label })}
         placeholder={ui('barcodeFocus')} autoComplete="off" autoCapitalize="none" spellCheck={false}
         value={entry} disabled={writeUnavailable} readOnly={busy}
@@ -127,8 +159,8 @@ export function EditControl(props) {
         setDraft(previous => value ? { value, revision: previous?.revision ?? revision } : null);
       },
     })}<button disabled={disabled}>{ui('writeValue')}</button></form>}
-    <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : barcode ? '' : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>
-    <span className="command-feedback" role={barcode ? 'status' : undefined}>{barcode && busy ? ui('working') : message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
+    {!dateTime && <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : barcode ? '' : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>}
+    <span className="command-feedback" role={barcode || dateTime ? 'status' : undefined}>{barcode && busy ? ui('working') : message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
     {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} multiline={multiline} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
   </article>;
 }

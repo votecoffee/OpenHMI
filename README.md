@@ -271,6 +271,11 @@ A **Barcode scanner input** binds to a writable text tag. Focus the field and
 scan with a keyboard-wedge scanner configured to append Enter, or enter a code
 manually and select **Submit code**. The input preserves leading zeros and
 spaces, applies the configured text limits, and clears after a verified write.
+A **Date/time input** uses the browser's date and time picker and displays UTC.
+Bind it to a writable, unscaled integer tag that stores whole Unix epoch
+seconds. Configure the earliest and latest UTC times in the HMI or bind them
+to numeric tags containing epoch seconds. The PLC tag type determines its
+actual storage range.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

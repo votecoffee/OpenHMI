@@ -54,7 +54,7 @@ class SubscriptionRequest(BaseModel):
 
 CHOICE_INPUTS = ('dropdown', 'radio_group')
 BOOLEAN_INPUTS = ('checkbox', 'toggle_switch')
-PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'barcode_input', 'slider')
+PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'barcode_input', 'slider', 'date_time')
 EDIT_INPUTS = ('input', 'text_input', 'mode_selector', *PALETTE_INPUTS)
 
 
@@ -262,6 +262,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 expected = ('string',) if control['kind'] in TEXT_INPUTS else ('boolean',)
                 if control['kind'] in CHOICE_INPUTS:
                     expected = ('integer',) if type(control['options'][0]['value']) is int else ('string',)
+                if control['kind'] == 'date_time':
+                    expected = ('integer',)
                 if control['kind'] == 'slider':
                     expected = ('integer',) if target and target.type == 'integer' else ('integer', 'number')
                 if not target or not target.writable or kinds.get(control['tag']) not in expected:

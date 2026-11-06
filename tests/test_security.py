@@ -192,6 +192,33 @@ class SecurityTests(unittest.TestCase):
                                          json={'value': 0, 'expected_revision': revision}).status_code, 404)
         self.assertEqual(driver.read('Travel'), [5])
 
+    def test_date_time_requires_whole_epoch_seconds_and_current_limits(self):
+        state = self.client.get('/api/project').json()
+        project = state['draft']
+        project['tags'] += [
+            {'name': 'MaintenanceTime', 'type': 'integer', 'initial': 1000, 'writable': True},
+            {'name': 'LatestTime', 'type': 'number', 'initial': 3600, 'writable': True},
+        ]
+        project['controls'].append({'id': 'maintenance', 'kind': 'date_time', 'tag': 'MaintenanceTime',
+                                    'label': 'Maintenance time', 'minimum': 1000, 'maximum_tag': 'LatestTime'})
+        saved = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': project})
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        revision = applied.json()['active_revision']
+        url = '/api/controls/maintenance/value'
+        self.assertEqual(self.client.put(url, json={'value': 1600}).status_code, 422)
+        for invalid in (1600.0, '1600', 999, 3601):
+            self.assertEqual(self.client.put(url, json={'value': invalid, 'expected_revision': revision}).status_code, 422)
+        request = {'value': 1600, 'expected_revision': revision}
+        self.client.put(url, json=request).raise_for_status()
+        driver = self.app.state.driver
+        self.assertEqual(driver.read('MaintenanceTime'), [1600])
+        driver.write('LatestTime', [3600.5])
+        self.assertEqual(self.client.put(url, json=request).status_code, 409)
+        driver.write('LatestTime', [1500.0])
+        self.assertEqual(self.client.put(url, json=request).status_code, 422)
+
     def controls(self):
         state = self.client.get('/api/project').json()
         project = state['draft']

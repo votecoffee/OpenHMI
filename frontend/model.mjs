@@ -2,7 +2,7 @@ export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
-  input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
+  input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', web_browser: 'WebBrowser',
@@ -49,6 +49,9 @@ export function toProject(data, settings = {}) {
       if (type === 'PermissiveList') return { ...base, checks: props.checks };
       if (type === 'StaticLabel') return { ...base, font_size: Number(props.font_size), alignment: props.alignment, weight: props.weight };
       if (type === 'ScreenSymbol') return { ...base, symbol: props.symbol, size: Number(props.size), rotation: Number(props.rotation) };
+      if (type === 'DateTimeInput') return { ...base, tag: props.tag,
+        minimum: props.minimum, maximum: props.maximum, minimum_tag: props.minimum_tag || '',
+        maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
       if (type === 'TextDisplay') return { ...base, tag: props.tag };
       if (type === 'Dropdown' || type === 'RadioGroup') return { ...base, tag: props.tag, options: props.options, security_groups: props.security_groups || [] };
       if (type === 'Checkbox' || type === 'ToggleSwitch') return { ...base, tag: props.tag, security_groups: props.security_groups || [] };

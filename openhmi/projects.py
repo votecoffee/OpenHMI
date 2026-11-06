@@ -18,6 +18,7 @@ from .runtime_models import MAX_PLC_CONNECTIONS, Connection, TagDefinition, Hist
 from .runtime_models import CommandDefinition, RecipeTransferDefinition
 from .identity_publish import IdentityPublication
 from .canvas import CanvasLayout
+from .edit_limits import MAX_UTC_EPOCH
 from .project_diff import encoded, digest, same, differences, merge_project, SCREEN_FIELDS
 
 
@@ -258,6 +259,22 @@ class NumericInputControl(NumericControl):
         return self
 
 
+class DateTimeControl(ControlBase):
+    kind: Literal['date_time']
+    tag: str = Field(min_length=1, max_length=200)
+    minimum: int = Field(default=0, ge=0, le=MAX_UTC_EPOCH)
+    maximum: int = Field(default=MAX_UTC_EPOCH, ge=0, le=MAX_UTC_EPOCH)
+    minimum_tag: str = Field(default='', max_length=200)
+    maximum_tag: str = Field(default='', max_length=200)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def ordered_limits(self):
+        if self.minimum > self.maximum:
+            raise ValueError('Earliest date/time must not exceed latest date/time')
+        return self
+
+
 class RecipeSelectionControl(ControlBase):
     kind: Literal['recipe']
 
@@ -419,7 +436,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | DateTimeControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

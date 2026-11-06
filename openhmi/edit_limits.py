@@ -3,6 +3,7 @@ import math
 
 LIMIT_TAGS = ('minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag')
 TEXT_INPUTS = ('text_input', 'text_area', 'barcode_input')
+MAX_UTC_EPOCH = 253402300799
 
 
 def edit_limits(control, values):
@@ -16,6 +17,8 @@ def edit_limits(control, values):
             raise ValueError('Edit limit tag has no good-quality numeric value')
         if text and (value != int(value) or not 0 <= value <= 4096):
             raise ValueError('Text length limits must be integers between 0 and 4096')
+        if control['kind'] == 'date_time' and (value != int(value) or not 0 <= value <= MAX_UTC_EPOCH):
+            raise ValueError('Date/time limits require whole UTC epoch seconds from 1970 through 9999')
         result.append(int(value) if text else value)
     if control['kind'] == 'slider' and not 0 < result[1] - result[0] < math.inf:
         raise ValueError('Slider range must have a positive, finite span')
@@ -30,5 +33,8 @@ def validate_entry(control, value, limits):
             raise ValueError('Text length is outside the configured limits or contains a null character')
         if control['kind'] == 'barcode_input' and (not value or '\r' in value or '\n' in value):
             raise ValueError('Barcode input requires one nonempty line')
+    elif control['kind'] == 'date_time':
+        if type(value) is not int or not limits[0] <= value <= limits[1]:
+            raise ValueError('Date/time must be whole UTC epoch seconds within the configured limits')
     elif type(value) not in (int, float) or not math.isfinite(value) or not limits[0] <= value <= limits[1]:
         raise ValueError('Value is outside the configured input limits')

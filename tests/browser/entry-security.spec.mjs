@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true });
+test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true, timezoneId: 'America/New_York' });
 
 test('input palette drag and drop and secured live entry', async ({ page }) => {
   test.setTimeout(60000);
@@ -30,6 +30,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { name: 'Travel', type: 'integer', initial: 2, writable: true },
         { name: 'TravelLimit', type: 'number', initial: 5.5 },
         { name: 'Scan', type: 'string', initial: '', writable: true },
+        { name: 'MaintenanceTime', type: 'integer', initial: Date.parse('2027-03-14T00:00:00Z') / 1000, writable: true },
       ],
       controls: [
         { id: 'color', kind: 'radio_group', tag: 'ColorChoice', label: 'Color',
@@ -40,9 +41,17 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { id: 'travel', kind: 'slider', tag: 'Travel', label: 'Travel', maximum_tag: 'TravelLimit' },
         { id: 'travel_progress', kind: 'progress', tag: 'Travel', label: 'Travel progress', minimum: 0, maximum: 4 },
         { id: 'scan', kind: 'barcode_input', tag: 'Scan', label: 'Part scan', max_length: 8 },
+        { id: 'maintenance', kind: 'date_time', tag: 'MaintenanceTime', label: 'Maintenance time',
+          minimum: Date.parse('2027-03-14T00:00:00Z') / 1000, maximum: Date.parse('2027-03-15T00:00:00Z') / 1000 },
       ],
     });
     await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Date/time input', exact: true })).toBeVisible();
+    await page.locator('[data-control="date_time"] .hmi-label').click();
+    const latest = page.getByRole('textbox', { name: 'Latest (UTC)', exact: true });
+    await expect(latest).toHaveValue('2027-03-15T00:00');
+    await latest.fill('2027-03-14T20:00');
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     const block = page.getByRole('button', { name: 'Dropdown', exact: true });
     await block.scrollIntoViewIfNeeded();
     const source = await block.boundingBox();
@@ -122,13 +131,24 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await expect(scanControl).toContainText('Enter one nonempty barcode line');
     await expect(scan).toHaveValue('');
 
+    const time = page.locator('[data-control="date_time"]');
+    const picker = time.getByLabel('Maintenance time new date and time (UTC)', { exact: true });
+    await expect(picker).toHaveAttribute('min', '2027-03-14T00:00:00');
+    await expect(picker).toHaveAttribute('max', '2027-03-14T20:00:00');
+    await expect(time).toContainText('2027-03-14 00:00:00 UTC');
+    await picker.fill('2027-03-14T02:30:45');
+    await time.getByRole('button', { name: 'Write value', exact: true }).click();
+    await expect(time).toContainText('2027-03-14 02:30:45 UTC');
+
     const data = await (await page.request.get('/api/tags')).json();
     expect(data.values).toMatchObject({
       SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na', Travel: 5, Scan: '00043',
+      MaintenanceTime: Date.parse('2027-03-14T02:30:45Z') / 1000,
     });
     data.samples.Checked = { quality: 'stale', age_seconds: 4 };
     data.samples.Travel = { quality: 'stale', age_seconds: 4 };
     data.samples.Scan = { quality: 'stale', age_seconds: 4 };
+    data.samples.MaintenanceTime = { quality: 'stale', age_seconds: 4 };
     await page.route('**/api/tags', route => route.fulfill({ json: data }));
     await expect(page.locator('[data-control="checkbox"]')).toContainText('STALE DATA');
     await expect(checkbox).toBeHidden();
@@ -136,6 +156,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await expect(slider).toBeDisabled();
     await expect(progress).toBeHidden();
     await expect(scan).toBeDisabled();
+    await expect(picker).toBeDisabled();
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
