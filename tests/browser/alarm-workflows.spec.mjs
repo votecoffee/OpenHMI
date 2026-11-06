@@ -37,12 +37,16 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
     await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
-    await page.route('**/api/alarms', async route => {
-      const response = await route.fetch();
-      await route.fulfill({ response, json: { ...await response.json(), evaluation_stale: true } });
-    });
-    await expect(page.getByText('Last recorded: 2 active / 2 unacknowledged', { exact: true })).toBeVisible();
+    const alarmStatus = await (await page.request.get('/api/alarms')).json();
+    let status = { ...alarmStatus, evaluation_stale: true };
+    await page.route('**/api/alarms', route => route.fulfill({ json: status }));
+    const lastRecorded = page.getByText('Last recorded: 2 active / 2 unacknowledged', { exact: true });
+    await expect(lastRecorded).toBeVisible();
     const ackAll = page.getByRole('button', { name: 'Acknowledge all', exact: true });
+    await expect(ackAll).toBeDisabled();
+    status = { ...alarmStatus, unacknowledged_count: 'invalid' };
+    await expect(page.getByRole('alert')).toHaveText('ALARM MONITOR UNAVAILABLE');
+    await expect(lastRecorded).toBeVisible();
     await expect(ackAll).toBeDisabled();
     await page.unroute('**/api/alarms');
     await expect(ackAll).toBeEnabled();

@@ -116,6 +116,39 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(unavailable).toHaveCount(0);
 });
 
+test('malformed alarm status keeps the last headline while the screen keeps updating', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const { active_revision: revision } = await (await page.request.get('/api/project')).json();
+  const good = { sampled_revision: revision, states: { process_alarm: { quality: 'good' } },
+    outstanding: [{ priority: 2, message: 'Process alarm', occurrence_id: 1 }], active_count: 1, unacknowledged_count: 1 };
+  let alarms = {};
+  let level = 42;
+  await page.route('**/api/alarms', route => route.fulfill({ body: JSON.stringify(alarms), contentType: 'application/json' }));
+  await page.route('**/api/tags', route => route.fulfill({ json: { values: { TankLevel: level } } }));
+  await page.goto('/runtime');
+  const banner = page.getByLabel('Screen alarm status');
+  const numeric = page.locator('[data-control="numeric"]');
+  await expect(banner).toContainText('ALARM MONITOR UNAVAILABLE');
+  alarms = good;
+  await expect(banner).toContainText('P2 Process alarm');
+  await expect(banner).not.toContainText('Last recorded');
+
+  for (const invalid of [null, { ...good, annunciated_outstanding: {} }, { ...good, outstanding: [null] },
+    { ...good, active_count: '1' }, { ...good, states: { process_alarm: { quality: 'unknown' } } }]) {
+    alarms = invalid;
+    await expect(banner).toContainText('ALARM MONITOR UNAVAILABLE');
+    await expect(banner).toContainText('P2 Process alarm');
+    await expect(banner).toContainText('Last recorded: 1 active / 1 unacknowledged');
+    level += 1;
+    await expect(numeric).toContainText(level.toFixed(1));
+    alarms = good;
+    await expect(banner).not.toContainText('Last recorded');
+    await expect(banner).toContainText('P2 Process alarm');
+  }
+  expect(errors).toEqual([]);
+});
+
 test('invalid tag replies fail closed and recover without reloading', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
