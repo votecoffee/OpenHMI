@@ -79,7 +79,14 @@ test('configure a camera and exercise approved navigation, isolation and refresh
     await context.addCookies([{ name: 'existing_camera_session', value: 'fixture', url: endpoint('camera-a.localhost') }]);
     let values = { CameraAddress: 'camera-a.localhost', CameraRefresh: false, CameraSequence: 10 };
     let samples = {};
-    await page.route('**/api/tags', route => route.fulfill({ json: { values, samples } }));
+    let refreshPulse = false;
+    await page.route('**/api/tags', async route => {
+      await route.fulfill({ json: { values, samples } });
+      if (refreshPulse) {
+        refreshPulse = false;
+        samples = { CameraRefresh: { quality: 'stale', age_seconds: 3 } };
+      }
+    });
     await page.goto('/runtime');
     const fixed = page.locator('[data-control="web_browser"]').filter({ hasText: 'Camera view' });
     const bound = page.locator('[data-control="web_browser"]').filter({ hasText: 'PLC camera' });
@@ -102,8 +109,22 @@ test('configure a camera and exercise approved navigation, isolation and refresh
     await page.waitForTimeout(1100);
     expect(hits['camera-a.localhost/view']).toBe(2);
     expect(hits['camera-a.localhost/fixed']).toBe(2);
-    await bound.getByRole('button', { name: 'Refresh camera', exact: true }).click();
+    values = { ...values, CameraRefresh: false };
+    await page.waitForResponse('**/api/tags');
+    const manualRefresh = bound.getByRole('button', { name: 'Refresh camera', exact: true });
+    await manualRefresh.click();
     await expect.poll(() => hits['camera-a.localhost/view']).toBe(3);
+    values = { ...values, CameraRefresh: true };
+    refreshPulse = true;
+    await expect(bound).toContainText('STALE DATA');
+    await page.waitForTimeout(1100);
+    expect(hits['camera-a.localhost/view']).toBe(3);
+    await manualRefresh.click();
+    await expect.poll(() => hits['camera-a.localhost/view']).toBe(4);
+    samples = {};
+    await expect(bound).not.toContainText('STALE DATA');
+    await page.waitForTimeout(1100);
+    expect(hits['camera-a.localhost/view']).toBe(4);
 
     samples = { CameraAddress: { quality: 'stale', age_seconds: 3 } };
     await expect(bound).toContainText('STALE DATA');
@@ -133,7 +154,20 @@ test('configure a camera and exercise approved navigation, isolation and refresh
       await expect(bound.locator('iframe')).toHaveCount(0);
     }
     redirect = false;
+    values = { ...values, CameraAddress: 123 };
+    await expect(bound).toContainText('BAD DATA');
+    await expect(bound.locator('iframe')).toHaveCount(0);
     values = { ...values, CameraAddress: 'camera-a.localhost' };
+    await expect(cameraHeading(bound, 'camera-a.localhost/view')).toBeVisible();
+    const displayed = await (await page.request.get('/api/project/active')).json();
+    await page.route('**/api/project/active', route => route.fulfill({ json: {
+      ...displayed, revision: displayed.revision + 1,
+      project: { ...displayed.project, controls: [fixedControl, { ...boundControl, hosts: null }] },
+    } }));
+    await expect(bound).toContainText('CAMERA ADDRESS MISSING OR BLOCKED');
+    await expect(bound.locator('iframe')).toHaveCount(0);
+    await expect(cameraHeading(fixed, 'camera-a.localhost/fixed')).toBeVisible();
+    await page.unroute('**/api/project/active');
     await save({ ...active, controls: [boundControl], layout: { width: 620, height: 400, boxes: {
       'bound-camera': { x: 10, y: 10, width: 400, height: 280 },
     } } });

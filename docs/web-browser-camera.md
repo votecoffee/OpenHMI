@@ -22,6 +22,9 @@ The embedded page opens on the live screen.
    establishes the baseline. Keep a BOOL pulse long enough for the screen to
    sample it, or use an integer sequence. Manual and PLC-triggered refreshes
    share a one-second minimum interval and coalesce while a reload is pending.
+   If the refresh tag loses quality while a PLC-triggered reload is queued,
+   the control cancels it. Manual refresh remains available for an approved
+   address.
 
 An invalid address or unavailable address sample removes the embedded page and
 its navigation actions. Address and refresh bindings use ordinary read-only

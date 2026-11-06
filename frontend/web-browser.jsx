@@ -11,10 +11,11 @@ const defaultPort = { http: 80, https: 443 };
 const refreshIntervalMs = 1000;
 
 function destination({ scheme, hosts, port, path }, address, hmiHost) {
-  const approved = hosts.split(',').map(host => host.trim().toLowerCase());
-  if (!Object.hasOwn(defaultPort, scheme) || !plainPath.test(path) || path.includes('//')
+  if (typeof hosts !== 'string' || typeof path !== 'string' || typeof scheme !== 'string'
+      || !Object.hasOwn(defaultPort, scheme) || !plainPath.test(path) || path.includes('//')
       || path.split('/').some(segment => segment === '.' || segment === '..')
       || (port != null && (!Number.isInteger(port) || port < 1 || port > 65535))) return null;
+  const approved = hosts.split(',').map(host => host.trim().toLowerCase());
   const value = address?.trim();
   const match = value?.match(fullAddress);
   const host = address === undefined ? approved[0] : (match?.[2] || value).toLowerCase();
@@ -50,31 +51,41 @@ function CameraPage({ url, label, refreshTag }) {
     ? trigger.value : undefined;
   const baseline = useRef(null);
   const lastReload = useRef(performance.now());
-  const timer = useRef(null);
+  const pending = useRef(null);
   const [generation, setGeneration] = useState(0);
   const [loaded, setLoaded] = useState(null);
 
-  function requestReload() {
-    if (timer.current !== null) return;
-    timer.current = setTimeout(() => {
-      timer.current = null;
+  function requestReload(source) {
+    if (pending.current) {
+      if (source === 'manual') pending.current.source = source;
+      return;
+    }
+    const timer = setTimeout(() => {
+      pending.current = null;
       lastReload.current = performance.now();
       setGeneration(previous => previous + 1);
     }, Math.max(0, refreshIntervalMs - (performance.now() - lastReload.current)));
+    pending.current = { timer, source };
   }
 
   useEffect(() => {
     const previous = baseline.current;
     baseline.current = { tag: refreshTag, value: refreshValue };
-    if (!embed || previous?.tag !== refreshTag || typeof previous.value !== typeof refreshValue) return;
+    if (!embed || previous?.tag !== refreshTag || typeof previous.value !== typeof refreshValue) {
+      if (pending.current?.source === 'plc') {
+        clearTimeout(pending.current.timer);
+        pending.current = null;
+      }
+      return;
+    }
     if (typeof refreshValue === 'boolean' ? !previous.value && refreshValue
-      : refreshValue !== undefined && refreshValue !== previous.value) requestReload();
+      : refreshValue !== undefined && refreshValue !== previous.value) requestReload('plc');
   }, [embed, refreshTag, refreshValue]);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => () => clearTimeout(pending.current?.timer), []);
 
   return <>
     <div className="camera-actions">
-      {embed && <button type="button" onClick={requestReload}>{ui('cameraRefresh')}</button>}
+      {embed && <button type="button" onClick={() => requestReload('manual')}>{ui('cameraRefresh')}</button>}
       <button type="button" onClick={() => window.open(url.href, '_blank', 'noopener,noreferrer')}>{ui('cameraOpenTab')}</button>
       {trigger && refreshValue === undefined && <Quality problem={trigger.problem || 'badData'} tag={refreshTag} />}
     </div>
