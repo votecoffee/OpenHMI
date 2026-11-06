@@ -41,6 +41,28 @@ export function ImageField({ label, value, onChange, readOnly }) {
   </fieldset>;
 }
 
+export function ImageStatesFields({ id, value = [], onChange, readOnly }) {
+  const next = Array.from({ length: 32 }, (_, code) => code).find(code => !value.some(state => state.value === code));
+  const edit = (index, fields) => onChange(value.map((state, i) => i === index ? { ...state, ...fields } : state));
+  return <fieldset className="chart-fields" disabled={readOnly}><legend>State images</legend>
+    {value.map((state, index) => <fieldset key={index}><legend>State {index + 1}</legend>
+      <label>Code<input type="number" step="1" value={state.value ?? ''} onChange={event => {
+        const code = event.target.valueAsNumber;
+        edit(index, { value: Number.isSafeInteger(code) ? code : null });
+      }} /></label>
+      <label>State label<input maxLength={100} value={state.label}
+        onChange={event => edit(index, { label: event.target.value })} /></label>
+      <ImageField key={id + ':' + index + ':' + state.value} label="Image" value={state.image}
+        onChange={image => edit(index, { image })} />
+      <button type="button" disabled={value.length <= 2}
+        onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove state</button>
+    </fieldset>)}
+    <button type="button" disabled={value.length >= 32} onClick={() => onChange([
+      ...value, { value: next, label: 'State ' + next, image: '' },
+    ])}>Add state</button>
+  </fieldset>;
+}
+
 function StatePicture({ identifier, alt }) {
   const { ui } = useLocalization();
   const [failed, setFailed] = useState(false);
@@ -49,18 +71,30 @@ function StatePicture({ identifier, alt }) {
       onError={() => setFailed(true)} />;
 }
 
-export function StateImage({ id, label, tag, on_image, off_image, on_text, off_text, show_label, puck }) {
-  const { value, valid, problem } = useValue(tag, 'boolean');
-  const { text } = useLocalization();
-  const title = text(`control.${id}.label`, label);
-  const stateText = value ? text(`control.${id}.on_text`, on_text) : text(`control.${id}.off_text`, off_text);
-  const image = value ? on_image : off_image;
-  const caption = show_label || puck?.isEditing;
-  return <article className="hmi-control hmi-state-image" data-control="state_image">
+function ImageReadout({ kind, title, tag, problem, stateText, image, caption, unknown = false }) {
+  return <article className="hmi-control hmi-state-image" data-control={kind}>
     {caption && <span className="hmi-label">{title}</span>}
-    {!valid ? <Quality problem={problem} tag={tag} /> : <>
-      {caption && <strong>{stateText}</strong>}
+    {problem ? <Quality problem={problem} tag={tag} /> : <>
+      {(caption || unknown) && <strong>{stateText}</strong>}
       {image && <StatePicture key={image} identifier={image} alt={caption ? '' : `${title}: ${stateText}`} />}
     </>}
   </article>;
+}
+
+export function StateImage({ id, label, tag, on_image, off_image, on_text, off_text, show_label, puck }) {
+  const { value, problem } = useValue(tag, 'boolean');
+  const { text } = useLocalization();
+  return <ImageReadout kind="state_image" title={text(`control.${id}.label`, label)} tag={tag} problem={problem}
+    stateText={value ? text(`control.${id}.on_text`, on_text) : text(`control.${id}.off_text`, off_text)}
+    image={value ? on_image : off_image} caption={show_label || puck?.isEditing} />;
+}
+
+export function MultiStateImage({ id, label, tag, states = [], show_label, puck }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui } = useLocalization();
+  const state = valid ? states.find(item => item.value === value) : undefined;
+  const quality = problem || (Number.isSafeInteger(value) ? null : 'badData');
+  return <ImageReadout kind="multi_state_image" title={text(`control.${id}.label`, label)} tag={tag} problem={quality}
+    stateText={state ? text(`control.${id}.state.${state.value}`, state.label) : ui('machineUnknownState', { value })}
+    image={state?.image} caption={show_label || puck?.isEditing} unknown={!state} />;
 }

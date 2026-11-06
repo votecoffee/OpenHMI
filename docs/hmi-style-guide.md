@@ -47,6 +47,7 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Binary indicator | Stable label, grayscale filled/empty square and configurable ON/OFF text |
 | Analog range | Value and units, scale endpoints, normal band and pointer; out-of-scale indication without falsifying the numeric value |
 | Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
+| Multi-state image | Map integer codes to named project images and indicate unknown states or bad quality |
 | State image | Switch between two project images from a Boolean tag, with an optional caption and explicit unavailable-data indication |
 | Setpoint comparison | Compare process and setpoint tags, show signed deviation and tolerance, and identify unavailable inputs individually |
 | Bitfield display | Read a 32-bit status word as hexadecimal and named on/off bits, with a common quality indication |

@@ -115,6 +115,8 @@ class CanvasImages:
             for control in controls:
                 if control.kind == 'state_image':
                     identifiers.update(identifier for identifier in (control.on_image, control.off_image) if identifier)
+                if control.kind == 'multi_state_image':
+                    identifiers.update(state.image for state in control.states if state.image)
         with self.store._lock:
             for identifier in identifiers:
                 if not self.store._db.execute('SELECT 1 FROM canvas_image WHERE id=?', (identifier,)).fetchone():

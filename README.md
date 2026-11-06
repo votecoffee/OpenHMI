@@ -306,6 +306,9 @@ changes. In the designer, upload a PNG, JPEG or WebP for each state and choose
 **Use uploaded image**. A state can be left blank for a transparent overlay
 when label and state text are hidden. Bad or stale data shows its quality
 instead of a state image. Project backups include the images.
+Use **Multi-state image** to map 2 to 32 integer codes to named images. It uses
+the same image upload and backup workflow and shows unmapped codes explicitly,
+even with captions hidden.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

@@ -290,7 +290,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if kinds.get(control['tag']) != 'integer':
                     raise HTTPException(422, 'Date/time display requires an unscaled integer tag')
                 continue
-            if control['kind'] in ('multi_state', 'mode_selector'):
+            if control['kind'] in ('multi_state', 'multi_state_image', 'mode_selector'):
                 if kinds.get(control['tag']) != 'integer':
                     raise HTTPException(422, 'Machine states require an unscaled integer tag')
                 if control['kind'] == 'mode_selector':

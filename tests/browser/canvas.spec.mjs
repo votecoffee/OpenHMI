@@ -114,13 +114,13 @@ test('compact annotations, LED and setpoint displays survive canvas save and liv
   }
 });
 
-test('state image uploads and switches with its Boolean tag and quality', async ({ page }) => {
+test('Boolean and multi-state image uploads switch with tag values and quality', async ({ page }) => {
   test.setTimeout(60000);
   const other = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGM0Di1ngAEmOAsvBwAyjgEHv03a3gAAAABJRU5ErkJggg==', 'base64');
   const original = await (await page.request.get('/api/project')).json();
   try {
     await save(page, { ...original.active, controls: [], screens: [], layout: null,
-      tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }] });
+      tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }, { name: 'FixtureState', type: 'integer', initial: 1 }] });
     await page.goto('/');
     await page.getByRole('button', { name: 'Enable freeform layout' }).click();
     const canvas = page.getByLabel('Freeform canvas', { exact: true });
@@ -139,6 +139,20 @@ test('state image uploads and switches with its Boolean tag and quality', async 
       await expect(image.getByRole('img', { name: 'Uploaded image preview' })).toHaveJSProperty('complete', true);
       await image.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
     }
+
+    await palette.getByRole('combobox', { name: 'Control type' }).selectOption('MultiStateImage');
+    await palette.getByRole('button', { name: 'Add or drag control' }).dragTo(canvas, { targetPosition: { x: 216, y: 40 } });
+    await fields.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'FixtureState' });
+    await fields.getByRole('textbox', { name: 'Label', exact: true }).fill('Fixture');
+    await fields.getByRole('combobox', { name: 'Show label and state text', exact: true }).selectOption({ label: 'No' });
+    const rows = fields.getByRole('group', { name: 'State images', exact: true });
+    await rows.getByRole('button', { name: 'Add state', exact: true }).click();
+    for (const [index, label, buffer] of [[2, 'Clamping', pixel], [3, 'Released', other]]) {
+      const row = rows.getByRole('group', { name: 'State ' + index, exact: true });
+      await row.getByRole('textbox', { name: 'State label', exact: true }).fill(label);
+      await row.getByLabel('Upload Image', { exact: true }).setInputFiles({ name: label + '.png', mimeType: 'image/png', buffer });
+      await row.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
+    }
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const { active } = await (await page.request.get('/api/project')).json();
@@ -152,12 +166,22 @@ test('state image uploads and switches with its Boolean tag and quality', async 
     const opened = control.getByRole('img', { name: 'Valve: Open', exact: true });
     await expect(opened).toHaveAttribute('src', '/api/canvas-images/' + image.on_image);
     await expect(opened).toHaveJSProperty('naturalWidth', 1);
+    const multi = page.locator('[data-control="multi_state_image"]');
+    await expect(multi.getByRole('img', { name: 'Fixture: Clamping', exact: true })).toHaveJSProperty('naturalWidth', 1);
     const live = await (await page.request.get('/api/tags')).json();
     live.values.ValveOpen = false;
+    live.values.FixtureState = 2;
     await page.route('**/api/tags', route => route.fulfill({ json: live }));
     const closed = control.getByRole('img', { name: 'Valve: Closed', exact: true });
     await expect(closed).toHaveAttribute('src', '/api/canvas-images/' + image.off_image);
     await expect(closed).toHaveJSProperty('naturalWidth', 4);
+    await expect(multi.getByRole('img', { name: 'Fixture: Released', exact: true })).toHaveJSProperty('naturalWidth', 4);
+    live.values.FixtureState = 99;
+    await expect(multi).toContainText('Unknown state (99)');
+    await expect(multi.locator('img')).toHaveCount(0);
+    live.samples.FixtureState = { quality: 'stale', age_seconds: 4 };
+    await expect(multi).toContainText('STALE DATA');
+    await expect(multi).not.toContainText('Unknown state');
     live.samples.ValveOpen = { quality: 'stale', age_seconds: 4 };
     await expect(control).toContainText('STALE DATA');
     await expect(control.locator('img')).toHaveCount(0);
