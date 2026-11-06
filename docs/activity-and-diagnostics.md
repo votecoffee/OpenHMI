@@ -77,7 +77,10 @@ automatically attributed to an operator.
 
 Open **Diagnostics** to inspect cached connection and tag state. The page shows
 configured routes, connected/disconnected/disabled/held status, errors, effective
-scan groups and counters. Counters include pycomm3 reads with a complete batch
+scan groups and counters. A failed or malformed response leaves the last
+received results for the current filter and page visible with a timestamp and
+an unavailable warning. An access denial clears those results. Counters
+include pycomm3 reads with a complete batch
 response and the addresses requested in those reads. Wire-packet counts require
 a separate measurement. Scan intervals remain best effort.
 

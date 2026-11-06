@@ -2,16 +2,18 @@ let projectInstance = null;
 export async function api(path, options = {}) {
   const headers = { ...options.headers, ...(projectInstance ? { 'X-OpenHMI-Project': projectInstance } : {}) };
   const response = await fetch(path, { signal: AbortSignal.timeout(5000), ...options, headers });
-  const data = await response.json();
   if (!response.ok) {
-    const detail = Array.isArray(data.detail)
-      ? data.detail.map(item => `${item.loc.join('.')}: ${item.msg}`).join('; ') : data.detail;
-    const error = new Error(detail || `HTTP ${response.status}`);
+    const { detail } = (await response.json().catch(() => null)) ?? {};
+    const message = Array.isArray(detail) ? detail.filter(item => Array.isArray(item?.loc) && typeof item.msg === 'string')
+      .map(item => `${item.loc.join('.')}: ${item.msg}`).join('; ') : detail;
+    const error = new Error(typeof message === 'string' && message ? message : `HTTP ${response.status}`);
+    error.status = response.status;
     error.conflict = response.status === 409;
     error.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
     error.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
     throw error;
   }
+  const data = await response.json();
   if (response.headers.has('X-OpenHMI-Operation-ID')) {
     data.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
     data.audit_status = response.headers.get('X-OpenHMI-Audit-Status');

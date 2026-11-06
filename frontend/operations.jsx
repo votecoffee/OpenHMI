@@ -171,30 +171,68 @@ function WorkerHealth({ workers }) {
   </>;
 }
 
+function isDiagnosticsSnapshot(data, offset) {
+  if (data?.offset !== offset || !Number.isSafeInteger(data.total_tags) || data.total_tags < 0
+    || typeof data.plc_hold !== 'boolean' || (data.next_offset !== null
+      && (!Number.isSafeInteger(data.next_offset) || data.next_offset <= offset))) return false;
+  const textFields = (row, ...fields) => row != null && fields.every(field => typeof row[field] === 'string');
+  const optionalText = value => value == null || typeof value === 'string';
+  const optionalNumber = value => value == null || Number.isFinite(value);
+  return Array.isArray(data.tags) && data.tags.every(tag => textFields(tag, 'name', 'address', 'type', 'quality')
+      && optionalText(tag.connection) && optionalText(tag.timestamp) && optionalText(tag.error) && optionalNumber(tag.age_seconds))
+    && Array.isArray(data.workers) && data.workers.every(worker => textFields(worker, 'id', 'state')
+      && Number.isSafeInteger(worker.failures) && optionalText(worker.last_success_at) && optionalText(worker.last_error_type)
+      && optionalNumber(worker.retry_in_seconds) && (worker.state !== 'overdue' || Number.isFinite(worker.running_seconds)))
+    && Array.isArray(data.connections) && data.connections.every(route => textFields(route, 'id', 'name', 'path', 'state')
+      && optionalText(route.error) && [route.read_calls, route.tags_read, route.route_failures].every(Number.isSafeInteger)
+      && Array.isArray(route.groups) && route.groups.every(group => Number.isFinite(group?.rate_ms)
+        && Array.isArray(group.addresses) && group.addresses.every(address => typeof address === 'string'))
+      && route.timings && typeof route.timings === 'object' && !Array.isArray(route.timings)
+      && Object.values(route.timings).every(timing => timing && ['last_ms', 'p50_ms', 'p95_ms', 'p99_ms', 'count']
+        .every(field => Number.isFinite(timing[field]))));
+}
+
 export function DiagnosticsConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'diagnostics.view');
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
-  const [data, setData] = useState(null);
-  const [message, setMessage] = useState('');
+  const [result, setResult] = useState(null);
+  const current = result?.search === search && result.offset === offset ? result : null;
+  const { data, message, receivedAt } = current ?? {};
   useEffect(() => {
-    if (!permitted) { setData(null); return; }
+    if (!permitted) { setResult(null); return; }
     let stopped = false, timer;
-    async function tick() { try { const result = await api(`/api/diagnostics?search=${encodeURIComponent(search)}&offset=${offset}`); if (!stopped) { setData(result); setMessage(''); } } catch (error) { if (!stopped) setMessage(error.message); } if (!stopped) timer = setTimeout(tick, 2000); }
+    async function tick() {
+      try {
+        const snapshot = await api(`/api/diagnostics?search=${encodeURIComponent(search)}&offset=${offset}`);
+        if (!isDiagnosticsSnapshot(snapshot, offset)) throw new Error('Invalid diagnostics response');
+        if (!stopped) setResult({ search, offset, data: snapshot, receivedAt: new Date() });
+      } catch (error) {
+        const denied = error.status === 401 || error.status === 403;
+        if (!stopped) setResult(previous => {
+          const retain = !denied && previous?.search === search && previous.offset === offset;
+          return { ...(retain ? previous : { search, offset }), message: error.message };
+        });
+      }
+      if (!stopped) timer = setTimeout(tick, 2000);
+    }
     tick(); return () => { stopped = true; clearTimeout(timer); };
   }, [permitted, search, offset]);
   if (!permitted) return <section className="engineering"><h1>Runtime diagnostics</h1><p>Sign in with diagnostics viewing permission to inspect runtime status.</p></section>;
   return <section className="engineering operations" aria-label="Runtime diagnostics"><h1>Runtime diagnostics</h1><p>Viewing diagnostics reads cached runtime state. It does not subscribe new tags or issue equipment writes.</p>
-    {message && <p role="alert">{message}</p>}{data?.plc_hold && <p role="status">PLC connections are held until reviewed and applied.</p>}
+    {message && <p role="alert">Diagnostics unavailable. {message}
+      {data && <> Showing last received diagnostics from {receivedAt.toLocaleTimeString()}.</>}</p>}
+    {!current && <p role="status">Waiting for diagnostics.</p>}
+    {data?.plc_hold && <p role="status">{message && 'Last received status: '}PLC connections are held until reviewed and applied.</p>}
     <h2>Connections and scans</h2><table><thead><tr><th>Connection / route</th><th>State</th><th>Read calls / addresses</th><th>Effective groups</th><th>Timing</th><th>Error</th></tr></thead><tbody>{data?.connections.map(connection => <tr key={connection.id}><td>{connection.name}<br />{connection.path}</td><td>{connection.state}</td><td>{connection.read_calls} / {connection.tags_read}</td><td>{connection.groups.map(group => <details key={group.rate_ms}><summary>{group.rate_ms} ms · {group.addresses.length} addresses</summary>{group.addresses.join(', ')}</details>)}</td><td><ConnectionTimings connection={connection} /></td><td>{connection.error || '—'}</td></tr>)}</tbody></table>
     {data && !data.connections.length && <p>No PLC connections are configured.</p>}
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>
     {!!data?.workers?.length && <WorkerHealth workers={data.workers} />}
     <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setSearch(filter); setOffset(0); }}><label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label><button>Filter diagnostic tags</button></form>
-    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?search=${encodeURIComponent(search)}`}>Export diagnostics JSON</a></div>
-    <p>{data?.total_tags || 0} matching logical tags. Values are omitted from this diagnostic export.</p>
+    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?search=${encodeURIComponent(search)}`}>Export diagnostics JSON</a></div>
+    {data && <p>{data.total_tags} matching logical tags. Values are omitted from this diagnostic export.</p>}
     <table className="diagnostics-tags"><thead><tr><th>Tag / source</th><th>Type</th><th>Quality</th><th>Age (s)</th><th>Acquisition time / error</th></tr></thead><tbody>{data?.tags.map(tag => <tr key={tag.name}><td>{tag.name}<br /><small>{tag.connection || 'Local'} · {tag.address}</small></td><td>{tag.type}</td><td><strong>{tag.quality}</strong></td><td>{tag.age_seconds == null ? '—' : tag.age_seconds.toFixed(2)}</td><td>{tag.timestamp ? new Date(tag.timestamp).toLocaleString() : 'No sample'}<br />{tag.error}</td></tr>)}</tbody></table>
   </section>;
 }

@@ -50,6 +50,53 @@ test('a stale operator button cannot dispatch a replacement action', async ({ pa
   }
 });
 
+test('diagnostics keeps readable results through bad polls and clears them on denied access', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const login = await page.request.post('/api/security/login', { data: { name: 'admin', password: 'SecurityTestOnly-2026!' } });
+  expect(login.ok()).toBe(true);
+  const snapshot = await (await page.request.get('/api/diagnostics')).json();
+  const healthy = { json: { ...snapshot, total_tags: 101, next_offset: 100 } };
+  let reply = healthy;
+  await page.route('**/api/diagnostics?*', route => reply ? route.fulfill(reply) : route.continue());
+  await page.goto('/diagnostics');
+  const panel = page.getByRole('region', { name: 'Runtime diagnostics', exact: true });
+  const warning = panel.getByRole('alert');
+  const rows = panel.locator('.diagnostics-tags tbody');
+  await expect(rows).toContainText('TankLevel');
+
+  for (const invalid of [{}, { ...snapshot, tags: [null] },
+    { ...snapshot, workers: [{ ...snapshot.workers[0], state: 'overdue', running_seconds: null }] }]) {
+    reply = { json: invalid };
+    await expect(warning).toContainText('Showing last received diagnostics');
+    await expect(rows).toContainText('TankLevel');
+    await expect(panel.getByRole('button', { name: 'More tags' })).toBeDisabled();
+    reply = healthy;
+    await expect(warning).toBeHidden();
+    await expect(panel.getByRole('button', { name: 'More tags' })).toBeEnabled();
+  }
+
+  reply = { status: 503, json: { detail: 'Synthetic diagnostics outage' } };
+  await expect(warning).toContainText('Showing last received diagnostics');
+  await panel.getByLabel('Tag filter').fill('MotorRunning');
+  await panel.getByRole('button', { name: 'Filter diagnostic tags' }).click();
+  await expect(warning).toContainText('Synthetic diagnostics outage');
+  await expect(warning).not.toContainText('Showing last received diagnostics');
+  await expect(rows.locator('tr')).toHaveCount(0);
+  reply = undefined;
+  await expect(rows).toContainText('MotorRunning');
+  await expect(rows).not.toContainText('TankLevel');
+  await expect(warning).toBeHidden();
+
+  reply = { status: 403, body: 'Forbidden', contentType: 'text/plain' };
+  await expect(warning).toContainText('HTTP 403');
+  await expect(rows.locator('tr')).toHaveCount(0);
+  reply = undefined;
+  await expect(rows).toContainText('MotorRunning');
+  await expect(warning).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('protected operator journal, denial attribution, filters, export and diagnostics', async ({ page }) => {
   test.setTimeout(120000);
   const errors = [];
