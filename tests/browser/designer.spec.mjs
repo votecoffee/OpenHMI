@@ -313,6 +313,10 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await expect(header.getByText('Line PLC · Disconnected / retrying', { exact: true })).toBeVisible();
   await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
   await expect(header.getByText('Spare PLC · Disabled', { exact: true })).toBeVisible();
+  live = { ...live, connections: [{ id: 'line', connected: true, scan_overdue: true }, online[1]] };
+  await expect(header.getByText('Line PLC · Scan overdue', { exact: true })).toBeVisible();
+  await expect(station).toContainText('PLC scan overdue');
+  await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
   await expect(indicator).toContainText('PLC COMM LOSS');
   await expect(numeric).toContainText('42.0');
   await expect(button).toBeDisabled();

@@ -314,6 +314,7 @@ class RuntimeDriver(SimulatorDriver):
         self.factory = factory
         self._scan_pool = None
         self._scans = {}
+        self._scan_started = {}
         self._closing = False
         self.connections, self.definitions, self.sources, self.samples = {}, {}, {}, {}
         self.address_aliases = {}
@@ -437,6 +438,7 @@ class RuntimeDriver(SimulatorDriver):
             for identifier, future in list(self._scans.items()):
                 if future.done():
                     del self._scans[identifier]
+                    del self._scan_started[identifier]
                     try:
                         future.result()
                     except Exception:
@@ -480,6 +482,7 @@ class RuntimeDriver(SimulatorDriver):
                     self._scan, identifier, connection, self.project, due, deadline,
                     None if real_clock else now, time.monotonic()
                 )
+                self._scan_started[identifier] = now
             scheduled = tuple(self._scans.values()) if wait else ()
         for future in scheduled:
             future.result()
@@ -717,15 +720,25 @@ class RuntimeDriver(SimulatorDriver):
             return int(value)
         return value
 
-    def status(self, *, include_timing=False):
+    def status(self, *, include_timing=False, now=None):
+        now = time.monotonic() if now is None else now
         with self.lock:
-            return [{'id': identifier, 'connected': connection.connected, 'error': connection.error,
-                     'connection_instance': connection.instance,
-                     'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
-                     **({'timings': connection.timings.snapshot(), 'route_failures': connection.failure_generation} if include_timing else {}),
-                     'groups': [{'rate_ms': rate, 'addresses': sorted(address for (conn, address), interval in self.last_rates.items() if conn == identifier and interval == rate)}
-                                for rate in sorted({interval for (conn, _), interval in self.last_rates.items() if conn == identifier})]}
-                    for identifier, connection in self.connections.items()]
+            routes = []
+            for identifier, connection in self.connections.items():
+                scan = self._scans.get(identifier)
+                age = max(0, now - self._scan_started[identifier]) if scan and not scan.done() else None
+                groups = {}
+                for (route, address), rate in self.last_rates.items():
+                    if route == identifier:
+                        groups.setdefault(rate, []).append(address)
+                routes.append({'id': identifier, 'connected': connection.connected, 'error': connection.error,
+                               'connection_instance': connection.instance,
+                               'scan_age_seconds': age,
+                               'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
+                               'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
+                               'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)} for rate, addresses in sorted(groups.items())],
+                               **({'timings': connection.timings.snapshot(), 'route_failures': connection.failure_generation} if include_timing else {})})
+            return routes
 
     def close(self):
         with self.io_lock:
@@ -740,6 +753,7 @@ class RuntimeDriver(SimulatorDriver):
             finally:
                 with self.lock:
                     self._scans.clear()
+                    self._scan_started.clear()
                     self.samples.clear()
                     self.deadlines.clear()
                     self._scan_pool = None

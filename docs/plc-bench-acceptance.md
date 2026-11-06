@@ -10,6 +10,12 @@ The [driver readiness roadmap](runtime-readiness-roadmap.md#m2--controllogix-acq
 defines the fault profile, supported tag checks and measurements. Agree the
 scan, acquisition age, recovery and controller load limits for this bench.
 
+The operator header labels a route **Scan overdue** when a scheduled scan
+remains in flight for at least five seconds or the configured socket timeout,
+whichever is longer. Diagnostics shows the elapsed time. A completed scan
+clears the in-flight warning. Tag quality and the route's disconnect/reconnect
+status continue to reflect their own evidence.
+
 ## Run the offline scan baseline
 
 From a source checkout with OpenHMI installed, create a report at a new path in

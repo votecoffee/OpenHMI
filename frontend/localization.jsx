@@ -66,6 +66,7 @@ export const uiText = {
   simulatorOnline: 'Simulator connected', simulatorOffline: 'Simulator disconnected',
   runtimeOnline: 'Runtime connected', runtimeOffline: 'Runtime offline',
   plcOnline: 'PLC routes connected ({connected}/{total})', plcPartial: 'PLC partial outage ({connected}/{total} connected)',
+  plcScanOverdue: 'PLC scan overdue', routeScanOverdue: 'Scan overdue',
   plcOffline: 'PLC communication lost', plcConnecting: 'Connecting to PLC', plcDisabled: 'PLC routes disabled',
   plcHeld: 'PLC acquisition held', routeConnected: 'Connected', routeConnecting: 'Connecting',
   routeRetrying: 'Disconnected / retrying', routeUnknown: 'Status unavailable', routeHeld: 'Held', routeDisabled: 'Disabled',

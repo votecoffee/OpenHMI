@@ -531,12 +531,19 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertFalse(slow_scan.done())
         self.assertEqual(healthy.reads, [('Level',), ('Level',)])
         self.assertEqual(driver.sample_snapshot(2)['OtherLevel']['value'], 85.0)
+        routes = {item['id']: item for item in driver.status(now=6)}
+        self.assertEqual(routes['plc']['scan_age_seconds'], 5)
+        self.assertTrue(routes['plc']['scan_overdue'])
+        self.assertTrue(routes['plc']['connected'])
+        self.assertIsNone(routes['other']['scan_age_seconds'])
+        self.assertFalse(routes['other']['scan_overdue'])
 
         # An in-flight read from the old project must not publish after Apply.
         project['tags'][1]['scale'] = 3.0
         driver.configure(Project.model_validate(project).model_dump())
         release.set()
         slow_scan.result(timeout=5)
+        self.assertFalse(next(item for item in driver.status(now=6) if item['id'] == 'plc')['scan_overdue'])
         self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'pending')
         driver.poll(2.1)
         self.assertEqual(driver.sample_snapshot(2.1)['LevelA']['value'], 95.0)

@@ -218,7 +218,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
     const response = await route.fetch();
     const data = await response.json();
     data.connections = [{
-      id: 'bench', name: 'Bench PLC', path: 'offline-only/0', state: 'connected',
+      id: 'bench', name: 'Bench PLC', path: 'offline-only/0', state: 'scan overdue', scan_age_seconds: 6,
       read_calls: 8, tags_read: 12, groups: [], route_failures: 1,
       timings: Object.fromEntries(Object.entries({
         recovery: 1375, scan_queue: 1, route_lock_wait: 150, adapter_read: 12,
@@ -234,6 +234,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
     await expect(bench.getByText(label, { exact: true })).toBeVisible();
   }
   await expect(bench).toContainText('Route failures: 1');
+  await expect(bench).toContainText('6.0 s in flight');
   expect(errors).toEqual([]);
   if ((await (await page.request.get('/api/tags')).json()).values.MotorRunning !== originalMotor) {
     expect((await page.request.post('/api/controls/toggle/activate', { data: {} })).ok()).toBe(true);
