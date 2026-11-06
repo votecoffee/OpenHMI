@@ -159,6 +159,14 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const latest = (await (await page.request.get('/api/project')).json()).active;
     expect(latest.screens[0].update_ms).toBe(200);
+    const instance = latest.screens[0].controls.find(control => control.kind === 'faceplate');
+    instance.enabled_tag = 'FaceplatePermit';
+    latest.tags.push({ name: 'FaceplatePermit', type: 'boolean', initial: false, writable: true },
+      { name: 'FaceplateOutput', type: 'boolean', initial: false, writable: true });
+    latest.faceplates[0].controls.push({ id: 'unitOutput', kind: 'button', label: 'Toggle unit output',
+      mode: 'toggle', target: 'FaceplateOutput' });
+    latest.screens[0].controls.push({ id: 'enableFaceplate', kind: 'button', label: 'Enable unit controls',
+      mode: 'set', target: 'FaceplatePermit', value: true });
     latest.screens.push({ id: 'details', title: 'Details', popup: true, update_ms: 1000, columns: 1, controls: [{ id: 'trend', kind: 'trend', label: 'Speed history', tags: ['UnitA.Speed', 'PLCLevel', 'MotorRunning'], seconds: 60 }] });
     latest.screens.at(-1).controls.push({ id: 'more', kind: 'button', label: 'More details', mode: 'popup', screen: 'more' });
     latest.screens.push({ id: 'more', title: 'More', popup: true, update_ms: 500, columns: 1, controls: [
@@ -171,6 +179,30 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await viewer.goto('/runtime');
     await viewer.getByRole('button', { name: 'Equipment', exact: true }).click();
     await expect(viewer.locator('[data-control="faceplate"]')).toContainText('12.5');
+    const output = viewer.getByRole('button', { name: 'Toggle unit output', exact: true });
+    await expect(viewer.getByText('Enable tag FaceplatePermit is off', { exact: true })).toBeVisible();
+    await expect(output).toBeDisabled();
+    const blocked = await viewer.request.post(`/api/controls/equipment__${instance.id}__unitOutput/activate`, { data: {} });
+    expect(blocked.status()).toBe(423);
+
+    await viewer.route('**/api/tags', async route => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.samples.FaceplatePermit = { quality: 'stale', error: 'Synthetic stale faceplate permit' };
+      await route.fulfill({ response, json: state });
+    });
+    const permit = viewer.getByRole('button', { name: 'Inspect FaceplatePermit quality (Enable tag · STALE DATA)', exact: true });
+    await expect(permit).toBeEnabled();
+    await permit.click();
+    const quality = viewer.getByRole('dialog', { name: 'Tag quality details', exact: true });
+    await expect(quality).toContainText('Synthetic stale faceplate permit');
+    await quality.getByRole('button', { name: 'Close Tag quality details' }).click();
+    await expect(output).toBeDisabled();
+    await viewer.unroute('**/api/tags');
+    await viewer.getByRole('button', { name: 'Enable unit controls', exact: true }).click();
+    await expect(output).toBeEnabled();
+    await output.click();
+    await expect.poll(async () => (await (await viewer.request.get('/api/tags')).json()).values.FaceplateOutput).toBe(true);
     const open = viewer.getByRole('button', { name: 'Open details', exact: true });
     await open.press('Enter');
     const details = viewer.getByRole('dialog', { name: 'Details', exact: true });

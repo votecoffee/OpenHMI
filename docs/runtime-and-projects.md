@@ -40,7 +40,9 @@ Local tags have typed initial values. UDT tags expose a configured member/type
 contract and may bind reusable faceplate definitions. Relative `$.Member` bindings
 resolve against each instance's root tag. Instance controls receive unique IDs,
 and server-side security/conditional-enable checks apply to the expanded controls.
-Specific equipment faceplates are intentionally left for later design.
+When an instance enable tag is off, its child actions and edits are disabled.
+If the enable data is unavailable, the instance's quality badge can still be
+opened for details. Specific equipment faceplates are left for later design.
 
 ## Shared polling
 

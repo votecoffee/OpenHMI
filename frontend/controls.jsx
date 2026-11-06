@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Live, useValue, tagValue, Quality, ConnectionStatus } from './live-quality.jsx';
 import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
-import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
+import { useLocalization, useUi, LanguageSelector, alarmMessage } from './localization.jsx';
 import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
@@ -221,11 +221,17 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
 
 function Conditional({ children, visible_tag, enabled_tag, color_tag, active_color, puck }) {
   const live = useContext(Live);
+  const ui = useUi();
   const isTrue = tag => { const state = tagValue(live, tag, 'boolean'); return state.valid && state.value; };
   if (!puck?.isEditing && visible_tag && !isTrue(visible_tag)) return null;
-  const disabled = !puck?.isEditing && enabled_tag && !isTrue(enabled_tag);
+  const enabled = !puck?.isEditing && enabled_tag ? tagValue(live, enabled_tag, 'boolean') : null;
+  const disabled = enabled != null && (!enabled.valid || enabled.value !== true);
   return <div className="binding-frame" style={color_tag && isTrue(color_tag) ? { '--hmi-live': active_color } : {}}>
-    <fieldset className="binding-contents" disabled={!!disabled}>{children}</fieldset></div>;
+    {disabled && (enabled.valid ? <small>{ui('editEnableOff', { tag: enabled_tag })}</small>
+      : <Quality tag={enabled_tag} problem={enabled.problem}
+        text={ui('editBindingProblem', { binding: ui('editEnableBinding'), quality: ui(enabled.problem) })} />)}
+    <fieldset className="binding-contents" disabled={disabled}>{children}</fieldset>
+  </div>;
 }
 
 function LiveTrend(props) {
