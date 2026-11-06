@@ -111,7 +111,7 @@ class LogixConnection:
         self.connected = False
         self.error = None
         self.retry_at, self.failures = 0, 0
-        self.failure_generation = 0
+        self.failure_generation = self.scan_generation = 0
         self.outage_started = None
         self.timings = ScanTimings()
         self.metadata = {}
@@ -491,14 +491,10 @@ class RuntimeDriver(SimulatorDriver):
                 if identifier in self._scans:
                     continue
                 reconnect = not connection.connected
-                if reconnect:
-                    if now < connection.retry_at:
-                        continue
-                    # A reconnect refreshes demand without waiting for old deadlines.
-                    for key in list(self.deadlines):
-                        if key[0] == identifier:
-                            del self.deadlines[key]
-                if not reconnect and not self._due_addresses(identifier, now):
+                if reconnect and now < connection.retry_at:
+                    continue
+                if (not reconnect and connection.scan_generation == connection.failure_generation
+                        and not self._due_addresses(identifier, now)):
                     continue
                 if self._scan_pool is None:
                     self._scan_pool = ThreadPoolExecutor(max_workers=MAX_PLC_CONNECTIONS, thread_name_prefix='openhmi-plc')
@@ -524,6 +520,12 @@ class RuntimeDriver(SimulatorDriver):
                 scan_start = started if now is None else now
                 if scan_start < connection.retry_at and not connection.connected:
                     return
+                if not connection.connected or connection.scan_generation != connection.failure_generation:
+                    # A disconnect may occur while queued, and an explicit read may reopen the route.
+                    for key in list(self.deadlines):
+                        if key[0] == identifier:
+                            del self.deadlines[key]
+                    connection.scan_generation = connection.failure_generation
                 # Demand can change while this scan waits for a writer or a worker slot.
                 due = self._due_addresses(identifier, scan_start)
                 deadline = min((self.deadlines[(identifier, address)] for address in due

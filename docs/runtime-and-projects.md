@@ -72,6 +72,9 @@ arrives during a scan, a sample received before that demand leaves the address
 due for the next scan.
 A scan waiting for the route rechecks the scheduler's due addresses before
 sending a PLC read. A connected route skips the read if no addresses remain due.
+After a connection failure, the first scan after backoff refreshes all
+currently requested addresses on that route, even if a separate verification
+read already reopened the connection.
 
 Due addresses share a single pycomm3 connection per configured PLC and are read
 in batches. pycomm3 splits requests to fit EtherNet/IP Multiple Service Packets

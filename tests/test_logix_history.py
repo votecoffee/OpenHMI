@@ -679,6 +679,38 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['quality'], 'good')
         self.assertNotIn('quality_reason', driver.sample_snapshot(2.4)['LevelA'])
 
+    def test_reconnect_during_route_wait_refreshes_slow_addresses(self):
+        for verification_reconnect in (False, True):
+            with self.subTest(verification_reconnect=verification_reconnect):
+                project = logix_project()
+                project['screens'][1]['update_ms'] = 60000
+                driver = RuntimeDriver(FakePLC)
+                self.addCleanup(driver.close)
+                driver.configure(Project.model_validate(project).model_dump())
+                clock = SimpleNamespace(now=1)
+                with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)):
+                    driver.lease('viewer', ['fast', 'slow'])
+                    driver.poll()
+                    connection = driver.connections['plc']
+                    original = connection.client
+                    with driver.write_scope(['LevelA']):
+                        clock.now = 1.2
+                        driver.poll(wait=False)
+                        queued = driver._scans['plc']
+                        self.assertFalse(queued.done())
+                        connection.failed(TimeoutError('Synthetic write timeout'), clock.now)
+                        clock.now = 2.3
+                        if verification_reconnect:
+                            connection.read(['Motor'])
+                        self.assertNotEqual(driver.sample_snapshot()['LevelA']['quality'], 'good')
+                    queued.result(timeout=5)
+                    self.assertTrue(original.closed)
+                    self.assertEqual(connection.client.reads[-1], ('Motor', 'Level'))
+                    samples = driver.sample_snapshot()
+                    self.assertEqual(samples['LevelA']['quality'], 'good')
+                    self.assertEqual(samples['LevelA']['age_seconds'], 0)
+                    self.assertEqual(samples['MotorA.Speed']['quality'], 'good')
+
     def test_route_lock_wait_replans_due_addresses_before_reading(self):
         project = logix_project()
         project['screens'][1]['controls'] = [project['screens'][1]['controls'][1]]
