@@ -70,7 +70,7 @@ def add_operations_routes(app, journal, security, driver, workers):
         connections = []
         for config in (driver.project or {}).get('connections', []):
             status = live.get(config['id'], {})
-            state = 'held' if driver.plc_hold and config['enabled'] else 'disabled' if not config['enabled'] else 'scan overdue' if status.get('scan_overdue') else 'connected' if status.get('connected') else 'disconnected'
+            state = 'held' if driver.plc_hold and config['enabled'] else 'disabled' if not config['enabled'] else 'scan overdue' if status.get('scan_overdue') else 'recovering' if status.get('recovering') else 'connected' if status.get('connected') else 'disconnected'
             connections.append({'id': config['id'], 'name': config['name'], 'path': config['path'], 'state': state,
                                 'connection_instance': status.get('connection_instance'),
                                 'scan_age_seconds': status.get('scan_age_seconds'),

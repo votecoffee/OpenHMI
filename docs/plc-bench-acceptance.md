@@ -14,7 +14,9 @@ The operator header labels a route **Scan overdue** when a scheduled scan
 remains in flight for at least five seconds or the configured socket timeout,
 whichever is longer. Diagnostics shows the elapsed time. A completed scan
 clears the in-flight warning. Tag quality and the route's disconnect/reconnect
-status continue to reflect their own evidence.
+status continue to reflect their own evidence. After a route reconnects, the
+header and Diagnostics show recovery in progress while active scan groups wait
+for their first usable sample. Individual tags retain their own quality.
 
 ## Run the offline scan baseline
 

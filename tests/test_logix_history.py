@@ -236,6 +236,41 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(status['timings']['recovery']['last_ms'], 1375)
         self.assertNotIn('timings', driver.status()[0])
 
+    def test_route_recovery_waits_for_usable_data_after_reconnect(self):
+        reject = False
+
+        class RejectingPLC(FakePLC):
+            def read(self, *addresses):
+                results = super().read(*addresses)
+                if reject:
+                    for result in results if isinstance(results, list) else [results]:
+                        result.error = 'Synthetic tag rejection'
+                return results
+
+        driver = RuntimeDriver(RejectingPLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        driver.connections['plc'].client.fail = True
+        driver.poll(2)
+        self.assertFalse(driver.status()[0]['connected'])
+
+        reject = True
+        driver.poll(3)
+        status = driver.status(include_timing=True)[0]
+        self.assertTrue(status['connected'])
+        self.assertTrue(status['recovering'])
+        self.assertNotIn('recovery', status['timings'])
+        self.assertEqual(driver.sample_snapshot(3)['LevelA']['quality'], 'bad')
+
+        reject = False
+        driver.poll(4)
+        status = driver.status(include_timing=True)[0]
+        self.assertFalse(status['recovering'])
+        self.assertEqual(status['timings']['recovery']['last_ms'], 2000)
+        self.assertEqual(driver.sample_snapshot(4)['LevelA']['quality'], 'good')
+
     def test_timing_window_keeps_recent_samples_and_uses_nearest_rank(self):
         timings = ScanTimings()
         for sample in range(260):

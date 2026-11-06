@@ -96,6 +96,7 @@ export function ConnectionStatus({ details = false }) {
       : !live.connected ? 'routeUnknown'
       : live.plcHold ? 'routeHeld'
       : status?.scan_overdue === true ? 'routeScanOverdue'
+      : status?.recovering === true ? 'routeRecovering'
       : status?.connected ? 'routeConnected'
       : status?.error != null ? 'routeRetrying' : 'routeConnecting';
     return { ...config, state };
@@ -108,6 +109,7 @@ export function ConnectionStatus({ details = false }) {
   else if (live.plcHold) summary = 'plcHeld';
   else if (connected === enabled.length) summary = 'plcOnline';
   else if (enabled.some(route => route.state === 'routeScanOverdue')) summary = 'plcScanOverdue';
+  else if (enabled.some(route => route.state === 'routeRecovering')) summary = 'plcRecovering';
   else if (connected > 0) summary = 'plcPartial';
   else summary = enabled.some(route => route.state === 'routeRetrying') ? 'plcOffline' : 'plcConnecting';
 

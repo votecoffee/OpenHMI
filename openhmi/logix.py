@@ -586,7 +586,8 @@ class RuntimeDriver(SimulatorDriver):
                                 if not math.isfinite(value):
                                     raise ValueError('Scaled PLC value is not finite')
                             sample = {'value': value, 'quality': 'good', 'error': None}
-                            if connection.outage_started is not None:
+                            if (connection.outage_started is not None
+                                    and scan_finished - acquired <= freshness_seconds(rate)):
                                 connection.timings.record('recovery', scan_finished - connection.outage_started)
                                 connection.outage_started = None
                         except (ValueError, KeyError, TypeError, IndexError) as failure:
@@ -776,6 +777,7 @@ class RuntimeDriver(SimulatorDriver):
                 routes.append({'id': identifier, 'connected': connection.connected, 'error': connection.error,
                                'connection_instance': connection.instance,
                                'scan_age_seconds': age,
+                               'recovering': connection.connected and connection.outage_started is not None and bool(groups),
                                'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
                                'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
                                'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)} for rate, addresses in sorted(groups.items())],
