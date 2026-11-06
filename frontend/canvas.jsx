@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { api } from './api.mjs';
+import { uploadProjectImage } from './api.mjs';
 import { useLocalization } from './localization.jsx';
 import './canvas.css';
 
@@ -582,7 +582,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     const request = ++pendingImage.current;
     try {
       setMessage('Uploading image...');
-      const image = await api('/api/canvas-images', { method: 'POST', body: file, signal: AbortSignal.timeout(15000) });
+      const image = await uploadProjectImage(file);
       if (request !== pendingImage.current) return;
       if (asObject) addDecoration('image', file.name.slice(0, 100) || 'Image', image.id);
       else if (latest.current.data.root.props.layout.background !== image.id) {

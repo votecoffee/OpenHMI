@@ -113,6 +113,7 @@ class SecurityTests(unittest.TestCase):
 
         self.client.post('/api/security/logout').raise_for_status()
         self.assertEqual(self.client.put(url, json=request).status_code, 401)
+        self.assertEqual(self.client.get('/api/canvas-images').status_code, 401)
 
     def test_palette_inputs_validate_tag_bindings_and_reject_unlisted_writes(self):
         state = self.client.get('/api/project').json()

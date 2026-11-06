@@ -1,34 +1,54 @@
+from contextlib import closing
+import hashlib
 from io import BytesIO
 from pathlib import Path
+import sqlite3
 from tempfile import TemporaryDirectory
 import unittest
 
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from openhmi.projects import ProjectStore
 from openhmi.workspace import ProjectWorkspace
 
 
 class CanvasBackupTests(unittest.TestCase):
     def test_canvas_background_survives_backup_and_image_references_are_checked(self):
         directory = self.enterContext(TemporaryDirectory())
-        workspace = ProjectWorkspace(Path(directory) / 'Canvas.openhmi.sqlite3')
+        path = Path(directory) / 'Canvas.openhmi.sqlite3'
+        legacy = BytesIO()
+        Image.new('RGB', (20, 20), '#f0f0f0').save(legacy, format='WEBP')
+        legacy_id = hashlib.sha256(legacy.getvalue()).hexdigest()
+        ProjectStore(path).close()
+        with closing(sqlite3.connect(path)) as db, db:
+            db.execute('CREATE TABLE canvas_image (id TEXT PRIMARY KEY, media_type TEXT NOT NULL, data BLOB NOT NULL)')
+            db.execute('INSERT INTO canvas_image VALUES (?, ?, ?)', (legacy_id, 'image/webp', legacy.getvalue()))
+        workspace = ProjectWorkspace(path)
         self.addCleanup(workspace.current.state.store.close)
         client = TestClient(workspace.current)
         state = client.get('/api/project').json()
+        self.assertEqual(client.get('/api/canvas-images').json()['items'], [{'id': legacy_id, 'name': ''}])
         project = state['draft']
         background = BytesIO()
         Image.new('RGB', (40, 30), '#789abc').save(background, format='PNG')
         invalid = client.post('/api/canvas-images', content=b'<svg/>')
         self.assertEqual(invalid.status_code, 422)
-        image = client.post('/api/canvas-images', content=background.getvalue())
+        image = client.post('/api/canvas-images', content=background.getvalue(), params={'name': r'C:\fixture\Background.png'})
         self.assertEqual(image.status_code, 200, image.text)
         identifier = image.json()['id']
         off = BytesIO()
         Image.new('RGB', (40, 30), '#123456').save(off, format='PNG')
-        off_image = client.post('/api/canvas-images', content=off.getvalue())
+        off_image = client.post('/api/canvas-images', content=off.getvalue(), params={'name': 'Closed.png'})
         self.assertEqual(off_image.status_code, 200, off_image.text)
         off_id = off_image.json()['id']
+        duplicate = client.post('/api/canvas-images', content=off.getvalue(), params={'name': 'Copy.png'})
+        self.assertEqual(duplicate.json()['id'], off_id)
+        newest = client.get('/api/canvas-images', params={'limit': 1}).json()
+        self.assertEqual(newest['items'], [{'id': off_id, 'name': 'Closed.png'}])
+        older = client.get('/api/canvas-images', params={'before': newest['next_before']}).json()
+        self.assertEqual(older['items'], [{'id': identifier, 'name': 'Background.png'}, {'id': legacy_id, 'name': ''}])
+        self.assertIsNone(older['next_before'])
         state_image = {'id': 'valve', 'kind': 'state_image', 'label': 'Valve', 'tag': 'MotorRunning',
                        'on_image': identifier, 'off_image': 'f' * 64}
         positions = {'id': 'positions', 'kind': 'multi_state_image', 'label': 'Positions', 'tag': 'AlarmWord',
@@ -69,6 +89,7 @@ class CanvasBackupTests(unittest.TestCase):
         try:
             restored_client = TestClient(restored)
             current = restored_client.get('/api/project').json()['active']
+            self.assertEqual(restored_client.get('/api/canvas-images').json(), client.get('/api/canvas-images').json())
             self.assertEqual(current['layout']['background'], identifier)
             self.assertTrue(current['layout']['decorations']['machine']['locked'])
             self.assertEqual(current['layout']['decorations']['machine']['image'], identifier)

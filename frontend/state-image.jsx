@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { api } from './api.mjs';
+import { api, uploadProjectImage } from './api.mjs';
 import { Quality, useValue } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 
@@ -7,6 +7,7 @@ const imagePath = identifier => '/api/canvas-images/' + identifier;
 
 export function ImageField({ label, value, onChange, readOnly }) {
   const [candidate, setCandidate] = useState('');
+  const [library, setLibrary] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -15,11 +16,28 @@ export function ImageField({ label, value, onChange, readOnly }) {
     event.target.value = '';
     if (!file) return;
     setCandidate('');
+    setLibrary(null);
     setError('');
     setBusy(true);
     try {
-      const { id } = await api('/api/canvas-images', { method: 'POST', body: file, signal: AbortSignal.timeout(15000) });
+      const { id } = await uploadProjectImage(file);
       setCandidate(id);
+    } catch (problem) {
+      setError(problem.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function browse(cursors) {
+    setError('');
+    setCandidate('');
+    setBusy(true);
+    try {
+      const before = cursors.at(-1);
+      const page = await api('/api/canvas-images' + (before ? '?' + new URLSearchParams({ before }) : ''));
+      if (!Array.isArray(page?.items)) throw new Error('Project images could not be listed.');
+      setLibrary({ ...page, cursors });
     } catch (problem) {
       setError(problem.message);
     } finally {
@@ -31,8 +49,25 @@ export function ImageField({ label, value, onChange, readOnly }) {
     <legend>{label}</legend>
     {value && <img src={imagePath(value)} alt="Current image" />}
     <label>Upload {label}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={upload} /></label>
-    {busy && <p role="status">Uploading image...</p>}
+    <button type="button" disabled={busy} onClick={() => library ? setLibrary(null) : browse([null])}>
+      {library ? 'Close project images' : 'Choose from project'}
+    </button>
+    {busy && <p role="status">Loading image data...</p>}
     {error && <p role="alert">{error}</p>}
+    {library && <div className="project-image-list">
+      {!library.items.length && <p>No project images</p>}
+      {library.items.map(asset => {
+        const name = asset.name || 'Image ' + asset.id.slice(0, 8);
+        return <button key={asset.id} type="button" disabled={busy} aria-label={'Use ' + name}
+          onClick={() => { onChange(asset.id); setLibrary(null); }}>
+          <img src={imagePath(asset.id)} alt="" loading="lazy" /><span>{name}</span>
+        </button>;
+      })}
+      {library.cursors.length > 1 && <button type="button" disabled={busy}
+        onClick={() => browse(library.cursors.slice(0, -1))}>Previous images</button>}
+      {library.next_before && <button type="button" disabled={busy}
+        onClick={() => browse([...library.cursors, library.next_before])}>More images</button>}
+    </div>}
     {candidate && <>
       <img src={imagePath(candidate)} alt="Uploaded image preview" />
       <button type="button" onClick={() => { onChange(candidate); setCandidate(''); }}>Use uploaded image</button>

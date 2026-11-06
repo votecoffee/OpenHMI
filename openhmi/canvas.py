@@ -4,7 +4,7 @@ import hashlib
 from io import BytesIO
 from typing import Literal
 
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Query, Request, Response
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -74,10 +74,12 @@ class CanvasImages:
         self.store = store
         with store.transaction() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS canvas_image (
-                id TEXT PRIMARY KEY, media_type TEXT NOT NULL, data BLOB NOT NULL
+                id TEXT PRIMARY KEY, media_type TEXT NOT NULL, data BLOB NOT NULL, name TEXT NOT NULL DEFAULT ''
             )''')
+            if 'name' not in {column[1] for column in db.execute('PRAGMA table_info(canvas_image)')}:
+                db.execute("ALTER TABLE canvas_image ADD COLUMN name TEXT NOT NULL DEFAULT ''")
 
-    def put(self, raw):
+    def put(self, raw, name=''):
         try:
             with Image.open(BytesIO(raw), formats=['PNG', 'JPEG', 'WEBP']) as image:
                 if max(image.size) > 4096 or getattr(image, 'n_frames', 1) != 1:
@@ -92,14 +94,28 @@ class CanvasImages:
         if len(data) > MAX_IMAGE:
             raise ValueError('Encoded canvas image exceeds 8 MiB')
         identifier = hashlib.sha256(data).hexdigest()
+        filename = name.replace('\\', '/').rsplit('/', 1)[-1]
+        filename = ''.join(character for character in filename if character.isprintable()).strip()[:100]
         with self.store.transaction() as db:
             if db.execute('SELECT 1 FROM canvas_image WHERE id=?', (identifier,)).fetchone():
+                if filename:
+                    db.execute("UPDATE canvas_image SET name=? WHERE id=? AND name=''", (filename, identifier))
                 return identifier
             total = db.execute('SELECT COALESCE(SUM(length(data)),0) FROM canvas_image').fetchone()[0]
             if total + len(data) > MAX_PROJECT_IMAGES:
                 raise ValueError('Project canvas images exceed the 48 MiB storage budget')
-            db.execute('INSERT INTO canvas_image VALUES (?, ?, ?)', (identifier, 'image/webp', data))
+            db.execute('INSERT INTO canvas_image(id, media_type, data, name) VALUES (?, ?, ?, ?)',
+                       (identifier, 'image/webp', data, filename))
         return identifier
+
+    def list(self, before, limit):
+        with self.store._lock:
+            query = 'SELECT rowid, id, name FROM canvas_image'
+            where, parameters = ('', ()) if before is None else (' WHERE rowid < ?', (before,))
+            rows = self.store._db.execute(query + where + ' ORDER BY rowid DESC LIMIT ?',
+                                          (*parameters, limit + 1)).fetchall()
+        return {'items': [{'id': identifier, 'name': name} for _, identifier, name in rows[:limit]],
+                'next_before': rows[limit - 1][0] if len(rows) > limit else None}
 
     def get(self, identifier):
         with self.store._lock:
@@ -127,7 +143,7 @@ class CanvasImages:
 
 def add_canvas_routes(app, images, security):
     @app.post('/api/canvas-images')
-    async def upload(request: Request):
+    async def upload(request: Request, name: str = Query(default='', max_length=512)):
         from starlette.concurrency import run_in_threadpool
 
         security.require(request, 'project.edit')
@@ -137,9 +153,15 @@ def add_canvas_routes(app, images, security):
                 raise HTTPException(413, 'Canvas image exceeds 8 MiB')
             data.extend(chunk)
         try:
-            return {'id': await run_in_threadpool(images.put, data)}
+            return {'id': await run_in_threadpool(images.put, data, name)}
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
+
+    @app.get('/api/canvas-images')
+    def list_images(request: Request, before: int | None = Query(default=None, ge=1, le=9223372036854775807),
+                    limit: int = Query(default=12, ge=1, le=32)):
+        security.require(request, 'project.edit')
+        return images.list(before, limit)
 
     @app.get('/api/canvas-images/{identifier}')
     def image(identifier: str):

@@ -22,6 +22,12 @@ export async function api(path, options = {}) {
   return data;
 }
 
+export function uploadProjectImage(file) {
+  return api('/api/canvas-images?' + new URLSearchParams({ name: file.name }), {
+    method: 'POST', body: file, signal: AbortSignal.timeout(15000),
+  });
+}
+
 export function json(method, body) {
   return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
 }

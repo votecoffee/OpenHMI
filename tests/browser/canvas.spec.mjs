@@ -249,11 +249,12 @@ test('state, position and rotation images follow tags and quality', async ({ pag
   }
 });
 
-test('static images work in grid screens and faceplates without tag bindings', async ({ page }) => {
+test('project image picker reuses assets in grid screens and faceplates', async ({ page }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   try {
-    const uploaded = await page.request.post('/api/canvas-images', { data: pixel });
+    const drawing = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGPsMZVgwAaYsIoOWgkAr1IA6dkMhO8AAAAASUVORK5CYII=', 'base64');
+    const uploaded = await page.request.post('/api/canvas-images?name=Equipment.png', { data: drawing });
     expect(uploaded.ok(), await uploaded.text()).toBe(true);
     const { id } = await uploaded.json();
     await save(page, { ...original.active, layout: null, screens: [],
@@ -279,8 +280,13 @@ test('static images work in grid screens and faceplates without tag bindings', a
     await page.getByRole('combobox', { name: 'Image fit', exact: true }).selectOption({ label: 'Cover' });
     await page.getByRole('combobox', { name: 'Show caption', exact: true }).selectOption({ label: 'No' });
     const upload = page.getByRole('group', { name: 'Project image', exact: true });
-    await upload.getByLabel('Upload Project image', { exact: true }).setInputFiles({ name: 'Drawing.png', mimeType: 'image/png', buffer: pixel });
-    await upload.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
+    let uploads = 0;
+    page.on('request', request => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/canvas-images') uploads += 1;
+    });
+    await upload.getByRole('button', { name: 'Choose from project', exact: true }).click();
+    await upload.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    expect(uploads).toBe(0);
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
 
@@ -288,7 +294,7 @@ test('static images work in grid screens and faceplates without tag bindings', a
     const image = page.getByRole('img', { name: 'Machine schematic', exact: true });
     await expect(image).toHaveAttribute('src', '/api/canvas-images/' + id);
     await expect(image).toHaveCSS('object-fit', 'cover');
-    await expect(image).toHaveJSProperty('naturalWidth', 1);
+    await expect(image).toHaveJSProperty('naturalWidth', 8);
     await expect(page.locator('[data-control="faceplate"]').getByRole('img', { name: 'Equipment outline', exact: true })).toBeVisible();
     const { active } = await (await page.request.get('/api/project')).json();
     const configured = active.controls.find(control => control.kind === 'image');

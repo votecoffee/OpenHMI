@@ -303,7 +303,8 @@ The control reports whether the deviation is within tolerance when the
 required readings are available.
 Use **Image** for a static project image in a grid, freeform screen, or
 faceplate. Set its fit, optional caption and alternative text. It needs no
-PLC tag.
+PLC tag. Image controls can also **Choose from project** to reuse an image
+already uploaded to the current project.
 A **State image** switches between project-owned images when a Boolean tag
 changes. In the designer, upload a PNG, JPEG or WebP for each state and choose
 **Use uploaded image**. A state can be left blank for a transparent overlay
