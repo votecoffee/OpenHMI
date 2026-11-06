@@ -164,8 +164,8 @@ test('touch entry, colored lock legend, login popup and explicit PLC identity st
     const applied = await page.request.post('/api/project/apply', { data: { expected_revision: (await saved.json()).draft_revision } }); expect(applied.ok()).toBe(true);
   }
   const project = structuredClone(original.active);
-  project.tags.push({ name: 'TouchLow', type: 'number', initial: 10, writable: true }, { name: 'TouchHigh', type: 'number', initial: 50, writable: true }, { name: 'LoginName', type: 'string', initial: '', writable: true }, { name: 'LoginBits', type: 'integer', initial: 0, writable: true });
-  project.controls.push({ id: 'touch_number', kind: 'input', label: 'Touch number', tag: 'TankLevel', minimum_tag: 'TouchLow', maximum_tag: 'TouchHigh', security_groups: ['TouchOperators'] }, { id: 'touch_text', kind: 'text_input', label: 'Touch text', tag: 'OperatorText', min_length: 1, max_length: 4, security_groups: ['TouchOperators'] }, { id: 'who', kind: 'current_user', label: 'Operator login' });
+  project.tags.push({ name: 'TouchLow', type: 'number', initial: 10, writable: true }, { name: 'TouchHigh', type: 'number', initial: 50, writable: true }, { name: 'TouchPermit', type: 'boolean', initial: true }, { name: 'LoginName', type: 'string', initial: '', writable: true }, { name: 'LoginBits', type: 'integer', initial: 0, writable: true });
+  project.controls.push({ id: 'touch_number', kind: 'input', label: 'Touch number', tag: 'TankLevel', minimum_tag: 'TouchLow', maximum_tag: 'TouchHigh', enabled_tag: 'TouchPermit', security_groups: ['TouchOperators'] }, { id: 'touch_text', kind: 'text_input', label: 'Touch text', tag: 'OperatorText', min_length: 1, max_length: 4, security_groups: ['TouchOperators'] }, { id: 'who', kind: 'current_user', label: 'Operator login' });
   project.identity_publication = { enabled: true, username_tag: 'LoginName', privileges_tag: 'LoginBits', username_bytes: 82, bits: [{ bit: 0, source: 'permission', name: 'runtime.operate' }, { bit: 3, source: 'group', name: 'TouchOperators' }] };
   try {
     await install(project); await page.reload();
@@ -177,7 +177,28 @@ test('touch entry, colored lock legend, login popup and explicit PLC identity st
     await legend.getByRole('button', { name: 'Close Security group legend', exact: true }).click();
     await login('touch_operator');
     await expect(page.locator('[data-control="current_user"]')).toContainText('touch_operator');
-    await page.getByRole('button', { name: 'Open numeric keypad for Touch number', exact: true }).click();
+    let permitBad = false;
+    await page.route('**/api/tags', async route => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.values.TouchPermit = false;
+      state.samples.TouchHigh = { quality: 'stale', age_seconds: 4, error: 'Synthetic stale maximum' };
+      if (permitBad) state.samples.TouchPermit = { quality: 'bad', quality_reason: 'disconnected' };
+      await route.fulfill({ response, json: state });
+    });
+    const keypad = page.getByRole('button', { name: 'Open numeric keypad for Touch number', exact: true });
+    const maximum = page.getByRole('button', { name: 'Inspect TouchHigh quality (Maximum · STALE DATA)', exact: true });
+    await expect(page.getByText('Enable tag TouchPermit is off', { exact: true })).toBeVisible();
+    await expect(keypad).toBeDisabled();
+    await maximum.tap();
+    const quality = page.getByRole('dialog', { name: 'Tag quality details', exact: true });
+    await expect(quality).toContainText('Synthetic stale maximum');
+    await quality.getByRole('button', { name: 'Close Tag quality details' }).tap();
+    permitBad = true;
+    await expect(page.getByRole('button', { name: 'Inspect TouchPermit quality (Enable tag · PLC COMM LOSS)', exact: true })).toBeEnabled();
+    await page.unroute('**/api/tags');
+    await expect(keypad).toBeEnabled();
+    await keypad.click();
     const numeric = page.getByRole('dialog', { name: 'Numeric entry: Touch number', exact: true });
     await numeric.getByLabel('Entry', { exact: true }).fill('55');
     await numeric.getByRole('button', { name: 'Accept entry', exact: true }).click();

@@ -326,7 +326,10 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    component.render = props => <Conditional {...props}>{renderer(props)}</Conditional>;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput;
+    component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
+      {renderer(props)}
+    </Conditional>;
   }
   if (!catalog.faceplates?.length) delete config.components.Faceplate;
   return config;

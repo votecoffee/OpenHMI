@@ -11,7 +11,9 @@ length limit. Text length tags must contain integers from 0 through 4096.
 
 Limit tags use the screen's shared scan demand, including UDT-relative bindings.
 The display uses good-quality cached values; stale, missing, nonnumeric or
-reversed limits block entry. Python checks the current cached limits again before
+reversed limits block entry. An edit identifies a bad limit or enable binding
+with an inspectable quality badge. A healthy enable tag that is off or an
+invalid range gets its own message. Python checks the current cached limits again before
 dispatching every write. There is no fallback to fixed values when a configured
 limit tag is unavailable. The PLC still owns process interlocks and final bounds
 that must hold independently of HMI polling and communication timing.

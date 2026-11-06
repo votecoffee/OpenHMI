@@ -57,7 +57,7 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
       const value = numeric ? Number(entry) : entry;
       const measured = numeric ? value : Array.from(entry).length;
       if (limits && (!limits.valid || measured < limits.low || measured > limits.high)) {
-        throw new Error(limits.valid ? ui(numeric ? 'allowedNumericRange' : 'allowedTextLength', limits) : ui('editLimitsUnavailable'));
+        throw new Error(limits.valid ? ui(numeric ? 'allowedNumericRange' : 'allowedTextLength', limits) : ui(limits.problem || 'editLimitsUnavailable'));
       }
       await accept(value); close();
     } catch (problem) { setError(problem.message); }
@@ -67,7 +67,7 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
   const entryLabel = ui(secret ? 'passwordEntry' : 'entryLabel');
   return <Popup title={title} close={close}><form onSubmit={submit}>
     <label>{entryLabel}<input ref={input} autoFocus type={secret ? 'password' : 'text'} inputMode={numeric ? 'decimal' : 'text'} autoComplete="off" value={entry} onChange={event => setEntry(event.target.value)} /></label>
-    {limits && <p>{limits.valid ? ui(numeric ? 'numericRange' : 'textLength', limits) : ui('editLimitsUnavailable')}</p>}
+    {limits && <p>{limits.valid ? ui(numeric ? 'numericRange' : 'textLength', limits) : ui(limits.problem || 'editLimitsUnavailable')}</p>}
     <fieldset disabled={busy} className={`touch-keys ${numeric ? 'numeric-keys' : ''}`} onPointerDown={event => {
       if (event.button === 0 && event.target.closest('button')) event.preventDefault();
     }}><legend>{ui(numeric ? 'numericKeypad' : 'textKeyboard')}</legend>
