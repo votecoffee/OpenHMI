@@ -20,7 +20,12 @@ implemented. PLC integers must be within ±9,007,199,254,740,991, the
 A wider value is marked bad. A UDT containing one is unavailable as a whole,
 while individually declared members with valid values stay available. Inverse
 scaling for writes must yield a finite value and, for integer tags, a whole
-number in that same range before the driver calls the adapter.
+number in that same range before the driver calls the adapter. Where PLC
+metadata resolves the target, OpenHMI also checks its signed or unsigned integer
+width and the maximum finite REAL magnitude. For PLC STRINGs recognized by
+pycomm3 it checks the declared DATA byte capacity and ISO-8859-1 encoding.
+These checks apply after scaling and support indexed scalar and nested member
+targets. Other address forms and types depend on adapter validation.
 Built-in simulation/recipe tags cannot be replaced by PLC aliases.
 
 Local tags have typed initial values. UDT tags expose a configured member/type

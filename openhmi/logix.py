@@ -18,6 +18,13 @@ from .alarms import utc_now
 
 
 MAX_SAFE_INTEGER = 2 ** 53 - 1
+REAL_MAX = float.fromhex('0x1.fffffep+127')
+PLC_INTEGER_LIMITS = {
+    'SINT': (-2 ** 7, 2 ** 7 - 1), 'USINT': (0, 2 ** 8 - 1),
+    'INT': (-2 ** 15, 2 ** 15 - 1), 'UINT': (0, 2 ** 16 - 1),
+    'DINT': (-2 ** 31, 2 ** 31 - 1), 'UDINT': (0, 2 ** 32 - 1),
+    'LINT': (-2 ** 63, 2 ** 63 - 1), 'ULINT': (0, 2 ** 64 - 1),
+}
 
 
 def member_value(value, path):
@@ -159,7 +166,7 @@ class LogixConnection:
     def kind(datatype):
         if datatype == 'BOOL':
             return 'boolean'
-        if datatype in ('SINT', 'INT', 'DINT', 'LINT', 'USINT', 'UINT', 'UDINT', 'ULINT'):
+        if isinstance(datatype, str) and datatype in PLC_INTEGER_LIMITS:
             return 'integer'
         if datatype in ('REAL', 'LREAL'):
             return 'number'
@@ -170,6 +177,37 @@ class LogixConnection:
             return self.metadata[address]
         candidates = [name for name in self.metadata if address.startswith(name + '.') or address.startswith(name + '[')]
         return self.metadata[max(candidates, key=len)] if candidates else {}
+
+    def validate_write(self, address, value):
+        if self.client is None:
+            raise ConnectionError('PLC is disconnected')
+        metadata = self.tag_metadata(address)
+        if metadata.get('external_access') != 'Read/Write':
+            raise ValueError('PLC metadata does not permit writes')
+        root = metadata['address']
+        datatype = self.client.tags.get(root, {}).get('data_type')
+        suffix = re.sub(r'\[[^\]]*\]', '', address[len(root):])
+        for member in suffix.split('.')[1:]:
+            if not isinstance(datatype, dict):
+                # Leave atomic bit suffixes and unresolved paths to the adapter.
+                return
+            datatype = datatype.get('internal_tags', {}).get(member, {}).get('data_type')
+        if isinstance(datatype, str):
+            limits = PLC_INTEGER_LIMITS.get(datatype)
+            if limits and (type(value) is not int or not limits[0] <= value <= limits[1]):
+                raise ValueError(f'Value must be an integer within the PLC {datatype} range [{limits[0]}, {limits[1]}]')
+            if datatype == 'REAL' and type(value) in (int, float) and abs(value) > REAL_MAX:
+                raise ValueError('Value exceeds the PLC REAL range')
+        elif isinstance(datatype, dict) and type(value) is str:
+            capacity = datatype.get('string')
+            if type(capacity) is int and capacity > 0:
+                # pycomm3 FixedSizeString uses ISO-8859-1 and reports the DATA array length.
+                try:
+                    encoded = value.encode('iso-8859-1')
+                except UnicodeEncodeError as error:
+                    raise ValueError('PLC STRING requires ISO-8859-1 text') from error
+                if len(encoded) > capacity:
+                    raise ValueError(f'Value exceeds the PLC STRING capacity of {capacity} bytes')
 
     def failed(self, error, now):
         self.error = str(error)
@@ -574,9 +612,6 @@ class RuntimeDriver(SimulatorDriver):
                 if not connection:
                     raise ConnectionError('PLC connection is disabled')
                 with connection.lock:
-                    metadata = connection.tag_metadata(tag['address'])
-                    if metadata.get('external_access') != 'Read/Write':
-                        raise ValueError('PLC metadata does not permit writes')
                     raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
                     if kind in ('number', 'integer') and not math.isfinite(raw):
                         raise ValueError('Inverse PLC scaling must produce a finite value')
@@ -587,6 +622,7 @@ class RuntimeDriver(SimulatorDriver):
                             raise ValueError('Scaled integer writes must resolve to an integer')
                         raw = int(raw)
                     physical_address = tag['address'] + ('.' + member if member else '')
+                    connection.validate_write(physical_address, raw)
                     try:
                         connection.write(physical_address, raw)
                     except TagWriteError as error:

@@ -87,6 +87,66 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(plc.writes, [('Level', 35)])
         self.assertIs(driver.connections['plc'].client, plc)
         driver.close()
+    def test_write_preflight_uses_physical_type_and_string_capacity(self):
+        class LimitsPLC(FakePLC):
+            def __init__(self, path, **kwargs):
+                super().__init__(path, **kwargs)
+                self.tags.update({
+                    'Small': {'external_access': 'Read/Write', 'data_type': 'SINT'},
+                    'Flags': {'external_access': 'Read/Write', 'data_type': 'DINT'},
+                    'Program:Mix.Units': {'external_access': 'Read/Write', 'data_type': {'internal_tags': {
+                        'Limits': {'data_type': {'internal_tags': {'Band': {'data_type': 'UINT'}}}},
+                        'Label': {'data_type': {'name': 'ShortString', 'string': 4}},
+                    }}},
+                })
+
+            def write(self, pair):
+                self.writes.append(pair)
+                self.values[pair[0]] = pair[1]
+                return SimpleNamespace(error=None)
+
+            def read(self, address):
+                return SimpleNamespace(value=self.values[address], error=None)
+
+        project = logix_project()
+        project['tags'].extend([
+            {'name': 'Small', 'connection': 'plc', 'address': 'Small', 'type': 'integer',
+             'scale': 0.5, 'writable': True},
+            {'name': 'PanelBit', 'connection': 'plc', 'address': 'Flags.0', 'type': 'boolean',
+             'writable': True},
+            {'name': 'Unit', 'connection': 'plc', 'address': 'Program:Mix.Units[2]', 'type': 'struct',
+             'writable': True, 'members': {'Limits.Band[0]': 'integer', 'Label': 'string'}},
+        ])
+        driver = RuntimeDriver(LimitsPLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.poll(0)
+        connection = driver.connections['plc']
+        plc = connection.client
+
+        for alias, value, reason in (
+            ('Small', 64, 'PLC SINT range'),
+            ('Unit.Limits.Band[0]', -1, 'PLC UINT range'),
+            ('Unit.Limits.Band[0]', 65536, 'PLC UINT range'),
+            ('Unit.Label', 'abcde', '4 bytes'),
+            ('Unit.Label', '\u03a9', 'ISO-8859-1'),
+            ('LevelA', 1e39, 'PLC REAL range'),
+        ):
+            with self.subTest(alias=alias, value=value):
+                with self.assertRaisesRegex(ValueError, reason):
+                    driver.write(alias, [value])
+        self.assertEqual(plc.writes, [])
+        self.assertIs(connection.client, plc)
+        self.assertEqual(connection.failure_generation, 0)
+
+        for alias, value in (('Small', 63.5), ('Unit.Limits.Band[0]', 65535),
+                             ('Unit.Label', '\u00e9abc'), ('PanelBit', True)):
+            driver.write(alias, [value])
+        self.assertEqual(plc.writes, [
+            ('Small', 127), ('Program:Mix.Units[2].Limits.Band[0]', 65535),
+            ('Program:Mix.Units[2].Label', '\u00e9abc'), ('Flags.0', True),
+        ])
+
     def test_browser_safe_integer_range_applies_to_nested_plc_data(self):
         project = logix_project()
         project['tags'][0]['members']['Counters.Totals[0]'] = 'integer'

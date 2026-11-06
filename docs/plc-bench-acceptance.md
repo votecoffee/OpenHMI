@@ -81,7 +81,9 @@ the approved controller limits.
 3. Include the approved representatives of each required scalar, UDT member and
    indexed array type. Document the expected type, dimensions, scale and source
    value from an independent engineering view of the controller. Leave the
-   controller and its tag values under the bench owner's control.
+   controller and its tag values under the bench owner's control. Record the
+   discovered integer widths and declared STRING capacities for later controlled
+   write tests.
 4. Start with one approved slow-rate screen. Record which viewers, alarms and
    historian settings contribute demand. Apply the reviewed configuration to
    start acquisition.
