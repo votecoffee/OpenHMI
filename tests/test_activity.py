@@ -222,7 +222,15 @@ class ActivityTests(unittest.TestCase):
             self.assertEqual(result['tags'][0]['quality'], 'bad')
             self.assertNotIn('value', result['tags'][0])
             self.assertEqual(result['tags'][0]['error'], 'PLC acquisition is held')
-            exported = self.client.get('/api/diagnostics.json').json()
+            filtered = self.client.get('/api/diagnostics', params={'quality': 'non-good', 'limit': 1}).json()
+            self.assertEqual(filtered['total_tags'], 4)
+            self.assertEqual(filtered['next_offset'], 1)
+            self.assertEqual(filtered['tags'][0]['name'], 'LevelA')
+            next_page = self.client.get('/api/diagnostics', params={'quality': 'non-good', 'limit': 1, 'offset': 1}).json()
+            self.assertEqual(next_page['tags'][0]['name'], 'MotorA')
+            exported = self.client.get('/api/diagnostics.json', params={'quality': 'bad', 'search': 'level'}).json()
+            self.assertEqual([tag['name'] for tag in exported['tags']], ['LevelA'])
+            self.assertNotIn('value', exported['tags'][0])
             self.assertNotIn('values', exported)
             self.assertEqual(exported['capture']['project_instance'], self.app.state.project_instance)
             self.assertGreater(exported['capture']['monotonic_seconds'], 0)
@@ -239,7 +247,7 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/diagnostics?search=LevelA').json()['tags'][0]['quality'], 'pending')
         with driver.lock:
             driver.samples['LevelA'] = {'value': 1.0, 'quality': 'good', 'timestamp': '2026-11-04T00:00:00+00:00', 'monotonic': time.monotonic() - 10, 'rate_ms': 100, 'error': None}
-        stale = self.client.get('/api/diagnostics?search=LevelA').json()['tags'][0]
+        stale = self.client.get('/api/diagnostics?search=LevelA&quality=stale').json()['tags'][0]
         self.assertEqual(stale['quality'], 'stale')
         self.assertGreaterEqual(stale['age_seconds'], 10)
         with driver.lock:

@@ -5,10 +5,14 @@ from datetime import datetime, timezone
 from io import StringIO
 import json
 import time
+from typing import Literal
 from fastapi import HTTPException, Query, Request
 from fastapi.responses import Response
 from .activity import STATUSES
 from .security import COOKIE
+
+
+DiagnosticQuality = Literal['all', 'non-good', 'bad', 'stale', 'pending', 'good']
 
 
 def can_view(security, request, permission):
@@ -50,12 +54,14 @@ def add_operations_routes(app, journal, security, driver, workers):
                              ['operation_id', 'started_at', 'finished_at', 'actor', 'provider', 'groups', 'operation', 'entity', 'phase', 'status', 'context', 'outcome', 'error']])
         return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="operator-activity.csv"', 'X-OpenHMI-Truncated': str(data['has_more']).lower()})
 
-    def diagnostic_data(request, search, offset, limit):
+    def diagnostic_data(request, search, quality, offset, limit):
         can_view(security, request, 'diagnostics.view')
         now = time.monotonic()
         samples = driver.sample_snapshot(now)
         query = search.casefold()
-        names = sorted(name for name in samples if query in name.casefold())
+        names = sorted(name for name, sample in samples.items() if query in name.casefold()
+                       and (quality == 'all' or sample['quality'] == quality
+                            or (quality == 'non-good' and sample['quality'] != 'good')))
         tags = []
         for name in names[offset:offset + limit]:
             root, member = driver.sources.get(name, (None, ''))
@@ -89,14 +95,16 @@ def add_operations_routes(app, journal, security, driver, workers):
                 'plc_hold': driver.plc_hold, 'counter_scope': 'pycomm3 read calls and requested addresses; not wire-packet measurements', 'scan_timing': 'best effort'}
 
     @app.get('/api/diagnostics')
-    def diagnostics(request: Request, search: str = Query(default='', max_length=100), offset: int = Query(default=0, ge=0, le=100000), limit: int = Query(default=100, ge=1, le=1000)):
-        return diagnostic_data(request, search, offset, limit)
+    def diagnostics(request: Request, search: str = Query(default='', max_length=100),
+                    offset: int = Query(default=0, ge=0, le=100000), limit: int = Query(default=100, ge=1, le=1000),
+                    quality: DiagnosticQuality = 'all'):
+        return diagnostic_data(request, search, quality, offset, limit)
 
     @app.get('/api/diagnostics.json')
-    def export_diagnostics(request: Request, search: str = Query(default='', max_length=100)):
+    def export_diagnostics(request: Request, search: str = Query(default='', max_length=100), quality: DiagnosticQuality = 'all'):
         capture = {'project_instance': app.state.project_instance, 'monotonic_seconds': time.monotonic(),
                    'utc': datetime.now(timezone.utc).isoformat()}
-        data = diagnostic_data(request, search, 0, 5000)
+        data = diagnostic_data(request, search, quality, 0, 5000)
         data['capture'] = capture
         return Response(json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False), media_type='application/json',
                         headers={'Content-Disposition': 'attachment; filename="runtime-diagnostics.json"'})

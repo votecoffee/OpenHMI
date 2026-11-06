@@ -237,30 +237,32 @@ export function DiagnosticsConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'diagnostics.view');
   const [filter, setFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [quality, setQuality] = useState('all');
+  const [criteria, setCriteria] = useState({ search: '', quality: 'all' });
   const [offset, setOffset] = useState(0);
   const [result, setResult] = useState(null);
-  const current = result?.search === search && result.offset === offset ? result : null;
+  const current = result?.criteria === criteria && result.offset === offset ? result : null;
   const { data, message, receivedAt } = current ?? {};
   useEffect(() => {
     if (!permitted) { setResult(null); return; }
     let stopped = false, timer;
     async function tick() {
       try {
-        const snapshot = await api(`/api/diagnostics?search=${encodeURIComponent(search)}&offset=${offset}`);
+        const query = new URLSearchParams({ ...criteria, offset });
+        const snapshot = await api(`/api/diagnostics?${query}`);
         if (!isDiagnosticsSnapshot(snapshot, offset)) throw new Error('Invalid diagnostics response');
-        if (!stopped) setResult({ search, offset, data: snapshot, receivedAt: new Date() });
+        if (!stopped) setResult({ criteria, offset, data: snapshot, receivedAt: new Date() });
       } catch (error) {
         const denied = error.status === 401 || error.status === 403;
         if (!stopped) setResult(previous => {
-          const retain = !denied && previous?.search === search && previous.offset === offset;
-          return { ...(retain ? previous : { search, offset }), message: error.message };
+          const retain = !denied && previous?.criteria === criteria && previous.offset === offset;
+          return { ...(retain ? previous : { criteria, offset }), message: error.message };
         });
       }
       if (!stopped) timer = setTimeout(tick, 2000);
     }
     tick(); return () => { stopped = true; clearTimeout(timer); };
-  }, [permitted, search, offset]);
+  }, [permitted, criteria, offset]);
   if (!permitted) return <section className="engineering"><h1>Runtime diagnostics</h1><p>Sign in with diagnostics viewing permission to inspect runtime status.</p></section>;
   return <section className="engineering operations" aria-label="Runtime diagnostics"><h1>Runtime diagnostics</h1><p>Viewing diagnostics reads cached runtime state. It does not subscribe new tags or issue equipment writes.</p>
     {message && <p role="alert">Diagnostics unavailable. {message}
@@ -271,8 +273,14 @@ export function DiagnosticsConsole() {
     {data && !data.connections.length && <p>No PLC connections are configured.</p>}
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>
     {!!data?.workers?.length && <WorkerHealth workers={data.workers} />}
-    <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setSearch(filter); setOffset(0); }}><label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label><button>Filter diagnostic tags</button></form>
-    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?search=${encodeURIComponent(search)}`}>Export diagnostics JSON</a></div>
+    <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setCriteria({ search: filter, quality }); setOffset(0); }}>
+      <label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
+      <label>Sample quality<select value={quality} onChange={event => setQuality(event.target.value)}>
+        <option value="all">All qualities</option><option value="non-good">Needs attention</option>
+        <option value="bad">Bad</option><option value="stale">Stale</option><option value="pending">Pending</option><option value="good">Good</option>
+      </select></label><button>Filter diagnostic tags</button>
+    </form>
+    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?${new URLSearchParams(criteria)}`}>Export diagnostics JSON</a></div>
     {data && <p>{data.total_tags} matching logical tags. Values are omitted from this diagnostic export.</p>}
     <table className="diagnostics-tags"><thead><tr><th>Tag / source</th><th>Type</th><th>Quality</th><th>Age (s)</th><th>Acquisition time / error</th></tr></thead><tbody>{data?.tags.map(tag => <tr key={tag.name}><td>{tag.name}<br /><small>{tag.connection || 'Local'} · {tag.address}</small></td><td>{tag.type}</td><td><strong>{tag.quality}</strong></td><td>{tag.age_seconds == null ? '—' : tag.age_seconds.toFixed(2)}</td><td>{tag.timestamp ? new Date(tag.timestamp).toLocaleString() : 'No sample'}<br />{tag.error}</td></tr>)}</tbody></table>
   </section>;

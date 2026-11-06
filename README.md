@@ -276,6 +276,8 @@ even while its transport stays connected. Open a control's quality badge to see
 its logical tag, configured PLC address and route, and the reported fault.
 Per-route timing separates worker queue delay, route lock wait, adapter reads,
 scan start lateness and recovery.
+Filter diagnostic tags by name and sample quality to find bad, stale, or pending
+bindings. JSON exports use the same tag filters.
 Diagnostics also shows background worker health and retry state. Grant `activity.view` / `diagnostics.view` through HMI
 groups; security administrators can inspect both. See
 [journal behavior, recovery and retention](docs/activity-and-diagnostics.md).

@@ -210,6 +210,16 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(1);
   await expect(page.locator('.diagnostics-tags tbody tr')).toContainText('good');
   await expect(page.getByText('No PLC connections are configured.')).toBeVisible();
+  const quality = page.getByRole('combobox', { name: 'Sample quality', exact: true });
+  const applyFilter = page.getByRole('button', { name: 'Filter diagnostic tags', exact: true });
+  await quality.selectOption('non-good');
+  await applyFilter.click();
+  await expect(page.getByText('0 matching logical tags.', { exact: false })).toBeVisible();
+  await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(0);
+  await quality.selectOption('good');
+  await applyFilter.click();
+  await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Export diagnostics JSON', exact: true })).toHaveAttribute('href', '/api/diagnostics.json?search=TankLevel&quality=good');
   const jsonDownload = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Export diagnostics JSON', exact: true }).click();
   expect((await jsonDownload).suggestedFilename()).toBe('runtime-diagnostics.json');
