@@ -105,6 +105,10 @@ an individual sample shows bad data for that binding while other bindings
 remain available. If the applied project response has an invalid revision,
 project identifier or layout structure, the browser warns that screen updates
 are unavailable and retains the open layout until a valid response arrives.
+A failed or invalid recipe selection response shows **Recipe selection
+unavailable** in the viewer and screen control. Load and Clear loaded copy
+require a current, valid selection response, including a valid version when
+no recipe is loaded.
 
 Tag rows show logical source/type, quality, observation timestamp, age and error.
 A tag-level read error or malformed result in a known batch position marks

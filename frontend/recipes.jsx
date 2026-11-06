@@ -147,8 +147,9 @@ export function RecipeWorkspace({ edit, catalog }) {
   }
   function transition(action) { return perform(() => api(`/api/recipe-revisions/${source.id}/transition`, json('POST', { action, expected_version: source.version, reason })), true); }
   async function load(clear = false) {
+    if (!live.recipeConnected) return;
     await perform(() => api('/api/recipes/select', json('POST', { revision_id: clear ? null : source.id, expected_revision_version: clear ? null : source.version,
-      expected_selection_version: live.recipeSelection?.version || state.selection.version, reason })));
+      expected_selection_version: live.recipeSelection.version, reason })));
   }
   async function upload(event) {
     const file = event.target.files?.[0];

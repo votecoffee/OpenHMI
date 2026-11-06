@@ -28,6 +28,7 @@ test('recipe image, same-user approval and independent production copy', async (
   viewer.on('pageerror', error => errors.push(error.message));
   await viewer.goto('/recipes');
   await expect(viewer.locator('.recipe-preview .recipe-image')).toBeVisible();
+  await expect(viewer.locator('.recipe-loaded')).toContainText('No recipe loaded');
   await viewer.getByLabel('Change / approval / load reason', { exact: true }).fill('Trial load before production approval');
   await viewer.getByRole('button', { name: 'Load recipe', exact: true }).click();
   await expect(viewer.locator('.recipe-loaded')).toContainText('NOT PRODUCTION APPROVED');
@@ -45,6 +46,27 @@ test('recipe image, same-user approval and independent production copy', async (
   await viewer.getByRole('button', { name: 'Load recipe', exact: true }).click();
   await expect(viewer.locator('.recipe-loaded .recipe-production')).toHaveText('PRODUCTION APPROVED');
   await expect(viewer.locator('.recipe-loaded .recipe-image')).toBeVisible();
+  const selected = await (await viewer.request.get('/api/recipes/selected')).json();
+  const loaded = viewer.locator('.recipe-loaded');
+  const load = viewer.getByRole('button', { name: 'Load recipe', exact: true });
+  const clear = viewer.getByRole('button', { name: 'Clear loaded copy', exact: true });
+  const endpoint = '**/api/recipes/selected';
+  let selection = selected;
+  await viewer.route(endpoint, route => route.fulfill({ body: JSON.stringify(selection), contentType: 'application/json' }));
+  for (const invalid of [{}, { ...selected, version: '2' }, { ...selected, snapshot: {} },
+    { ...selected, snapshot: { ...selected.snapshot, production_approved: 'false' } },
+    { ...selected, snapshot: { ...selected.snapshot, content: { ...selected.snapshot.content, parameters: [null] } } }]) {
+    selection = invalid;
+    await expect(loaded).toContainText('Recipe selection unavailable');
+    await expect(loaded).not.toContainText('PRODUCTION APPROVED');
+    await expect(load).toBeDisabled();
+    await expect(clear).toBeDisabled();
+    selection = selected;
+    await expect(loaded.locator('.recipe-production')).toHaveText('PRODUCTION APPROVED');
+    await expect(load).toBeEnabled();
+    await expect(clear).toBeEnabled();
+  }
+  await viewer.unroute(endpoint);
   if (process.env.OPENHMI_RECIPE_VIEWER) await viewer.screenshot({ path: process.env.OPENHMI_RECIPE_VIEWER, fullPage: true });
   await page.getByLabel('Parameter 1 value', { exact: true }).fill('60');
   await page.getByLabel('Change / approval / load reason', { exact: true }).fill('Next trial speed');
@@ -63,6 +85,14 @@ test('recipe image, same-user approval and independent production copy', async (
   await viewer.goto('/runtime');
   await expect(viewer.locator('[data-control="recipe"]')).toContainText('Fixture A');
   await expect(viewer.locator('[data-control="recipe"] .recipe-image')).toBeVisible();
+  const compact = viewer.locator('[data-control="recipe"]');
+  selection = null;
+  await viewer.route(endpoint, route => route.fulfill({ body: JSON.stringify(selection), contentType: 'application/json' }));
+  await expect(compact).toContainText('Recipe selection unavailable');
+  await expect(compact).not.toContainText('Fixture A');
+  selection = selected;
+  await expect(compact).toContainText('Fixture A');
+  await viewer.unroute(endpoint);
   expect((await (await page.request.get('/api/tags')).json()).values.RecipeProductionApproved).toBe(true);
   expect(errors).toEqual([]);
 });
