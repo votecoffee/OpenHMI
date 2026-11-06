@@ -31,9 +31,9 @@ test('project library creates, opens, exports and imports a complete backup', as
   const reloaded = observer.waitForEvent('framenavigated', { predicate: frame => frame === observer.mainFrame() });
   await page.getByRole('button', { name: 'Open BrowserRestore.openhmi.sqlite3', exact: true }).click();
   await reloaded;
-  await expect(observer.getByText('Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
+  await expect(observer.getByText('PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open HMI login', exact: true }).first()).toBeVisible();
-  await expect(page.getByText('Imported PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
+  await expect(page.getByText('PLC connections are held. Review the project and use Apply live to enable its configured connections.')).toBeVisible();
   await login();
   await expect(page.getByRole('button', { name: 'Apply live', exact: true })).toBeVisible();
   await page.goto('/projects');

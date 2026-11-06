@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import zipfile
 
 from openhmi.package_manager import Packages, main, relative_name
@@ -136,8 +136,10 @@ class PackageTests(unittest.TestCase):
         with patch('subprocess.Popen') as run, self.assertRaises(SystemExit) as error:
             runtime = run.return_value
             runtime.wait.side_effect = [subprocess.TimeoutExpired('runtime', 0.25), KeyboardInterrupt, 7]
-            main(['--root', str(self.packages.root), 'launch'])
+            main(['--root', str(self.packages.root), 'launch', '--project', str(self.root / 'station.sqlite3'),
+                  '--watchdog-restarts', '2'])
         self.assertEqual(error.exception.code, 7)
+        run.assert_called_once()
         self.assertEqual(runtime.wait.call_count, 3)
         self.assertGreater(runtime.wait.call_args.kwargs['timeout'], 0)
         runtime.kill.assert_not_called()
@@ -164,6 +166,43 @@ class PackageTests(unittest.TestCase):
             main(['--root', str(self.packages.root), 'launch', '--shutdown-timeout', '0'])
         self.assertEqual(error.exception.code, 2)
         run.assert_not_called()
+
+    def test_watchdog_retries_only_nonzero_exits_with_bounded_backoff_and_held_arguments(self):
+        archive, digest = self.archive()
+        self.packages.install(archive, digest)
+        self.packages.activate(digest)
+        runtimes = [Mock(**{'wait.return_value': code}) for code in (8, 9, 10)]
+        with patch('subprocess.Popen', side_effect=runtimes) as run, patch('openhmi.package_manager.time.sleep') as sleep, \
+                redirect_stderr(StringIO()) as errors, self.assertRaises(SystemExit) as result:
+            main(['--root', str(self.packages.root), 'launch', '--project', str(self.root / 'station.sqlite3'),
+                  '--handlers', str(self.root / 'startup.py'), '--open-browser', '--watchdog-restarts', '2'])
+        self.assertEqual(result.exception.code, 10)
+        initial, first, second = [call.args[0] for call in run.call_args_list]
+        self.assertIn('--handlers', initial)
+        self.assertIn('--open-browser', initial)
+        self.assertNotIn('--hold-connections', initial)
+        self.assertIn('--hold-connections', first)
+        self.assertNotIn('--handlers', first)
+        self.assertNotIn('--open-browser', first)
+        self.assertEqual(first, second)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, 4])
+        self.assertIn('Recovery 2/2', errors.getvalue())
+
+    def test_watchdog_stops_on_clean_exit_and_on_interrupt_between_launches(self):
+        archive, digest = self.archive()
+        self.packages.install(archive, digest)
+        self.packages.activate(digest)
+        arguments = ['--root', str(self.packages.root), 'launch', '--project', str(self.root / 'station.sqlite3'),
+                     '--watchdog-restarts', '2']
+        for code, expected in ((0, 0), (9, 130)):
+            with self.subTest(code=code), patch('subprocess.Popen') as run, \
+                    patch('openhmi.package_manager.time.sleep', side_effect=KeyboardInterrupt) as sleep, \
+                    redirect_stderr(StringIO()), self.assertRaises(SystemExit) as result:
+                run.return_value.wait.return_value = code
+                main(arguments)
+            self.assertEqual(result.exception.code, expected)
+            run.assert_called_once()
+            self.assertEqual(sleep.call_count, int(code != 0))
 
     def test_launcher_package_dispatch_and_manager_lock(self):
         with redirect_stdout(StringIO()) as output:

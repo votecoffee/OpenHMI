@@ -163,6 +163,8 @@ def main(argv=None):
     parser.add_argument('--recipe-users', type=Path, default=None if getattr(sys, 'frozen', False) else Path('.local/recipe-users.json'), help='Optional legacy recipe account file')
     parser.add_argument('--port', type=int, default=8000, help='Local HTTP port (default 8000)')
     parser.add_argument('--log-dir', type=Path, help='Rotating log folder (default: logs inside the project library)')
+    parser.add_argument('--hold-connections', action='store_true',
+                        help='Open projects with PLC connections held until Apply live; omit startup handlers')
     parser.add_argument('--open-browser', action='store_true', help='Open the designer after this server starts')
     args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
@@ -210,7 +212,10 @@ def main(argv=None):
             url = f'http://127.0.0.1:{args.port}'
             logging.info('OpenHMI %s; project=%s; logs=%s; URL=%s; stop with Ctrl+C', application_version(), project, logs, url)
             try:
-                workspace = ProjectWorkspace(project, args.handlers, args.recipe_users)
+                handlers = None if args.hold_connections else args.handlers
+                if args.hold_connections:
+                    logging.warning('Recovery launch: PLC connections held until Apply live; startup handlers omitted')
+                workspace = ProjectWorkspace(project, handlers, args.recipe_users, hold_connections=args.hold_connections)
             except Exception:
                 logging.exception('Could not initialize project %s', project)
                 raise SystemExit(1)
@@ -231,6 +236,9 @@ def main(argv=None):
                 # Uvicorn completes lifespan shutdown, then asyncio re-raises Ctrl+C.
                 # Treat that ordinary console stop as success in a frozen executable.
                 logging.info('OpenHMI stopped by console operator')
+            else:
+                if not server.started:
+                    raise SystemExit(1)
             finally:
                 finished.set()
     except (OSError, RuntimeError) as error:

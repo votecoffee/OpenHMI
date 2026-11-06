@@ -435,7 +435,8 @@ assessment, product references, and acceptance gates. The
 [offline reliability drills](docs/runtime-soak.md) exercise recovery under
 load and check that pending commands reconcile without replay after a forced
 runtime process exit. Managed Windows [package launch](docs/package-management.md)
-also provides a configurable Ctrl+C shutdown deadline.
+also provides a configurable Ctrl+C shutdown deadline and an opt-in exit
+watchdog that starts recovery with PLC acquisition held.
 
 See the [milestone-based development plan](docs/project-plan.md) and
 [GitHub milestones](https://github.com/votecoffee/OpenHMI/milestones).

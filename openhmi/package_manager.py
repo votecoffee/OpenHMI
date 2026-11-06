@@ -229,7 +229,7 @@ def wait_for_runtime(runtime, shutdown_timeout):
         while True:
             try:
                 # A short wait also lets Python handle console signals between waits on Windows.
-                return runtime.wait(timeout=0.25)
+                return runtime.wait(timeout=0.25), False
             except subprocess.TimeoutExpired:
                 continue
     except KeyboardInterrupt:
@@ -238,7 +238,7 @@ def wait_for_runtime(runtime, shutdown_timeout):
 
     exit_code = wait_until_exit(runtime, deadline)
     if exit_code is not None:
-        return exit_code
+        return exit_code, True
     print(f'OpenHMI runtime exceeded the {shutdown_timeout}s shutdown grace period. '
           'Terminating this launch; verify any pending operation before retrying.', file=sys.stderr)
     # Keep using the original child handle even if the PID could be reused.
@@ -247,11 +247,30 @@ def wait_for_runtime(runtime, shutdown_timeout):
     except ProcessLookupError:
         exit_code = runtime.poll()
         if exit_code is not None:
-            return exit_code
+            return exit_code, True
         raise
     if wait_until_exit(runtime, time.monotonic() + 5) is None:
         raise RuntimeError('Could not confirm that the managed runtime terminated')
-    return FORCED_SHUTDOWN_EXIT_CODE
+    return FORCED_SHUTDOWN_EXIT_CODE, True
+
+
+def supervise_runtime(executable, initial, recovery, shutdown_timeout, restart_budget, verify):
+    arguments = initial
+    for attempt in range(restart_budget + 1):
+        runtime = subprocess.Popen([str(executable), *arguments])
+        code, operator_stop = wait_for_runtime(runtime, shutdown_timeout)
+        if operator_stop or code == 0 or attempt == restart_budget:
+            return code
+
+        delay = 2 ** (attempt + 1)
+        print(f'OpenHMI runtime exited with code {code}. Recovery {attempt + 1}/{restart_budget} '
+              f'in {delay}s with PLC connections held.', file=sys.stderr)
+        try:
+            time.sleep(delay)
+            verify()
+        except KeyboardInterrupt:
+            return 130
+        arguments = recovery
 
 
 def main(argv=None):
@@ -269,14 +288,22 @@ def main(argv=None):
     launch.add_argument('--open-browser', action='store_true')
     launch.add_argument('--shutdown-timeout', metavar='SECONDS', type=int, default=DEFAULT_SHUTDOWN_TIMEOUT,
                         help=f'Ctrl+C grace period before terminating the launched runtime (default {DEFAULT_SHUTDOWN_TIMEOUT})')
+    launch.add_argument('--watchdog-restarts', type=int, default=0, metavar='COUNT',
+                        help='Maximum automatic recovery launches after nonzero exits (default 0)')
     mode = launch.add_mutually_exclusive_group()
     mode.add_argument('--self-check', action='store_true')
     mode.add_argument('--preflight', action='store_true')
     mode.add_argument('--check-windows-mappings', action='store_true')
     mode.add_argument('--check-windows-login', metavar='ACCOUNT')
     args = parser.parse_args(argv)
-    if args.operation == 'launch' and not 1 <= args.shutdown_timeout <= 600:
-        parser.error('Shutdown timeout must be between 1 and 600 seconds.')
+    if args.operation == 'launch':
+        if not 1 <= args.shutdown_timeout <= 600:
+            parser.error('Shutdown timeout must be between 1 and 600 seconds.')
+        if not 0 <= args.watchdog_restarts <= 5:
+            parser.error('Watchdog restarts must be between 0 and 5.')
+        if args.watchdog_restarts and (not args.project or args.self_check or args.preflight
+                                       or args.check_windows_mappings or args.check_windows_login is not None):
+            parser.error('Watchdog requires an explicit --project and a normal runtime launch.')
     packages = Packages(args.root)
     try:
         if args.operation == 'install': result = packages.install(args.archive, args.sha256)
@@ -286,23 +313,29 @@ def main(argv=None):
         else:
             selection = packages.current()
             if not selection: raise ValueError('Install and activate an application package first')
-            packages.verify(selection['release'])
+            release = selection['release']
+
+            def verify():
+                packages.verify(release)
+
+            verify()
             arguments = []
             for field in ('project', 'log_dir'):
                 value = getattr(args, field)
                 if value:
                     if value.resolve().is_relative_to(packages.root): raise ValueError('Project data and logs must stay outside the application installation')
                     arguments += ['--' + field.replace('_', '-'), str(value.resolve())]
-            if args.handlers: arguments += ['--handlers', str(args.handlers.resolve())]
             arguments += ['--port', str(args.port)]
+            recovery = [*arguments, '--hold-connections']
+            if args.handlers: arguments += ['--handlers', str(args.handlers.resolve())]
             if args.open_browser: arguments += ['--open-browser']
             if args.self_check: arguments += ['--self-check']
             if args.preflight: arguments += ['--preflight']
             if args.check_windows_mappings: arguments += ['--check-windows-mappings']
             if args.check_windows_login is not None: arguments += ['--check-windows-login', args.check_windows_login]
-            executable = packages.release(selection['release']) / 'OpenHMI/OpenHMI.exe'
-            runtime = subprocess.Popen([str(executable), *arguments])
-            raise SystemExit(wait_for_runtime(runtime, args.shutdown_timeout))
+            executable = packages.release(release) / 'OpenHMI/OpenHMI.exe'
+            raise SystemExit(supervise_runtime(executable, arguments, recovery, args.shutdown_timeout,
+                                               args.watchdog_restarts, verify))
         print(json.dumps(result, indent=2))
     except (OSError, ValueError, RuntimeError, zipfile.BadZipFile) as error:
         parser.exit(1, f'OpenHMI package: {error}\n')

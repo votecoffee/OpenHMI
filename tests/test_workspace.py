@@ -76,6 +76,39 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertEqual(client.post('/api/project/apply', json={'expected_revision': 1}, headers={'X-OpenHMI-Project': state['project_instance']}).status_code, 409)
                 self.assertTrue(path.exists())
 
+    def test_recovery_start_holds_applied_plc_routes_and_new_project_opens(self):
+        from openhmi.projects import Project, ProjectStore
+        from tests.test_logix_history import FakePLC, logix_project
+
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'Original.openhmi.sqlite3'
+            ProjectStore(path, initial_project=Project.model_validate(logix_project())).close()
+            workspace = ProjectWorkspace(path, hold_connections=True)
+            with TestClient(workspace) as client:
+                driver = workspace.current.state.driver
+                self.assertFalse(driver.connections)
+                held = client.get('/api/tags').json()
+                self.assertTrue(held['plc_hold'])
+                self.assertEqual(held['samples']['LevelA']['quality_reason'], 'held')
+                self.assertNotIn('LevelA', held['values'])
+
+                driver.factory = FakePLC
+                state = client.get('/api/project').json()
+                applied = client.post('/api/project/apply', json={'expected_revision': state['draft_revision']})
+                self.assertEqual(applied.status_code, 200, applied.text)
+                self.assertFalse(client.get('/api/tags').json()['plc_hold'])
+                self.assertIn('plc', driver.connections)
+
+                created = client.post('/api/workspace/create', json={'name': 'Other', 'title': 'Other project'})
+                self.assertEqual(created.status_code, 200, created.text)
+                opened = client.post('/api/workspace/open', json={'file': created.json()['file']})
+                self.assertEqual(opened.status_code, 200, opened.text)
+                self.assertTrue(client.get('/api/tags').json()['plc_hold'])
+                reopened = client.post('/api/workspace/open', json={'file': path.name})
+                self.assertEqual(reopened.status_code, 200, reopened.text)
+                self.assertFalse(workspace.current.state.driver.connections)
+                self.assertTrue(client.get('/api/tags').json()['plc_hold'])
+
     def test_backup_corruption_paths_and_security_are_rejected(self):
         with TemporaryDirectory() as directory:
             workspace = ProjectWorkspace(Path(directory) / 'Original.openhmi.sqlite3')

@@ -185,7 +185,7 @@ export function DiagnosticsConsole() {
   }, [permitted, search, offset]);
   if (!permitted) return <section className="engineering"><h1>Runtime diagnostics</h1><p>Sign in with diagnostics viewing permission to inspect runtime status.</p></section>;
   return <section className="engineering operations" aria-label="Runtime diagnostics"><h1>Runtime diagnostics</h1><p>Viewing diagnostics reads cached runtime state. It does not subscribe new tags or issue equipment writes.</p>
-    {message && <p role="alert">{message}</p>}{data?.plc_hold && <p role="status">Imported PLC connections are held until reviewed and applied.</p>}
+    {message && <p role="alert">{message}</p>}{data?.plc_hold && <p role="status">PLC connections are held until reviewed and applied.</p>}
     <h2>Connections and scans</h2><table><thead><tr><th>Connection / route</th><th>State</th><th>Read calls / addresses</th><th>Effective groups</th><th>Timing</th><th>Error</th></tr></thead><tbody>{data?.connections.map(connection => <tr key={connection.id}><td>{connection.name}<br />{connection.path}</td><td>{connection.state}</td><td>{connection.read_calls} / {connection.tags_read}</td><td>{connection.groups.map(group => <details key={group.rate_ms}><summary>{group.rate_ms} ms · {group.addresses.length} addresses</summary>{group.addresses.join(', ')}</details>)}</td><td><ConnectionTimings connection={connection} /></td><td>{connection.error || '—'}</td></tr>)}</tbody></table>
     {data && !data.connections.length && <p>No PLC connections are configured.</p>}
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>

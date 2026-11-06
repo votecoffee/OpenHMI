@@ -22,18 +22,19 @@ TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'rec
 
 
 class ProjectWorkspace:
-    def __init__(self, path, handlers=None, recipe_users=None):
+    def __init__(self, path, handlers=None, recipe_users=None, *, hold_connections=False):
         self.path = Path(path).resolve()
         self.root = self.path.parent
         self.root.mkdir(parents=True, exist_ok=True)
         self.handlers, self.recipe_users = handlers, recipe_users
+        self.hold_connections = hold_connections
         self.lock = asyncio.Lock()
         self.context = None
         self.current = self._app(self.path, handlers)
 
     def _app(self, path, handlers=None):
         from .server import create_app
-        hold = path.with_suffix('.hold').exists()
+        hold = self.hold_connections or path.with_suffix('.hold').exists()
         legacy = path.with_suffix('.recipe-users.json')
         app = create_app(path, handlers, legacy if legacy.exists() else self.recipe_users, hold_connections=hold)
         app.state.release_connections = lambda: path.with_suffix('.hold').unlink(missing_ok=True)

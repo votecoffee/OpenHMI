@@ -65,6 +65,32 @@ operations before starting OpenHMI again. The manager reports an error if
 it cannot confirm termination. The deadline applies to **package launch**
 after Ctrl+C. Direct launches follow the foreground runtime's shutdown.
 
+## Exit watchdog
+
+Enable bounded recovery explicitly for a named project:
+
+    OpenHMI.exe package launch --project D:\OpenHMI\projects\Line1.openhmi.sqlite3 --watchdog-restarts 2
+
+The default is zero retries. The count is a per-launch budget from 0 to 5.
+After a nonzero runtime exit, the manager waits 2 seconds before the first
+retry and doubles the delay for each further retry. It verifies and reuses
+the original package and the project path supplied on the command line.
+A normal exit or Ctrl+C ends supervision. Ctrl+C during the delay cancels
+the retry. A shutdown forced by the managed Ctrl+C deadline also ends the
+session.
+
+A recovery launch holds PLC acquisition, including when another project is
+opened in that recovery session. The runtime omits startup Python handlers
+and the manager skips automatic browser opening. Review diagnostics and
+uncertain operations before using **Apply live** to release the hold on
+the open project. Projects that require startup handlers can be restarted
+deliberately with the approved handler file. Watchdog events are printed
+to the manager's stderr. Runtime diagnostics remain in the runtime log.
+
+This watchdog responds to process exits. Use the managed shutdown procedure
+for a stalled running process. Windows service registration and station
+startup configuration are separate deployment work.
+
 ## Update and rollback
 
 1. Export complete backups from **Projects**, retain external handlers and stop
