@@ -137,6 +137,16 @@ class ConnectionStatusControl(ControlBase):
     connection: str = Field(default='', max_length=60)
 
 
+class StateImageControl(ControlBase):
+    kind: Literal['state_image']
+    tag: str = Field(min_length=1, max_length=200)
+    on_image: str = Field(default='', pattern=r'^(?:[a-f0-9]{64})?$')
+    off_image: str = Field(default='', pattern=r'^(?:[a-f0-9]{64})?$')
+    on_text: str = Field(default='ON', min_length=1, max_length=100)
+    off_text: str = Field(default='OFF', min_length=1, max_length=100)
+    show_label: bool = True
+
+
 class LabelControl(ControlBase):
     kind: Literal['label']
     font_size: int = Field(default=16, ge=8, le=72)
@@ -507,7 +517,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | StateImageControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

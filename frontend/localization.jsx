@@ -97,6 +97,7 @@ export const uiText = {
   cameraMixedContent: 'HTTP camera embedding is blocked on an HTTPS station. Use the new tab.',
   cameraIsolationUnavailable: 'This browser cannot isolate the embedded camera. Use the new tab.',
   tagInspectQuality: 'Inspect {tag} quality ({label})', tagQualityDetails: 'Tag quality details',
+  stateImageUnavailable: 'Image unavailable',
   comparisonProcess: 'Process value', comparisonSetpoint: 'Setpoint', comparisonDeviation: 'Deviation',
   comparisonTolerance: 'Tolerance', comparisonWithin: 'Within tolerance', comparisonOutside: 'Outside tolerance',
   comparisonUnavailable: 'Comparison unavailable', comparisonChooseSetpoint: 'Choose a setpoint tag',

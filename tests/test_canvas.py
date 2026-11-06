@@ -24,6 +24,14 @@ class CanvasBackupTests(unittest.TestCase):
         image = client.post('/api/canvas-images', content=background.getvalue())
         self.assertEqual(image.status_code, 200, image.text)
         identifier = image.json()['id']
+        off = BytesIO()
+        Image.new('RGB', (40, 30), '#123456').save(off, format='PNG')
+        off_image = client.post('/api/canvas-images', content=off.getvalue())
+        self.assertEqual(off_image.status_code, 200, off_image.text)
+        off_id = off_image.json()['id']
+        state_image = {'id': 'valve', 'kind': 'state_image', 'label': 'Valve', 'tag': 'MotorRunning',
+                       'on_image': identifier, 'off_image': 'f' * 64}
+        project['controls'].append(state_image)
         project['layout'] = {'background': '0' * 64, 'boxes': {
             control['id']: {'x': index * 100, 'y': 0, 'width': 80, 'height': 48}
             for index, control in enumerate(project['controls'])
@@ -35,6 +43,8 @@ class CanvasBackupTests(unittest.TestCase):
                                                        'locked': True, 'x': 0, 'y': 0, 'width': 640, 'height': 400}}
         self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
         project['layout']['decorations']['machine']['image'] = identifier
+        self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
+        state_image['off_image'] = off_id
         saved = client.put('/api/project/draft', json=request)
         self.assertEqual(saved.status_code, 200, saved.text)
         applied = client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -49,5 +59,9 @@ class CanvasBackupTests(unittest.TestCase):
             self.assertEqual(current['layout']['decorations']['machine']['image'], identifier)
             asset = '/api/canvas-images/' + identifier
             self.assertEqual(restored_client.get(asset).content, client.get(asset).content)
+            restored_image = next(control for control in current['controls'] if control['id'] == 'valve')
+            self.assertEqual((restored_image['on_image'], restored_image['off_image']), (identifier, off_id))
+            off_asset = '/api/canvas-images/' + off_id
+            self.assertEqual(restored_client.get(off_asset).content, client.get(off_asset).content)
         finally:
             restored.state.store.close()

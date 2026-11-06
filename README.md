@@ -301,6 +301,11 @@ A **Setpoint comparison** shows a process value, setpoint and signed deviation
 in the same units. Set a tolerance in the designer or bind it to a numeric tag.
 The control reports whether the deviation is within tolerance when the
 required readings are available.
+A **State image** switches between project-owned images when a Boolean tag
+changes. In the designer, upload a PNG, JPEG or WebP for each state and choose
+**Use uploaded image**. A state can be left blank for a transparent overlay
+when label and state text are hidden. Bad or stale data shows its quality
+instead of a state image. Project backups include the images.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

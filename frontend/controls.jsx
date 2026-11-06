@@ -8,6 +8,7 @@ import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
 import { WebBrowser } from './web-browser.jsx';
+import { ImageField, StateImage } from './state-image.jsx';
 import { DateTimeLimit, EditControl, formatUtcEpoch, MAX_UTC_EPOCH } from './edit-control.jsx';
 import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { Bitfield, BitfieldFields, MultiState, ModeSelector, PermissiveList, StackLight, StackLightFields, StateFields, PermissiveFields } from './machine-state.jsx';
@@ -492,7 +493,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -569,6 +570,16 @@ export function createConfig(catalog) {
         defaultProps: { ...numericDefaults, label: 'Setpoint slider', unit: '', tag: catalog.tags.find(sliderTag)?.name || '',
           minimum: 0, maximum: 100, security_groups: [] },
         render: props => <EditControl {...props} slider sliderInteger={!!catalog.tags.find(tag => tag.name === props.tag)?.integer} /> },
+      StateImage: { label: 'State image', fields: {
+        label: labelField, tag: tagField('boolean'),
+        on_text: { type: 'text', label: 'ON text' }, off_text: { type: 'text', label: 'OFF text' },
+        on_image: { type: 'custom', render: props => <ImageField key={props.id} {...props} label="ON image" /> },
+        off_image: { type: 'custom', render: props => <ImageField key={props.id} {...props} label="OFF image" /> },
+        show_label: { type: 'select', label: 'Show label and state text', options: [
+          { label: 'Yes', value: true }, { label: 'No', value: false },
+        ] },
+      }, defaultProps: { label: 'Machine image', tag: 'MotorRunning', on_image: '', off_image: '',
+        on_text: 'ON', off_text: 'OFF', show_label: true }, render: props => <StateImage {...props} /> },
       StaticLabel: { label: 'Static label', fields: {
         label: labelField, font_size: { type: 'number', label: 'Font size (px)', min: 8, max: 72 },
         alignment: { type: 'select', label: 'Text alignment', options: [

@@ -110,6 +110,11 @@ class CanvasImages:
         identifiers = {identifier for layout in layouts if layout
                        for identifier in (layout.background, *(item.image for item in layout.decorations.values()))
                        if identifier}
+        for controls in (project.controls, *(screen.controls for screen in project.screens),
+                         *(faceplate.controls for faceplate in project.faceplates)):
+            for control in controls:
+                if control.kind == 'state_image':
+                    identifiers.update(identifier for identifier in (control.on_image, control.off_image) if identifier)
         with self.store._lock:
             for identifier in identifiers:
                 if not self.store._db.execute('SELECT 1 FROM canvas_image WHERE id=?', (identifier,)).fetchone():

@@ -22,6 +22,10 @@
 .canvas-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 .canvas-object { position: absolute; min-width: 0; }
 .canvas-object-body { height: 100%; overflow: auto; }
+.canvas-object-body > .binding-frame:has(> .binding-contents > .hmi-state-image),
+.canvas-object-body > .binding-frame > .binding-contents:has(> .hmi-state-image),
+.canvas-object-body > .binding-frame > .binding-contents > .hmi-state-image { height: 100%; }
+.canvas-object-body .hmi-state-image > .state-image-graphic { flex: 1 1 auto; max-height: none; }
 .canvas-object .hmi-control { min-height: 0; padding: 4px; gap: 3px; border-bottom: 0; }
 .canvas-object .hmi-value { font-size: 19px; }
 .canvas-object .hmi-action { min-height: 32px; padding: 5px 8px; }

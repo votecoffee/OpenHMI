@@ -18,6 +18,7 @@ function size(type) {
   if (type === 'RadialGauge') return { width: 176, height: 160 };
   if (type === 'DateTimeDisplay') return { width: 208, height: 56 };
   if (type === 'PlcConnectionStatus') return { width: 192, height: 88 };
+  if (type === 'StateImage') return { width: 160, height: 120 };
   if (type === 'SetpointComparison') return { width: 208, height: 148 };
   if (type === 'TagQuality') return { width: 176, height: 64 };
   if (type === 'LedDisplay') return { width: 176, height: 64 };
@@ -174,7 +175,7 @@ function Properties({ item, component, onChange }) {
   return <fieldset><legend>Control properties</legend>{Object.entries(component.fields).map(([key, field]) => {
     const value = item.props[key] ?? component.defaultProps[key];
     const change = next => onChange(key, next);
-    if (field.type === 'custom') return <div key={key}>{field.render({ field, name: key, value, onChange: change })}</div>;
+    if (field.type === 'custom') return <div key={key}>{field.render({ field, name: key, id: item.props.id + ':' + key, value, onChange: change })}</div>;
     return <label key={key}>{field.label || key}{field.type === 'select'
       ? <select value={field.options.findIndex(option => option.value === value)}
           onChange={event => change(field.options[Number(event.target.value)]?.value ?? '')}>

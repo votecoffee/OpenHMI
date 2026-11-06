@@ -114,6 +114,59 @@ test('compact annotations, LED and setpoint displays survive canvas save and liv
   }
 });
 
+test('state image uploads and switches with its Boolean tag and quality', async ({ page }) => {
+  test.setTimeout(60000);
+  const other = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGM0Di1ngAEmOAsvBwAyjgEHv03a3gAAAABJRU5ErkJggg==', 'base64');
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    await save(page, { ...original.active, controls: [], screens: [], layout: null,
+      tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }] });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Enable freeform layout' }).click();
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    const palette = page.getByRole('group', { name: 'Control palette' });
+    await palette.getByRole('combobox', { name: 'Control type' }).selectOption('StateImage');
+    await palette.getByRole('button', { name: 'Add or drag control' }).dragTo(canvas, { targetPosition: { x: 24, y: 40 } });
+    const fields = page.getByRole('group', { name: 'Control properties' });
+    await fields.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'ValveOpen' });
+    await fields.getByRole('textbox', { name: 'Label', exact: true }).fill('Valve');
+    await fields.getByRole('textbox', { name: 'ON text', exact: true }).fill('Open');
+    await fields.getByRole('textbox', { name: 'OFF text', exact: true }).fill('Closed');
+    await fields.getByRole('combobox', { name: 'Show label and state text', exact: true }).selectOption({ label: 'No' });
+    for (const [state, buffer] of [['ON', pixel], ['OFF', other]]) {
+      const image = fields.getByRole('group', { name: state + ' image', exact: true });
+      await image.getByLabel('Upload ' + state + ' image').setInputFiles({ name: state + '.png', mimeType: 'image/png', buffer });
+      await expect(image.getByRole('img', { name: 'Uploaded image preview' })).toHaveJSProperty('complete', true);
+      await image.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
+    }
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    const { active } = await (await page.request.get('/api/project')).json();
+    const image = active.controls[0];
+    expect(image.on_image).toMatch(/^[a-f0-9]{64}$/);
+    expect(image.off_image).toMatch(/^[a-f0-9]{64}$/);
+    expect(image.off_image).not.toBe(image.on_image);
+
+    await page.goto('/runtime');
+    const control = page.locator('[data-control="state_image"]');
+    const opened = control.getByRole('img', { name: 'Valve: Open', exact: true });
+    await expect(opened).toHaveAttribute('src', '/api/canvas-images/' + image.on_image);
+    await expect(opened).toHaveJSProperty('naturalWidth', 1);
+    const live = await (await page.request.get('/api/tags')).json();
+    live.values.ValveOpen = false;
+    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    const closed = control.getByRole('img', { name: 'Valve: Closed', exact: true });
+    await expect(closed).toHaveAttribute('src', '/api/canvas-images/' + image.off_image);
+    await expect(closed).toHaveJSProperty('naturalWidth', 4);
+    live.samples.ValveOpen = { quality: 'stale', age_seconds: 4 };
+    await expect(control).toContainText('STALE DATA');
+    await expect(control.locator('img')).toHaveCount(0);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('runtime fit width preserves canvas alignment, controls and trend cursor', async ({ page }) => {
   await page.setViewportSize({ width: 620, height: 780 });
   const original = await (await page.request.get('/api/project')).json();
