@@ -179,7 +179,11 @@ class LogixHistoryTests(unittest.TestCase):
         samples = driver.sample_snapshot(3)
         self.assertEqual(samples['MotorA']['value']['Counters']['Totals'][0], 9007199254740991)
         self.assertEqual(samples['MotorA.Counters.Totals[0]']['value'], 9007199254740991)
-        self.assertEqual(samples['LevelA']['value'], -9007199254740991)
+        self.assertEqual(samples['LevelA']['quality'], 'bad')
+
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.poll(3.1)
+        self.assertEqual(driver.sample_snapshot(3.1)['LevelA']['value'], -9007199254740991)
 
     def test_reconnect_backoff_is_not_extended_by_skipped_polls(self):
         driver = RuntimeDriver(FakePLC)
@@ -369,6 +373,59 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(exported.status_code, 200)
         self.assertEqual({row['name'] for row in exported.json()['tags']},
                          {'MotorA', 'MotorA.Speed', 'MotorA.Running', 'LevelA'})
+
+    def test_bad_address_retries_slowly_while_healthy_tags_keep_scanning(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.poll(0)
+        plc = driver.connections['plc'].client
+        plc.values['Level'] = 'invalid level'
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        driver.poll(2)
+        self.assertEqual(plc.reads, [('Motor', 'Level'), ('Motor',)])
+        self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'bad')
+
+        plc.values['Level'] = 42.0
+        for now in range(3, 33):
+            driver.lease('viewer', ['slow'], now)
+            driver.poll(now)
+        self.assertEqual(plc.reads[2:30], [('Motor',)] * 28)
+        self.assertEqual(plc.reads[30:], [('Motor', 'Level'), ('Motor', 'Level')])
+        self.assertEqual(driver.sample_snapshot(32)['LevelA']['value'], 89.0)
+
+    def test_bad_address_retry_delay_yields_when_the_route_loses_usable_data(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.poll(0)
+        plc = driver.connections['plc'].client
+        plc.values['Level'] = 'invalid level'
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+
+        plc.values['Motor']['Running'] = 'invalid status'
+        driver.poll(2)
+        self.assertEqual(plc.reads[-1], ('Motor',))
+        self.assertTrue(driver.status(now=2)[0]['data_unavailable'])
+        driver.poll(3)
+        self.assertEqual(plc.reads[-1], ('Motor', 'Level'))
+
+    def test_shared_udt_with_a_usable_requested_member_keeps_its_scan_rate(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.poll(0)
+        plc = driver.connections['plc'].client
+        plc.values['Motor']['Speed'] = 'invalid speed'
+        driver.lease('viewer', ['slow', 'fast'], 1)
+        driver.poll(1)
+        driver.poll(1.2)
+        self.assertEqual(plc.reads, [('Motor', 'Level'), ('Motor',)])
+        samples = driver.sample_snapshot(1.2)
+        self.assertEqual(samples['MotorA.Speed']['quality'], 'bad')
+        self.assertEqual(samples['MotorA.Running']['quality'], 'good')
 
     def test_status_only_api_omits_tag_values_and_address_groups(self):
         app = create_app()
@@ -745,12 +802,14 @@ class LogixHistoryTests(unittest.TestCase):
 
         swapped = [Tag('Level', 50.0, 'REAL'), Tag('Motor', plc.values['Motor'], 'MotorUDT')]
         with patch.object(plc, 'read', return_value=swapped):
-            driver.poll(3)
+            driver.poll(5.1)
         self.assertIsNone(connection.client)
         self.assertIn('unexpected tag address', connection.error)
-        self.assertEqual(driver.sample_snapshot(3)['LevelA']['quality_reason'], 'disconnected')
-        driver.poll(4)
-        self.assertEqual(driver.sample_snapshot(4)['LevelA']['value'], 65.0)
+        self.assertEqual(driver.sample_snapshot(5.1)['LevelA']['quality_reason'], 'disconnected')
+        driver.poll(6.1)
+        recovered = driver.sample_snapshot(6.1)
+        self.assertEqual(recovered['LevelA']['value'], 65.0)
+        self.assertEqual(recovered['MotorA.Running']['quality'], 'good')
 
     def test_write_verification_checks_result_address_and_boolean_type(self):
         driver = RuntimeDriver(FakePLC)

@@ -279,7 +279,12 @@ tab while the original screen continues scanning. In the runtime header, use
 **Inspect tags** next to an affected PLC route to open its **Needs attention**
 list in Diagnostics.
 Per-route timing separates worker queue delay, route lock wait, adapter reads,
-scan start lateness and recovery.
+scan start lateness and recovery. While a PLC route has fresh requested data,
+addresses returning only bad samples wait at least 30 seconds between automatic
+retries. A shared UDT read keeps its requested rate when a requested member is
+usable. Loss of all usable data bypasses the delay, and applying a project clears
+it so corrected bindings can be tried immediately.
+
 Filter diagnostic tags by name, sample quality, and PLC connection or local HMI
 source. JSON exports use the same tag filters.
 Diagnostics also shows background worker health and retry state. Grant `activity.view` / `diagnostics.view` through HMI

@@ -20,6 +20,7 @@ from .alarms import utc_now
 MAX_SAFE_INTEGER = 2 ** 53 - 1
 MAX_VIEWER_LEASES = 1000
 MAX_SUBSCRIPTION_SEQUENCES = 2 * MAX_VIEWER_LEASES
+BAD_TAG_RETRY_SECONDS = 30
 REAL_MAX = float.fromhex('0x1.fffffep+127')
 PLC_INTEGER_LIMITS = {
     'SINT': (-2 ** 7, 2 ** 7 - 1), 'USINT': (0, 2 ** 8 - 1),
@@ -332,6 +333,7 @@ class RuntimeDriver(SimulatorDriver):
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self._refresh_after = {}
+        self._bad_tag_retry_at = {}
         self._demanded_aliases = {}
         self._lease_sequences = {}
         self.local_names = set()
@@ -385,6 +387,7 @@ class RuntimeDriver(SimulatorDriver):
                 self.project = project
                 self._screen_demands = screen_demands
                 self.deadlines.clear()
+                self._bad_tag_retry_at.clear()
             for connection in retired:
                 connection.close()
 
@@ -440,8 +443,16 @@ class RuntimeDriver(SimulatorDriver):
         return rates
 
     def _due_addresses(self, identifier, now):
-        return [address for route, address in self.last_rates
-                if route == identifier and now >= self.deadlines.get((route, address), 0)]
+        due = {address: self.deadlines.get((route, address), 0) for route, address in self.last_rates
+               if route == identifier and now >= self.deadlines.get((route, address), 0)}
+        if not self._bad_tag_retry_at or not any((identifier, address) in self._bad_tag_retry_at for address in due):
+            return due
+        connection = self.connections[identifier]
+        if not self._has_usable_data(identifier, connection.failure_generation, now):
+            return due
+        effective = {address: max(deadline, self._bad_tag_retry_at.get((identifier, address), 0))
+                     for address, deadline in due.items()}
+        return {address: deadline for address, deadline in effective.items() if now >= deadline}
 
     def poll(self, now=None, *, wait=True):
         """Schedule at most one scan per route. Explicit callers can wait for completion."""
@@ -468,11 +479,14 @@ class RuntimeDriver(SimulatorDriver):
                     key = (tag['connection'], tag['address'])
                     grouped[key] = min(rate, grouped.get(key, rate))
                     demanded_aliases[tag['connection']][alias] = key
+                    if alias not in self._demanded_aliases.get(tag['connection'], {}):
+                        self._bad_tag_retry_at.pop(key, None)
             for key, previous_rate in self.last_rates.items():
                 rate = grouped.get(key)
                 if rate is None:
                     self.deadlines.pop(key, None)
                     self._refresh_after.pop(key, None)
+                    self._bad_tag_retry_at.pop(key, None)
                 elif rate < previous_rate:
                     self.deadlines[key] = now
                     # Tighten the existing samples without letting slower demand revive them.
@@ -527,13 +541,14 @@ class RuntimeDriver(SimulatorDriver):
                     return
                 if not connection.connected or connection.scan_generation != connection.failure_generation:
                     # A disconnect may occur while queued, and an explicit read may reopen the route.
-                    for key in list(self.deadlines):
-                        if key[0] == identifier:
-                            del self.deadlines[key]
+                    for schedule in (self.deadlines, self._bad_tag_retry_at):
+                        for key in list(schedule):
+                            if key[0] == identifier:
+                                del schedule[key]
                     connection.scan_generation = connection.failure_generation
                 # Demand can change while this scan waits for a writer or a worker slot.
                 due = self._due_addresses(identifier, scan_start)
-                deadline = min((self.deadlines[(identifier, address)] for address in due
+                deadline = min((deadline for address, deadline in due.items()
                                 if (identifier, address) in self.deadlines), default=None)
             if not due:
                 if connection.connected:
@@ -549,7 +564,7 @@ class RuntimeDriver(SimulatorDriver):
             if deadline is not None:
                 connection.timings.record('scan_lateness', scan_start - deadline)
             try:
-                results = connection.read(due, now, with_receipts=True)
+                results = connection.read(list(due), now, with_receipts=True)
             except Exception:
                 # A route failure invalidates its entire cache in sample_snapshot.
                 return
@@ -577,6 +592,7 @@ class RuntimeDriver(SimulatorDriver):
                     # A sample received before a faster demand arrived cannot satisfy its refresh.
                     if pending_deadline is None or pending_deadline <= acquired:
                         self.deadlines[key] = scan_finished + rate / 1000
+                    usable_address = False
                     for alias, tag, member in self.address_aliases[key]:
                         try:
                             if result is None or result.error:
@@ -600,13 +616,18 @@ class RuntimeDriver(SimulatorDriver):
                             'failure_generation': connection.failure_generation,
                         }
                         # One physical UDT read can populate aliases no consumer requested.
-                        if (awaiting_usable and alias in demanded_aliases and sample['quality'] == 'good'
-                                and scan_finished - acquired <= freshness_seconds(rate)):
-                            connection.has_usable_sample = True
-                            awaiting_usable = False
-                            if connection.outage_started is not None:
-                                connection.timings.record('recovery', scan_finished - connection.outage_started)
-                                connection.outage_started = None
+                        if alias in demanded_aliases and sample['quality'] == 'good':
+                            usable_address = True
+                            if awaiting_usable and scan_finished - acquired <= freshness_seconds(rate):
+                                connection.has_usable_sample = True
+                                awaiting_usable = False
+                                if connection.outage_started is not None:
+                                    connection.timings.record('recovery', scan_finished - connection.outage_started)
+                                    connection.outage_started = None
+                    if usable_address:
+                        self._bad_tag_retry_at.pop(key, None)
+                    else:
+                        self._bad_tag_retry_at[key] = scan_finished + BAD_TAG_RETRY_SECONDS
 
     def sample_snapshot(self, now=None, *, include_values=True):
         now = time.monotonic() if now is None else now
@@ -769,7 +790,9 @@ class RuntimeDriver(SimulatorDriver):
                         raise
                     # A write readback verifies the transaction; normal polling owns displayed samples.
                     with self.lock:
-                        self.deadlines.pop((tag['connection'], tag['address']), None)
+                        key = (tag['connection'], tag['address'])
+                        self.deadlines.pop(key, None)
+                        self._bad_tag_retry_at.pop(key, None)
             else:
                 with self.lock:
                     if member:
@@ -847,5 +870,6 @@ class RuntimeDriver(SimulatorDriver):
                     self.samples.clear()
                     self.deadlines.clear()
                     self._refresh_after.clear()
+                    self._bad_tag_retry_at.clear()
                     self._scan_pool = None
                     self._closing = False
