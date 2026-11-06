@@ -288,11 +288,16 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 
     @app.get("/api/tags")
-    def tags() -> dict:
+    def tags(status_only: bool = False) -> dict:
         with application.lock:
-            samples = application.driver.sample_snapshot()
-            values = {name: sample['value'] for name, sample in samples.items() if sample['quality'] == 'good'}
-            return {'driver': 'logix' if application.driver.connections else 'simulator', 'values': values, 'samples': samples, 'connections': application.driver.status(), 'plc_hold': application.driver.plc_hold}
+            driver = application.driver
+            payload = {}
+            if not status_only:
+                samples = driver.sample_snapshot()
+                values = {name: sample['value'] for name, sample in samples.items() if sample['quality'] == 'good'}
+                payload.update(values=values, samples=samples)
+            return {**payload, 'driver': 'logix' if driver.connections else 'simulator',
+                    'connections': driver.status(include_groups=not status_only), 'plc_hold': driver.plc_hold}
 
     @app.get("/api/catalog")
     def catalog() -> dict:

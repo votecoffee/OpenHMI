@@ -331,6 +331,7 @@ const MemoBuilder = React.memo(Builder);
 
 function App({ initial, catalog }) {
   const runtime = location.pathname !== '/';
+  const diagnostics = location.pathname === '/diagnostics';
   const [live, setLive] = useState({ values: {}, connected: false, alarms: null, alarmConnected: false });
   const [active, setActive] = useState({ revision: initial.active_revision, project: initial.active, project_instance: initial.project_instance });
   const [projectChanged, setProjectChanged] = useState(false);
@@ -457,8 +458,9 @@ function App({ initial, catalog }) {
       return () => { stopped = true; clearTimeout(timer); };
     }
 
-    const stopTags = poll('/api/tags', tags => {
-      const { values, samples = {}, connections = [], plc_hold: plcHold = false } = tags ?? {};
+    const stopTags = poll(diagnostics ? '/api/tags?status_only=true' : '/api/tags', tags => {
+      const { values = diagnostics ? {} : null, samples = {},
+        connections = diagnostics ? null : [], plc_hold: plcHold = diagnostics ? null : false } = tags ?? {};
       if (!isRecord(values) || !isRecord(samples) || typeof plcHold !== 'boolean'
         || !Array.isArray(connections) || connections.some(route =>
           typeof route?.id !== 'string' || typeof route.connected !== 'boolean')) {
@@ -468,13 +470,13 @@ function App({ initial, catalog }) {
     }, () => {
       setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false, connections: [], plcHold: false }));
     });
-    const stopAlarms = poll('/api/alarms', alarms => {
+    const stopAlarms = diagnostics ? null : poll('/api/alarms', alarms => {
       if (!isAlarmSnapshot(alarms)) throw new Error('Invalid alarm status response');
       setLive(previous => ({ ...previous, alarms, alarmConnected: true }));
     }, () => {
       setLive(previous => ({ ...previous, alarmConnected: false }));
     });
-    const stopRecipe = poll('/api/recipes/selected', recipeSelection => {
+    const stopRecipe = diagnostics ? null : poll('/api/recipes/selected', recipeSelection => {
       if (!isRecipeSelection(recipeSelection)) throw new Error('Invalid recipe selection response');
       setLive(previous => ({ ...previous, recipeSelection, recipeConnected: true }));
     }, () => {
@@ -493,8 +495,8 @@ function App({ initial, catalog }) {
       setActive(previous => previous.revision === next.revision ? previous : next);
       setScreenConnected(true);
     }, () => setScreenConnected(false));
-    return () => { stopTags(); stopAlarms(); stopRecipe(); stopIdentity(); stopProject(); };
-  }, [runtime]);
+    return () => { stopTags(); stopAlarms?.(); stopRecipe?.(); stopIdentity(); stopProject(); };
+  }, [runtime, diagnostics]);
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
   const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision, diagnosticsPermitted: canInspect(session, 'diagnostics.view') }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>

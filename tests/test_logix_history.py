@@ -344,6 +344,31 @@ class LogixHistoryTests(unittest.TestCase):
         driver.poll(7)
         self.assertFalse(driver.status(now=7)[0]['data_unavailable'])
 
+    def test_status_only_api_omits_tag_values_and_address_groups(self):
+        app = create_app()
+        driver = app.state.driver
+        self.addCleanup(driver.close)
+        driver.factory = FakePLC
+        driver.configure(logix_project())
+        driver.lease('viewer', ['fast'])
+        driver.poll()
+        client = TestClient(app)
+        self.addCleanup(client.close)
+
+        with patch.object(driver, 'sample_snapshot', side_effect=AssertionError('Status must not copy tag values')):
+            compact = client.get('/api/tags?status_only=true')
+        self.assertEqual(compact.status_code, 200)
+        summary = compact.json()
+        self.assertEqual(set(summary), {'driver', 'connections', 'plc_hold'})
+        self.assertTrue(summary['connections'][0]['connected'])
+        self.assertFalse(summary['connections'][0]['data_unavailable'])
+        self.assertNotIn('groups', summary['connections'][0])
+
+        full = client.get('/api/tags').json()
+        self.assertEqual(full['values']['MotorA.Speed'], 42.0)
+        self.assertEqual(full['samples']['MotorA.Speed']['quality'], 'good')
+        self.assertEqual(full['connections'][0]['groups'][0]['addresses'], ['Motor'])
+
     def test_route_recovery_waits_for_usable_data_after_reconnect(self):
         reject = False
 

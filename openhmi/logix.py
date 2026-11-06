@@ -783,7 +783,7 @@ class RuntimeDriver(SimulatorDriver):
                 return True
         return False
 
-    def status(self, *, include_timing=False, now=None):
+    def status(self, *, include_timing=False, include_groups=True, now=None):
         now = time.monotonic() if now is None else now
         with self.lock:
             routes = []
@@ -791,10 +791,11 @@ class RuntimeDriver(SimulatorDriver):
                 scan = self._scans.get(identifier)
                 age = max(0, now - self._scan_started[identifier]) if scan and not scan.done() else None
                 groups = {}
-                for (route, address), rate in self.last_rates.items():
-                    if route == identifier:
-                        groups.setdefault(rate, []).append(address)
-                active = connection.connected and bool(groups)
+                if include_groups:
+                    for (route, address), rate in self.last_rates.items():
+                        if route == identifier:
+                            groups.setdefault(rate, []).append(address)
+                active = connection.connected and bool(self._demanded_aliases.get(identifier))
                 recovering = active and connection.outage_started is not None
                 routes.append({'id': identifier, 'connected': connection.connected, 'error': connection.error,
                                'connection_instance': connection.instance,
@@ -805,7 +806,8 @@ class RuntimeDriver(SimulatorDriver):
                                                     and not self._has_usable_data(identifier, connection.failure_generation, now)),
                                'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
                                'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
-                               'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)} for rate, addresses in sorted(groups.items())],
+                               **({'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)}
+                                              for rate, addresses in sorted(groups.items())]} if include_groups else {}),
                                **({'timings': connection.timings.snapshot(), 'route_failures': connection.failure_generation} if include_timing else {})})
             return routes
 

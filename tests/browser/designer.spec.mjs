@@ -311,6 +311,11 @@ test('one missing PLC tag is marked on its control while the same route keeps up
       await expect(rows).toHaveCount(1);
       await expect(rows).toContainText('LevelTypo');
       await expect(rows).toContainText('Tag does not exist');
+      await expect(diagnostics.locator('.app-header .connection')).toContainText('PLC routes connected (1/1)');
+      const paths = await diagnostics.evaluate(() => performance.getEntriesByType('resource')
+        .map(entry => new URL(entry.name)).map(url => url.pathname + url.search));
+      expect(paths).toContain('/api/tags?status_only=true');
+      expect(paths).not.toContain('/api/tags');
       await expect.poll(async () => (await snapshot()).LineRunning.timestamp > first.LineRunning.timestamp).toBe(true);
     } finally {
       await diagnostics.close();
