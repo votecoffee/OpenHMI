@@ -46,7 +46,10 @@ Specific equipment faceplates are intentionally left for later design.
 
 Each screen has an update interval, bounded to 100–60,000 ms. Viewers lease the
 screen/popups they currently use. Leases expire after 15 seconds unless refreshed.
-The server merges demand across viewers and selects the fastest requested rate
+An empty subscription releases the viewer. When demand for an address ends, the
+driver drops its next scan deadline. A new request can then refresh the address
+on the next scheduler tick. The server merges demand across viewers and selects
+the fastest requested rate
 for each source address. Multiple UDT members are acquired through a single root
 UDT read. Alarm tags demand 250 ms; historian tags demand their sampling interval,
 independent of viewers. Idle screen tags are not kept on a scan solely because

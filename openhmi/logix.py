@@ -375,13 +375,16 @@ class RuntimeDriver(SimulatorDriver):
 
     def lease(self, client, screens, now=None, preview_root=''):
         now = time.monotonic() if now is None else now
+        screens = set(screens)
         with self.lock:
             if any(screen not in self._screen_demands for screen in screens):
                 raise ValueError('Unknown subscription screen')
             if preview_root and (preview_root not in self.definitions or self.definitions[preview_root]['type'] != 'struct'):
                 raise ValueError('Faceplate preview requires a configured UDT tag')
-            self.leases[client] = (set(screens), now + 15, preview_root)
+            self.leases.pop(client, None)
             self.leases = {key: value for key, value in self.leases.items() if value[1] > now}
+            if screens or preview_root:
+                self.leases[client] = (screens, now + 15, preview_root)
             if len(self.leases) > 1000:
                 self.leases.pop(next(iter(self.leases)))
 
@@ -435,8 +438,11 @@ class RuntimeDriver(SimulatorDriver):
                 if tag and tag['connection']:
                     key = (tag['connection'], tag['address'])
                     grouped[key] = min(rate, grouped.get(key, rate))
-            for key, rate in grouped.items():
-                if rate < self.last_rates.get(key, rate):
+            for key, previous_rate in self.last_rates.items():
+                rate = grouped.get(key)
+                if rate is None:
+                    self.deadlines.pop(key, None)
+                elif rate < previous_rate:
                     self.deadlines[key] = now
             self.last_rates = grouped
 

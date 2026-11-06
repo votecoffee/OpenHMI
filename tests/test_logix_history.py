@@ -270,6 +270,44 @@ class LogixHistoryTests(unittest.TestCase):
         driver.close()
         self.assertTrue(plc.closed)
 
+    def test_reopening_an_idle_screen_refreshes_before_its_old_deadline(self):
+        project = logix_project()
+        project['screens'][1]['update_ms'] = 60000
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(project)
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        plc = driver.connections['plc'].client
+
+        driver.lease('viewer', [], 2)
+        self.assertNotIn('viewer', driver.leases)
+        driver.poll(2)
+        self.assertEqual(plc.reads, [('Motor', 'Level')])
+        self.assertEqual(driver.status()[0]['groups'], [])
+
+        plc.values['Level'] = 40.0
+        driver.lease('viewer', ['slow'], 3)
+        driver.poll(3)
+        self.assertEqual(plc.reads, [('Motor', 'Level'), ('Motor', 'Level')])
+        self.assertEqual(driver.sample_snapshot(3)['LevelA']['value'], 85.0)
+
+    def test_lease_cap_ignores_releases_and_keeps_renewed_viewers(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        for viewer in range(1000):
+            driver.lease(f'viewer-{viewer}', ['slow'], 1)
+        driver.lease('unknown-viewer', [], 2)
+        self.assertEqual(len(driver.leases), 1000)
+        self.assertIn('viewer-0', driver.leases)
+
+        driver.lease('viewer-0', [], 3, preview_root='MotorA')
+        driver.lease('new-viewer', ['slow'], 4)
+        self.assertNotIn('viewer-1', driver.leases)
+        self.assertEqual(driver.leases['viewer-0'][2], 'MotorA')
+        self.assertEqual(driver.demands(4)['MotorA'], 500)
+
     def test_scan_isolates_a_malformed_slot_and_rejects_misaddressed_batches(self):
         driver = RuntimeDriver(FakePLC)
         self.addCleanup(driver.close)
