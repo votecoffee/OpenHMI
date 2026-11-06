@@ -279,17 +279,27 @@ test('one missing PLC tag is marked on its control while the same route keeps up
       { id: 'level', kind: 'numeric', label: 'Line level', tag: 'LineLevel', decimals: 1 },
       { id: 'running', kind: 'indicator', label: 'Line running', tag: 'LineRunning' },
       { id: 'level_quality', kind: 'tag_quality', label: 'Level signal status', tag: 'LineLevel' },
+      { id: 'route_quality', kind: 'connection_status', label: 'Line connection status', connection: '' },
     ],
   };
 
   try {
     await save(project);
+    await page.goto('/');
+    await page.locator('[data-control="connection_status"] .hmi-label').click();
+    await page.getByRole('combobox', { name: 'PLC connection', exact: true }).selectOption({ label: 'Synthetic PLC' });
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    project.controls.find(control => control.id === 'route_quality').connection = 'line';
     await page.goto('/runtime');
     const header = page.locator('.app-header .connection');
     const numeric = page.locator('[data-control="numeric"]').filter({ hasText: 'Line level' });
     const indicator = page.locator('[data-control="indicator"]');
     const badge = numeric.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true });
     const status = page.locator('[data-control="tag_quality"]');
+    const routeControl = page.locator('[data-control="connection_status"]');
+    await expect(routeControl.getByRole('status')).toContainText('Synthetic PLC · Connected');
+    await expect(routeControl.getByRole('link')).toHaveCount(0);
     await expect(status.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true })).toBeVisible();
     await expect(indicator).toContainText('ON');
     await expect(header).toContainText('PLC routes connected (1/1)');
@@ -361,7 +371,11 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   ];
   function withRoutes(project) {
     project.connections = configs;
-    project.controls.push({ id: 'tank_quality', kind: 'tag_quality', label: 'Tank signal quality', tag: 'TankLevel', show_age: false });
+    project.controls.push(
+      { id: 'tank_quality', kind: 'tag_quality', label: 'Tank signal quality', tag: 'TankLevel', show_age: false },
+      { id: 'line_route', kind: 'connection_status', label: 'Line connection', connection: 'line' },
+      { id: 'spare_route', kind: 'connection_status', label: 'Spare connection', connection: 'spare' },
+    );
     const button = project.controls.find(control => control.id === 'toggle');
     Object.assign(button, { mode: 'toggle', target: 'MotorRunning', enabled_tag: 'ActionEnable' });
   }
@@ -388,7 +402,12 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   const numeric = page.locator('[data-control="numeric"]');
   const indicator = page.locator('[data-control="indicator"]');
   const button = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
+  const lineStatus = page.locator('[data-control="connection_status"]').filter({ hasText: 'Line connection' });
+  const spareStatus = page.locator('[data-control="connection_status"]').filter({ hasText: 'Spare connection' });
   await expect(header).toContainText('Waiting for initial PLC data');
+  await expect(lineStatus.getByRole('status')).toContainText('Line PLC · Connected / waiting for first good data');
+  await expect(spareStatus.getByRole('status')).toContainText('Spare PLC · Disabled');
+  await expect(spareStatus.getByRole('link')).toHaveCount(0);
   await header.locator('summary').click();
   await expect(header.getByText('Line PLC · Connected / waiting for first good data', { exact: true })).toBeVisible();
   await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
@@ -419,6 +438,8 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await header.locator('summary').click();
   await expect(header.getByText('Runtime connected', { exact: true })).toBeVisible();
   await expect(header.getByText('Line PLC · Disconnected / retrying', { exact: true })).toBeVisible();
+  await expect(lineStatus.getByRole('status')).toContainText('Line PLC · Disconnected / retrying');
+  await expect(lineStatus.getByRole('link')).toHaveAttribute('href', '/diagnostics?connection=line&quality=non-good');
   await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
   await expect(header.getByText('Spare PLC · Disabled', { exact: true })).toBeVisible();
   await expect(header.getByRole('link', { name: /Inspect (Utility|Spare) PLC tags/ })).toHaveCount(0);
@@ -439,6 +460,7 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await expect(station).toContainText('PLC scan overdue');
   live = { ...live, connections: [{ id: 'line', connected: true, recovering: true }, online[1]] };
   await expect(station).toContainText('PLC recovery in progress');
+  await expect(lineStatus.getByRole('status')).toContainText('Line PLC · Reconnected / waiting for good data');
   await expect(header.getByText('Line PLC · Reconnected / waiting for good data', { exact: true })).toBeVisible();
   await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
   await expect(indicator).toContainText('PLC COMM LOSS');

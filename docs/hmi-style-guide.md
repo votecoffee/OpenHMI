@@ -47,6 +47,7 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Binary indicator | Stable label, grayscale filled/empty square and configurable ON/OFF text |
 | Analog range | Value and units, scale endpoints, normal band and pointer; out-of-scale indication without falsifying the numeric value |
 | Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
+| PLC connection status | Show one configured controller's acquisition state and link to affected tags when Diagnostics access is available |
 | Tag quality | Show good, stale, unavailable, or disconnected status for one tag, with sample age and an inspectable badge |
 | Numeric LED display | Compact seven-segment readout with fixed positions, units, and explicit overflow and quality indications |
 | Stack light | Group Boolean signals using configurable active color and polarity, with text and quality on each lamp |

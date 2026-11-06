@@ -1,5 +1,5 @@
 export const controlTypes = {
-  numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', indicator: 'Indicator', button: 'ActionButton',
+  numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', connection_status: 'PlcConnectionStatus', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar',
@@ -53,6 +53,7 @@ export function toProject(data, settings = {}) {
       if (type === 'DateTimeInput') return { ...base, tag: props.tag,
         minimum: props.minimum, maximum: props.maximum, minimum_tag: props.minimum_tag || '',
         maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
+      if (type === 'PlcConnectionStatus') return { ...base, connection: props.connection || '' };
       if (type === 'TagQuality') return { ...base, tag: props.tag, show_age: props.show_age ?? true };
       if (type === 'TextDisplay' || type === 'DateTimeDisplay') return { ...base, tag: props.tag };
       if (type === 'DurationDisplay') return { ...base, tag: props.tag, source_unit: props.source_unit, decimals: Number(props.decimals) };

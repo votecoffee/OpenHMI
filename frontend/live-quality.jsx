@@ -115,22 +115,50 @@ const routeNeedsAttention = new Set([
   'routeScanOverdue', 'routeRecovering', 'routeAwaitingData', 'routeDataUnavailable', 'routeRetrying',
 ]);
 
+function routeState(live, config) {
+  const status = live.connections?.find(item => item.id === config.id);
+  return !config.enabled ? 'routeDisabled'
+    : !live.connected ? 'routeUnknown'
+    : live.plcHold ? 'routeHeld'
+    : status?.scan_overdue === true ? 'routeScanOverdue'
+    : status?.recovering === true ? 'routeRecovering'
+    : status?.awaiting_data === true ? 'routeAwaitingData'
+    : status?.data_unavailable === true ? 'routeDataUnavailable'
+    : status?.connected ? 'routeConnected'
+    : status?.error != null ? 'routeRetrying' : 'routeConnecting';
+}
+
+function RouteDiagnosticsLink({ route }) {
+  const live = useContext(Live);
+  const ui = useUi();
+  if (!live.diagnosticsPermitted || !routeNeedsAttention.has(route.state)) return null;
+  return <a href={`/diagnostics?${new URLSearchParams({ connection: route.id, quality: 'non-good' })}`}
+    target="_blank" rel="noopener" aria-label={ui('routeOpenDiagnostics', { route: route.name })}>
+    {ui('routeInspectTags')}
+  </a>;
+}
+
+export function PlcConnectionStatus({ id, label, connection, puck }) {
+  const live = useContext(Live);
+  const { text, ui } = useLocalization();
+  const config = live.project?.connections?.find(item => item.id === connection);
+  const route = config ? { ...config, state: routeState(live, config) } : null;
+  const marker = route?.state === 'routeConnected' ? '✓' : route?.state === 'routeDisabled' ? '○' : '×';
+  return <article className="hmi-control hmi-route-control" data-control="connection_status">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {route ? <>
+      <strong role="status" data-route-state={route.state}>
+        <span aria-hidden="true">{marker}</span> {route.name} · {ui(route.state)}
+      </strong>
+      {!puck?.isEditing && <RouteDiagnosticsLink route={route} />}
+    </> : <strong role="status">{ui('routeUnbound')}</strong>}
+  </article>;
+}
+
 export function ConnectionStatus({ details = false }) {
   const live = useContext(Live);
   const ui = useUi();
-  const routes = (live.project?.connections || []).map(config => {
-    const status = live.connections?.find(item => item.id === config.id);
-    const state = !config.enabled ? 'routeDisabled'
-      : !live.connected ? 'routeUnknown'
-      : live.plcHold ? 'routeHeld'
-      : status?.scan_overdue === true ? 'routeScanOverdue'
-      : status?.recovering === true ? 'routeRecovering'
-      : status?.awaiting_data === true ? 'routeAwaitingData'
-      : status?.data_unavailable === true ? 'routeDataUnavailable'
-      : status?.connected ? 'routeConnected'
-      : status?.error != null ? 'routeRetrying' : 'routeConnecting';
-    return { ...config, state };
-  });
+  const routes = (live.project?.connections || []).map(config => ({ ...config, state: routeState(live, config) }));
   const enabled = routes.filter(route => route.enabled);
   const connected = enabled.filter(route => route.state === 'routeConnected').length;
   let summary;
@@ -154,11 +182,7 @@ export function ConnectionStatus({ details = false }) {
       <strong>{ui(live.connected ? 'runtimeOnline' : 'runtimeOffline')}</strong>
       <ul>{routes.map(route => <li key={route.id}>
         <span>{route.name} · {ui(route.state)}</span>
-        {live.diagnosticsPermitted && routeNeedsAttention.has(route.state) && <a
-          href={`/diagnostics?${new URLSearchParams({ connection: route.id, quality: 'non-good' })}`}
-          target="_blank" rel="noopener" aria-label={ui('routeOpenDiagnostics', { route: route.name })}>
-          {ui('routeInspectTags')}
-        </a>}
+        <RouteDiagnosticsLink route={route} />
       </li>)}</ul>
     </div>
   </details>;

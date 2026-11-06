@@ -290,6 +290,10 @@ as text with an overflow indication.
 A **Tag quality** control shows the selected tag's acquisition status and
 optional sample age. Select the badge to inspect the source, timestamp and
 any available error details. Authorized users can open the tag in Diagnostics.
+A **PLC connection status** control shows the selected controller's state on
+any screen. It distinguishes a healthy connection from acquisition hold,
+recovery, overdue scans and unusable data. Authorized operators can open the
+selected controller's affected tags in Diagnostics.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

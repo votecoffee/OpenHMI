@@ -21,7 +21,7 @@ export function engineeringCatalog(catalog, settings, template = null) {
     for (const [member, type] of Object.entries(tag.members || {})) tags.push({ name: `${tag.name}.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer', writable: tag.writable === true });
   }
   if (template) for (const [member, type] of Object.entries(template.members)) tags.push({ name: `$.${member}`, type: type === 'integer' ? 'number' : type, integer: type === 'integer', writable: true });
-  return { ...catalog, tags, commands: settings.commands || [], faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
+  return { ...catalog, tags, connections: settings.connections || [], commands: settings.commands || [], faceplates: template ? [] : settings.faceplates || [], screens: [{ id: 'overview', title: 'Overview', popup: false }, ...(settings.screens || [])] };
 }
 
 function Members({ value, change }) {

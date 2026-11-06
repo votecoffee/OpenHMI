@@ -103,6 +103,7 @@ export const uiText = {
   machineUnknownState: 'Unknown state ({value})', machineRequestedMode: 'Requested mode', machineConfirmedMode: 'PLC confirmed mode',
   machineChooseMode: 'Choose a mode', machineRequestMode: 'Request mode', machineWaitingMode: 'Waiting for PLC confirmation',
   machineReady: 'Ready', machineBlocked: 'Blocked', machineUnavailable: 'Unavailable',
+  routeUnbound: 'Choose a PLC connection',
   routeInspectTags: 'Inspect tags', routeOpenDiagnostics: 'Inspect {route} tags in Diagnostics (new tab)',
   tagSampleAge: '{age} s old', editDataUnavailable: 'Fresh data and an enabled control are required to write',
   badData: 'BAD DATA', badRange: 'BAD RANGE', on: 'ON', off: 'OFF', state: 'STATE', textShape: 'Text + shape',
