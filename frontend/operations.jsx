@@ -238,11 +238,13 @@ export function DiagnosticsConsole() {
   const permitted = canInspect(session, 'diagnostics.view');
   const [filter, setFilter] = useState('');
   const [quality, setQuality] = useState('all');
-  const [criteria, setCriteria] = useState({ search: '', quality: 'all' });
+  const [connection, setConnection] = useState('');
+  const [criteria, setCriteria] = useState({ search: '', quality: 'all', connection: '' });
   const [offset, setOffset] = useState(0);
   const [result, setResult] = useState(null);
   const current = result?.criteria === criteria && result.offset === offset ? result : null;
   const { data, message, receivedAt } = current ?? {};
+  const connections = result?.data?.connections ?? [];
   useEffect(() => {
     if (!permitted) { setResult(null); return; }
     let stopped = false, timer;
@@ -273,11 +275,17 @@ export function DiagnosticsConsole() {
     {data && !data.connections.length && <p>No PLC connections are configured.</p>}
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>
     {!!data?.workers?.length && <WorkerHealth workers={data.workers} />}
-    <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setCriteria({ search: filter, quality }); setOffset(0); }}>
+    <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setCriteria({ search: filter, quality, connection }); setOffset(0); }}>
       <label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
       <label>Sample quality<select value={quality} onChange={event => setQuality(event.target.value)}>
         <option value="all">All qualities</option><option value="non-good">Needs attention</option>
         <option value="bad">Bad</option><option value="stale">Stale</option><option value="pending">Pending</option><option value="good">Good</option>
+      </select></label>
+      <label>Tag connection<select value={connection} onChange={event => setConnection(event.target.value)}>
+        <option value="">All connections</option><option value=":local">Local HMI</option>
+        {connections.map(route => <option key={route.id} value={route.id}>{route.name} ({route.id})</option>)}
+        {connection && connection !== ':local' && !connections.some(route => route.id === connection)
+          && <option value={connection}>{connection}</option>}
       </select></label><button>Filter diagnostic tags</button>
     </form>
     <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?${new URLSearchParams(criteria)}`}>Export diagnostics JSON</a></div>

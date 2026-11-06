@@ -210,6 +210,28 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/activity').status_code, 200)
         self.assertEqual(self.client.get('/api/diagnostics').status_code, 200)
 
+    def test_diagnostics_can_isolate_one_connection_or_local_tags(self):
+        driver = self.app.state.driver
+        project = logix_project()
+        project['connections'][0]['enabled'] = False
+        project['connections'].append({**project['connections'][0], 'id': 'local'})
+        project['tags'].append({**project['tags'][1], 'name': 'OtherLevel', 'connection': 'local'})
+        driver.configure(project)
+
+        filters = {'search': 'level', 'quality': 'bad', 'connection': 'local', 'limit': 1}
+        filtered = self.client.get('/api/diagnostics', params=filters).json()
+        self.assertEqual(filtered['total_tags'], 1)
+        self.assertIsNone(filtered['next_offset'])
+        self.assertEqual([tag['name'] for tag in filtered['tags']], ['OtherLevel'])
+        self.assertEqual({route['id'] for route in filtered['connections']}, {'plc', 'local'})
+
+        exported = self.client.get('/api/diagnostics.json', params={'connection': 'plc', 'quality': 'bad'}).json()
+        self.assertTrue(exported['tags'])
+        self.assertTrue(all(tag['connection'] == 'plc' for tag in exported['tags']))
+        local_tags = self.client.get('/api/diagnostics', params={'connection': ':local', 'search': 'TankLevel'}).json()['tags']
+        self.assertEqual([(tag['name'], tag['connection']) for tag in local_tags], [('TankLevel', '')])
+        self.assertFalse(driver.connections)
+
     def test_diagnostics_held_and_disabled_are_read_only_and_omit_values(self):
         driver = self.app.state.driver
         driver.plc_hold = True

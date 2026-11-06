@@ -219,7 +219,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await quality.selectOption('good');
   await applyFilter.click();
   await expect(page.locator('.diagnostics-tags tbody tr')).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'Export diagnostics JSON', exact: true })).toHaveAttribute('href', '/api/diagnostics.json?search=TankLevel&quality=good');
+  await expect(page.getByRole('link', { name: 'Export diagnostics JSON', exact: true })).toHaveAttribute('href', '/api/diagnostics.json?search=TankLevel&quality=good&connection=');
   const jsonDownload = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Export diagnostics JSON', exact: true }).click();
   expect((await jsonDownload).suggestedFilename()).toBe('runtime-diagnostics.json');
@@ -245,6 +245,16 @@ test('protected operator journal, denial attribution, filters, export and diagno
   }
   await expect(bench).toContainText('Route failures: 1');
   await expect(bench).toContainText('6.0 s in flight');
+  const source = page.getByRole('combobox', { name: 'Tag connection', exact: true });
+  await source.selectOption('bench');
+  await applyFilter.click();
+  await expect(page.getByText(/^0 matching logical tags/)).toBeVisible();
+  await expect(bench).toContainText('6.0 s in flight');
+  await source.selectOption(':local');
+  await applyFilter.click();
+  await expect(page.locator('.diagnostics-tags tbody tr')).toContainText('TankLevel');
+  await expect(page.getByRole('link', { name: 'Export diagnostics JSON', exact: true }))
+    .toHaveAttribute('href', '/api/diagnostics.json?search=TankLevel&quality=good&connection=%3Alocal');
   expect(errors).toEqual([]);
   if ((await (await page.request.get('/api/tags')).json()).values.MotorRunning !== originalMotor) {
     expect((await page.request.post('/api/controls/toggle/activate', { data: {} })).ok()).toBe(true);
