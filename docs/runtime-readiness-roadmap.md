@@ -35,7 +35,8 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
    never replayed. Verify this behavior on the bench.
 2. **Measure before tuning.** The current schedule includes scan duration and
    the polling loop delay. Diagnostics now reports rolling p50/p95/p99 for
-   scan duration and start lateness, successful opens and loss to first good
+   scan duration, worker queue delay, route lock wait, adapter read duration,
+   start lateness, successful opens and loss to first good
    data. Use the [offline scan baseline](plc-bench-acceptance.md#run-the-offline-scan-baseline)
    to compare single-route and mixed-rate two-route scheduling with a simulated
    disconnect. On the bench, record these timings with requested rates, tag ages,

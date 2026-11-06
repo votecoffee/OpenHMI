@@ -125,6 +125,13 @@ observations from before the capture interval.
 * **Scan start lateness** measures how late the batch started relative to the
   earliest existing deadline among its due addresses. First reads with no
   prior deadline do not contribute.
+* **Scan worker queue** measures submission to the start of the worker.
+  **Route lock wait** measures how long that worker waits to acquire the route,
+  including contention with commands and writes. Both cover due scan batches.
+* **Adapter read call** measures a call to pycomm3 after route acquisition and
+  connection setup. It includes failed attempts and recipe verification reads.
+  A scheduled batch can make several calls. Direct write readbacks have their
+  own transaction path.
 * **Initial connection** and **Reconnect** report successful open and tag
   metadata setup time. **Loss to first good read** measures from the first
   detected route failure to the acquisition time of the first good sample

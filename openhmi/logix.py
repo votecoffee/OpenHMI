@@ -181,7 +181,11 @@ class LogixConnection:
                 results = []
                 for start in range(0, len(addresses), 200):
                     batch = addresses[start:start + 200]
-                    returned = self.client.read(*batch)
+                    started = time.monotonic()
+                    try:
+                        returned = self.client.read(*batch)
+                    finally:
+                        self.timings.record('adapter_read', time.monotonic() - started)
                     returned = returned if isinstance(returned, list) else [returned]
                     if len(returned) != len(batch):
                         raise ConnectionError('PLC returned an incomplete tag batch')
@@ -371,16 +375,19 @@ class RuntimeDriver(SimulatorDriver):
                 deadline = min((self.deadlines[(identifier, address)] for address in due
                                 if (identifier, address) in self.deadlines), default=None)
                 self._scans[identifier] = self._scan_pool.submit(
-                    self._scan, identifier, connection, self.project, due, deadline, None if real_clock else now
+                    self._scan, identifier, connection, self.project, due, deadline,
+                    None if real_clock else now, time.monotonic()
                 )
             scheduled = tuple(self._scans.values()) if wait else ()
         for future in scheduled:
             future.result()
 
-    def _scan(self, identifier, connection, project, due, deadline, now):
+    def _scan(self, identifier, connection, project, due, deadline, now, submitted_at):
         # Serialize reads, writes and publication for this route. Never hold the
         # runtime state lock across socket operations.
+        worker_started = time.monotonic()
         with connection.lock:
+            route_acquired = time.monotonic()
             with self.lock:
                 if self._closing or self.project is not project:
                     return
@@ -395,6 +402,8 @@ class RuntimeDriver(SimulatorDriver):
                 except Exception as error:
                     connection.failed(error, time.monotonic() if now is None else now)
                 return
+            connection.timings.record('scan_queue', worker_started - submitted_at)
+            connection.timings.record('route_lock_wait', route_acquired - worker_started)
             if deadline is not None:
                 connection.timings.record('scan_lateness', scan_start - deadline)
             try:

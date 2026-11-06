@@ -85,7 +85,8 @@ class BenchBuilderTests(unittest.TestCase):
             before = client.get('/api/diagnostics.json').json()
             connection = before['connections'][0]
             self.assertEqual(connection['timings']['scan']['count'], 2)
-            self.assertIn('p99_ms', connection['timings']['scan_lateness'])
+            for metric in ('scan_lateness', 'scan_queue', 'route_lock_wait', 'adapter_read'):
+                self.assertIn('p99_ms', connection['timings'][metric])
             self.assertEqual(connection['route_failures'], 0)
             self.assertNotIn('value', before['tags'][0])
 

@@ -107,7 +107,9 @@ test('protected operator journal, denial attribution, filters, export and diagno
     data.connections = [{
       id: 'bench', name: 'Bench PLC', path: 'offline-only/0', state: 'connected',
       read_calls: 8, tags_read: 12, groups: [], route_failures: 1,
-      timings: { recovery: { last_ms: 1375, p50_ms: 1375, p95_ms: 1375, p99_ms: 1375, count: 1 } },
+      timings: Object.fromEntries(Object.entries({
+        recovery: 1375, scan_queue: 1, route_lock_wait: 150, adapter_read: 12,
+      }).map(([key, ms]) => [key, { last_ms: ms, p50_ms: ms, p95_ms: ms, p99_ms: ms, count: 1 }])),
     }];
     await route.fulfill({ response, json: data });
   });
@@ -115,6 +117,9 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await bench.getByText('Timing (ms)', { exact: true }).click();
   await expect(bench.getByText('Loss to first good read', { exact: true })).toBeVisible();
   await expect(bench).toContainText('p95 1375');
+  for (const label of ['Scan worker queue', 'Route lock wait', 'Adapter read call']) {
+    await expect(bench.getByText(label, { exact: true })).toBeVisible();
+  }
   await expect(bench).toContainText('Route failures: 1');
   expect(errors).toEqual([]);
   if ((await (await page.request.get('/api/tags')).json()).values.MotorRunning !== originalMotor) {

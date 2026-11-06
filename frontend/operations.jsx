@@ -128,6 +128,8 @@ export function ActivityConsole() {
 
 const scanTimingLabels = [
   ['scan', 'Read cycle'], ['scan_lateness', 'Scan start lateness'],
+  ['scan_queue', 'Scan worker queue'], ['route_lock_wait', 'Route lock wait'],
+  ['adapter_read', 'Adapter read call'],
   ['cold_open', 'Initial connection'], ['reconnect_open', 'Reconnect'],
   ['recovery', 'Loss to first good read'],
 ];

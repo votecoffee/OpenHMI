@@ -128,6 +128,11 @@ class LogixHistoryTests(unittest.TestCase):
         status = driver.status(include_timing=True)[0]
         self.assertEqual(status['route_failures'], 1)
         self.assertEqual(status['timings']['scan']['count'], 3)
+        self.assertEqual(status['timings']['scan_queue']['count'], 3)
+        self.assertEqual(status['timings']['route_lock_wait']['count'], 3)
+        self.assertEqual(status['timings']['adapter_read']['count'], 3)
+        self.assertEqual(status['timings']['adapter_read']['p95_ms'], 250)
+        self.assertEqual(status['timings']['scan']['p95_ms'], 375)
         self.assertEqual(status['timings']['scan_lateness']['p95_ms'], 500)
         self.assertEqual(status['timings']['reconnect_open']['last_ms'], 125)
         self.assertEqual(status['timings']['recovery']['last_ms'], 1375)

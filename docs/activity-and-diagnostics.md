@@ -77,12 +77,15 @@ automatically attributed to an operator.
 
 Open **Diagnostics** to inspect cached connection and tag state. The page shows
 configured routes, connected/disconnected/disabled/held status, errors, effective
-scan groups and counters. Counters mean pycomm3 read calls/requested addresses,
-not measured wire packets. Scan intervals remain best effort.
+scan groups and counters. Counters include pycomm3 reads with a complete batch
+response and the addresses requested in those reads. Wire-packet counts require
+a separate measurement. Scan intervals remain best effort.
 
 Expand **Timing (ms)** for the latest measurement and p50, p95 and p99 by
 route. Each metric uses up to 256 recent observations in memory and is also
-in the JSON export. A new connection instance starts a fresh window.
+in the JSON export. A new connection instance starts a fresh window. Worker
+queue delay, route lock wait and adapter read duration have separate rows.
+See the [timing definitions](plc-bench-acceptance.md#record-read-only-results).
 
 **Runtime workers** shows the state, last successful tick, failure count and
 latest exception type for acquisition, commands, alarms, trend recording,
