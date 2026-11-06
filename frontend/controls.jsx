@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Live, useValue, tagValue, Quality, ConnectionStatus } from './live-quality.jsx';
+import { Live, useValue, tagValue, Quality, ConnectionStatus, unavailableAlarmTriggers } from './live-quality.jsx';
 import { api, json } from './api.mjs';
 import { controlTypes } from './model.mjs';
 import { useLocalization, useUi, LanguageSelector, alarmMessage } from './localization.jsx';
@@ -195,7 +195,12 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
   const headline = active[0];
   const headlineMessage = headline && `P${headline.priority} ${alarmMessage(headline, language)}`;
   const unknown = !live.alarmConnected || monitor?.error;
-  const badQuality = Object.values(monitor?.states || {}).some(state => state.quality === 'bad');
+  const unavailableCount = unavailableAlarmTriggers(live).length;
+  const triggerWarning = unavailableCount > 0 && (puck?.isEditing
+    ? <Quality text={ui('alarmUnavailableTriggersCount', { count: unavailableCount })} />
+    : <a className="hmi-quality" href="/alarms">
+      <span aria-hidden="true">×</span> {ui('alarmUnavailableTriggersCount', { count: unavailableCount })}
+    </a>);
   return <section className="hmi-screen">
     <header className="station-header">
       <div className="station-identity"><strong>OpenHMI</strong><span>{ui('localStation')}</span></div>
@@ -205,8 +210,8 @@ export function ScreenFrame({ children, canvas, title, columns, puck, screen_id 
             ? <a className="alarm-headline-link" href={`/alarms?occurrence=${headline.occurrence_id}`}
               aria-label={ui('openAlarmDetails', { message: headlineMessage })}>{headlineMessage}</a>
             : headlineMessage} · {ui('activeAlarms', { active: monitor.annunciated_active_count ?? monitor.active_count, unack: monitor.annunciated_unacknowledged_count ?? monitor.unacknowledged_count })}</strong>
-          {badQuality && <Quality text={ui('badData')} />}</> : badQuality ? <Quality text={ui('badData')} />
-          : monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms')}
+          {triggerWarning}</> : triggerWarning ||
+          (monitor?.shelved_count ? ui('noUnshelvedAlarms') : Object.keys(monitor?.states || {}).length ? ui('noActiveAlarms') : ui('noAlarms'))}
           {!!monitor?.shelved_count && <a className="shelved-summary" href="/alarms?shelving=shelved">{ui('shelvedSummary', { count: monitor.shelved_count })}</a>}
       </div><h1>{text(screen_id === 'overview' ? 'screen.title' : `screen.${screen_id}.title`, title)}</h1></div>
       <div className="station-mode"><LanguageSelector /><strong>{plcConfigured ? 'PLC' : ui('simulation')}</strong><ConnectionStatus /></div>

@@ -51,7 +51,8 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
 test('analog context, redundant alarm priority and data quality remain explicit', async ({ page }) => {
   let values = { TankLevel: 42.0, MotorRunning: true, ProcessAlarm: false };
   let alarms = { states: { process_alarm: { quality: 'good', condition: 0 } }, outstanding: [], active_count: 0, unacknowledged_count: 0 };
-  await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
+  let samples = {};
+  await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values, samples } }));
   await page.route('**/api/alarms', route => route.fulfill({ json: alarms }));
   await page.goto('/runtime');
   await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
@@ -71,8 +72,27 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   alarms = { ...alarms, states: { process_alarm: { quality: 'bad' } } };
   await expect(page.locator('[data-control="analog"]')).toContainText('BAD DATA');
   await expect(page.locator('[data-control="indicator"]')).toContainText('BAD DATA');
-  await expect(page.getByLabel('Screen alarm status')).toContainText('BAD DATA');
+  const banner = page.getByLabel('Screen alarm status');
+  const triggerWarning = banner.getByRole('link', { name: 'Unavailable alarm triggers (1)', exact: true });
+  await expect(triggerWarning).toBeVisible();
+  await expect(banner).toContainText('P2 Process alarm');
   await expect(page.locator('[data-control="alarm"]')).not.toContainText('INACTIVE');
+
+  alarms = { ...alarms, active_count: 0, unacknowledged_count: 0, outstanding: [] };
+  samples = { ProcessAlarm: { quality: 'bad', quality_reason: 'disconnected', error: 'Synthetic alarm source loss' } };
+  await expect(banner).not.toContainText('P2 Process alarm');
+  await expect(banner).not.toContainText('No active or unacknowledged alarms');
+  await triggerWarning.click();
+  const unavailable = page.getByRole('region', { name: 'Unavailable alarm triggers', exact: true });
+  await expect(unavailable).toContainText('Process alarm');
+  await expect(page.getByText('No recorded alarms in this view', { exact: true })).toBeVisible();
+  await unavailable.getByRole('button', { name: 'Inspect ProcessAlarm quality (PLC COMM LOSS)', exact: true }).click();
+  const triggerDetails = page.getByRole('dialog', { name: 'Tag quality details' });
+  await expect(triggerDetails).toContainText('Synthetic alarm source loss');
+  await page.keyboard.press('Escape');
+
+  alarms = { ...alarms, states: { process_alarm: { quality: 'good', condition: 0 } } };
+  await expect(unavailable).toHaveCount(0);
 });
 
 test('PLC route status and binding quality distinguish loss, stale data and recovery', async ({ page }) => {

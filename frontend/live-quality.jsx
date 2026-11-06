@@ -63,6 +63,11 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   </>;
 }
 
+export function unavailableAlarmTriggers(live) {
+  const states = live.alarms?.states;
+  return (live.project?.alarms || []).filter(alarm => alarm.enabled && states?.[alarm.id]?.quality === 'bad');
+}
+
 export function ConnectionStatus({ details = false }) {
   const live = useContext(Live);
   const ui = useUi();
