@@ -33,6 +33,18 @@ export function useValue(tag, type) {
   return tagValue(useContext(Live), tag, type);
 }
 
+function plcBinding(project, tag) {
+  const definition = project?.tags?.find(item => item.name === tag
+    || (tag.startsWith(item.name + '.') && Object.hasOwn(item.members || {}, tag.slice(item.name.length + 1))));
+  if (!definition?.connection) return null;
+  const connection = project.connections?.find(item => item.id === definition.connection);
+  return {
+    address: definition.address + tag.slice(definition.name.length),
+    connection: connection?.name || definition.connection,
+    route: connection?.path,
+  };
+}
+
 export function Quality({ problem, tag, text, sample: suppliedSample }) {
   const live = useContext(Live);
   const { language } = useLocalization() || { language: { code: 'en' } };
@@ -50,6 +62,7 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
     {problem === 'tagStale' && ageText && <small>{ageText}</small>}
   </>;
   if (!tag) return <span className="hmi-quality" title={title}>{badge}</span>;
+  const source = opener ? plcBinding(live.project, tag) : null;
   return <>
     <button type="button" className="hmi-quality hmi-quality-inspect" title={title}
       aria-label={ui('tagInspectQuality', { tag, label })} aria-haspopup="dialog"
@@ -57,6 +70,11 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
     {opener && <Popup title={ui('tagQualityDetails')} opener={opener} close={() => setOpener(null)}>
       <dl className="quality-details">
         <dt>{ui('tagQualityBinding')}</dt><dd>{tag}</dd>
+        {source && <>
+          <dt>{ui('tagPlcConnection')}</dt><dd>{source.connection}</dd>
+          <dt>{ui('tagPlcAddress')}</dt><dd>{source.address}</dd>
+          {source.route && <><dt>{ui('tagPlcRoute')}</dt><dd>{source.route}</dd></>}
+        </>}
         <dt>{ui('status')}</dt><dd>{label}</dd>
         {reason && <><dt>{ui('tagQualityReason')}</dt><dd>{reason}</dd></>}
         {timeText && <><dt>{ui('tagSourceTime')}</dt><dd>{timeText}</dd></>}

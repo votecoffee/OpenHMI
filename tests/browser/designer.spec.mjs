@@ -170,6 +170,7 @@ test('invalid tag replies fail closed and recover without reloading', async ({ p
   await numeric.getByRole('button', { name: 'Inspect TankLevel quality (STALE DATA)' }).click();
   const details = page.getByRole('dialog', { name: 'Tag quality details' });
   await expect(details).toContainText('STALE DATA');
+  await expect(details.getByText('PLC address', { exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
 
   for (const invalid of [null, { ...good, values: [] }, { ...good, samples: [] }, { ...good, connections: [null] }]) {
@@ -284,7 +285,7 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     await save(project);
     await page.goto('/runtime');
     const header = page.locator('.app-header .connection');
-    const numeric = page.locator('[data-control="numeric"]');
+    const numeric = page.locator('[data-control="numeric"]').filter({ hasText: 'Line level' });
     const indicator = page.locator('[data-control="indicator"]');
     const badge = numeric.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true });
     await expect(indicator).toContainText('ON');
@@ -292,6 +293,9 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     await badge.click();
     const details = page.getByRole('dialog', { name: 'Tag quality details' });
     await expect(details).toContainText('LineLevel');
+    await expect(details).toContainText('Synthetic PLC');
+    await expect(details).toContainText('LevelTypo');
+    await expect(details).toContainText('offline-only/0');
     await expect(details).toContainText('Tag does not exist');
     await page.keyboard.press('Escape');
     await expect(badge).toBeFocused();
@@ -308,6 +312,14 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     await expect(badge).toHaveCount(0);
     await expect(indicator).toContainText('ON');
     await expect(header).toContainText('PLC routes connected (1/1)');
+
+    project.tags.push({ name: 'LineMotor', connection: 'line', address: 'Motor', type: 'struct', members: { MissingSpeed: 'number' } });
+    project.controls.push({ id: 'speed', kind: 'numeric', label: 'Line speed', tag: 'LineMotor.MissingSpeed' });
+    await save(project);
+    const member = page.getByRole('button', { name: 'Inspect LineMotor.MissingSpeed quality (BAD DATA)', exact: true });
+    await member.click();
+    await expect(details.getByText('Motor.MissingSpeed', { exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
