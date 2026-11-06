@@ -58,7 +58,7 @@ def add_operations_routes(app, journal, security, driver, workers):
         can_view(security, request, 'diagnostics.view')
         with driver.lock:
             now = time.monotonic()
-            samples = driver.sample_snapshot(now)
+            samples = driver.sample_snapshot(now, include_values=False)
             sources, definitions = driver.sources, driver.definitions
             project, plc_hold = driver.project, driver.plc_hold
             live = {connection['id']: connection for connection in driver.status(include_timing=True, now=now)}
@@ -80,7 +80,7 @@ def add_operations_routes(app, journal, security, driver, workers):
             sample = samples[name]
             tags.append({'name': name, 'connection': connection,
                          'address': definition['address'] + ('.' + member if member else '') if definition and definition['connection'] else 'Local HMI',
-                         'type': definition['members'][member] if definition and member else definition['type'] if definition else type(sample.get('value')).__name__,
+                         'type': definition['members'][member] if definition and member else definition['type'] if definition else sample['value_type'],
                          'quality': sample['quality'], 'timestamp': sample.get('timestamp'), 'age_seconds': sample.get('age_seconds', 0 if sample['quality'] == 'good' else None),
                          'error': sample.get('error')})
         connections = []

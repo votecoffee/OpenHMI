@@ -608,24 +608,39 @@ class RuntimeDriver(SimulatorDriver):
                                 connection.timings.record('recovery', scan_finished - connection.outage_started)
                                 connection.outage_started = None
 
-    def sample_snapshot(self, now=None):
+    def sample_snapshot(self, now=None, *, include_values=True):
         now = time.monotonic() if now is None else now
         with self.lock:
-            result = {name: {'value': deepcopy(value), 'quality': 'good', 'timestamp': utc_now(), 'error': None} for name, value in self._tags.items()}
+            result = {}
+            for name, value in self._tags.items():
+                sample = {'quality': 'good', 'timestamp': utc_now(), 'error': None}
+                if include_values:
+                    sample['value'] = deepcopy(value)
+                elif name not in self.definitions:
+                    sample['value_type'] = type(value).__name__
+                result[name] = sample
             for name, tag in self.definitions.items():
                 if not tag['connection']:
                     for member in tag['members']:
                         try:
-                            result[f'{name}.{member}'] = {**result[name], 'value': member_value(self._tags[name], member)}
+                            value = member_value(self._tags[name], member)
+                            sample = result[name].copy()
                         except (KeyError, TypeError, IndexError):
-                            result[f'{name}.{member}'] = {'value': None, 'quality': 'bad', 'timestamp': utc_now(), 'error': 'Missing UDT member'}
+                            value = None
+                            sample = {'quality': 'bad', 'timestamp': utc_now(), 'error': 'Missing UDT member'}
+                        if include_values:
+                            sample['value'] = value
+                        result[f'{name}.{member}'] = sample
             held = {config['id'] for config in (self.project or {}).get('connections', [])
                     if self.plc_hold and config['enabled']}
             for alias, (root, _) in self.sources.items():
                 tag = self.definitions[root]
                 if not tag['connection']:
                     continue
-                sample = deepcopy(self.samples.get(alias, {'value': None, 'quality': 'pending', 'timestamp': None, 'error': 'Waiting for PLC sample'}))
+                cached = self.samples.get(alias)
+                sample = cached.copy() if cached is not None else {
+                    'value': None, 'quality': 'pending', 'timestamp': None, 'error': 'Waiting for PLC sample',
+                }
                 connection = self.connections.get(tag['connection'])
                 generation = sample.pop('failure_generation', 0)
                 if connection is None:
@@ -634,7 +649,7 @@ class RuntimeDriver(SimulatorDriver):
                     sample.update(value=None, quality='bad', quality_reason=reason, error=error)
                 elif not connection.connected and connection.error is not None:
                     sample.update(value=None, quality='bad', quality_reason='disconnected', error=connection.error)
-                elif alias in self.samples and generation != connection.failure_generation:
+                elif cached is not None and generation != connection.failure_generation:
                     sample.update(value=None, quality='bad', quality_reason='recovering',
                                   error='Waiting for a fresh PLC sample after connection loss')
                 elif (tag['connection'], tag['address']) in self._refresh_after:
@@ -642,8 +657,12 @@ class RuntimeDriver(SimulatorDriver):
                 elif sample['quality'] == 'good' and now - sample['monotonic'] > freshness_seconds(sample['rate_ms']):
                     sample.update(quality='stale', error='PLC sample is stale')
                 sample.pop('monotonic', None)
-                if alias in self.samples:
-                    sample['age_seconds'] = max(0, now - self.samples[alias]['monotonic'])
+                if cached is not None:
+                    sample['age_seconds'] = max(0, now - cached['monotonic'])
+                if include_values:
+                    sample['value'] = deepcopy(sample['value'])
+                else:
+                    sample.pop('value', None)
                 result[alias] = sample
             return result
 

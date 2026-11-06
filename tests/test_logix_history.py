@@ -344,6 +344,32 @@ class LogixHistoryTests(unittest.TestCase):
         driver.poll(7)
         self.assertFalse(driver.status(now=7)[0]['data_unavailable'])
 
+    def test_diagnostics_uses_quality_metadata_without_copying_tag_values(self):
+        app = create_app()
+        driver = app.state.driver
+        self.addCleanup(driver.close)
+        driver.factory = FakePLC
+        driver.configure(logix_project())
+        driver.lease('viewer', ['fast'])
+        driver.poll()
+        client = TestClient(app)
+        self.addCleanup(client.close)
+
+        with patch('openhmi.logix.deepcopy', side_effect=AssertionError('Diagnostics copied a tag value')):
+            diagnostics = client.get('/api/diagnostics')
+            exported = client.get('/api/diagnostics.json', params={'connection': 'plc'})
+
+        self.assertEqual(diagnostics.status_code, 200)
+        rows = {row['name']: row for row in diagnostics.json()['tags']}
+        self.assertEqual(rows['TankLevel']['type'], 'float')
+        self.assertEqual(rows['MotorA']['quality'], 'good')
+        self.assertEqual(rows['MotorA.Speed']['address'], 'Motor.Speed')
+        self.assertEqual(rows['LevelA']['quality'], 'pending')
+        self.assertTrue(all('value' not in row for row in rows.values()))
+        self.assertEqual(exported.status_code, 200)
+        self.assertEqual({row['name'] for row in exported.json()['tags']},
+                         {'MotorA', 'MotorA.Speed', 'MotorA.Running', 'LevelA'})
+
     def test_status_only_api_omits_tag_values_and_address_groups(self):
         app = create_app()
         driver = app.state.driver
