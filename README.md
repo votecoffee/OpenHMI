@@ -268,6 +268,10 @@ a **Symbol** for an arrow or annotation. Set label size, alignment and weight,
 or choose a symbol shape, size and rotation. Both support translations and
 optional Boolean visibility and color bindings. Place them over a machine image
 in freeform layout for a compact diagram.
+A **Sparkline** shows one numeric tag's recent recorded history alongside its
+live value. Set a window from 5 seconds to 1 hour. The plot scales to the
+recorded values and leaves gaps at bad-quality samples. Enable logging for the
+tag under **History** to collect samples.
 
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See

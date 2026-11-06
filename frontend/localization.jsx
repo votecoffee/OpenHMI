@@ -19,6 +19,8 @@ export const uiText = {
   trendHistoryUnavailable: 'History unavailable', trendLastHistory: 'Showing last received history ending {time}',
   trendSelectTags: 'Select trend tags.',
   trendNoSamples: 'No recorded good samples in this window. Check acquisition settings and tag quality.',
+  sparklineEmpty: 'No recent good samples', sparklineWindow: 'Last {count} s',
+  sparklinePlot: '{label}, last {count} seconds',
   trendLimited: 'Result limited. Shorten the time range.',
   trendOnChangeHint: 'On-change traces hold the last recorded value between samples.',
   trendExportHistory: 'Export history CSV', trendData: 'Trend data',

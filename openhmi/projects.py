@@ -98,6 +98,11 @@ class SymbolControl(ControlBase):
     rotation: Literal[0, 90, 180, 270] = 0
 
 
+class SparklineControl(NumericControl):
+    kind: Literal['sparkline']
+    seconds: int = Field(default=60, ge=5, le=3600)
+
+
 class TextDisplayControl(ControlBase):
     kind: Literal['text']
     tag: str = Field(min_length=1, max_length=200)
@@ -372,7 +377,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

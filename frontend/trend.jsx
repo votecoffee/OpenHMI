@@ -1,6 +1,6 @@
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useId, useMemo, useState } from 'react';
 import { api } from './api.mjs';
-import { tagValue, Quality } from './live-quality.jsx';
+import { Live, tagValue, Quality } from './live-quality.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 import './trend.css';
 import { CaptureTools, useTrendCaptures } from './trend-recording.jsx';
@@ -215,10 +215,74 @@ function formatTime(seconds, ui) {
   return ui('trendSeconds', { count: seconds });
 }
 
+function useHistory(query, follow, interval = 1000) {
+  const [response, setResponse] = useState(null);
+  useEffect(() => {
+    if (!query) return;
+    let stopped = false, timer;
+    async function refresh() {
+      let retry = follow;
+      try {
+        const data = await api(query);
+        if (!isTrendHistory(data)) throw new Error('Invalid trend history response');
+        if (!stopped) setResponse({ query, data });
+      } catch (problem) {
+        const discard = [401, 403, 404].includes(problem.status);
+        retry = true;
+        if (!stopped) setResponse(previous => ({ query, error: true,
+          data: !discard && previous?.query === query ? previous.data : null }));
+      }
+      if (!stopped && retry) timer = setTimeout(refresh, interval);
+    }
+    refresh();
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [query, follow, interval]);
+  return response?.query === query ? response : null;
+}
+
+function formatValue(value, decimals, locale) {
+  const options = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false };
+  try { return new Intl.NumberFormat(locale, options).format(value); }
+  catch { return value.toFixed(decimals); }
+}
+
+export function Sparkline({ id, label, tag = '', unit = '', decimals = 1, seconds = 60 }) {
+  const live = useContext(Live);
+  const { text, ui, language } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const source = tag.startsWith('$.') ? (live.previewRoot ? live.previewRoot + tag.slice(1) : '') : tag;
+  const query = source && Number.isInteger(seconds) && seconds >= 5 && seconds <= 3600
+    ? '/api/history?' + new URLSearchParams({ tags: source, seconds, limit: 1000, trend_context: true }) : '';
+  const response = useHistory(query, true, 5000);
+  const history = response?.data;
+  const trace = useMemo(() => {
+    if (!history) return null;
+    const rows = history.samples.filter(row => row.tag === source);
+    const context = history.change_context?.[source];
+    const samples = context ? holdChangeSamples(rows, context, history.start, history.end) : rows;
+    const range = scale({}, samples);
+    return range ? { tag: source, samples, range, digital: false, color: 'var(--hmi-live)' } : null;
+  }, [history, source]);
+  const current = tagValue(live, tag, 'number');
+  return <article className="hmi-control hmi-sparkline" data-control="sparkline">
+    <div className="sparkline-heading"><span className="hmi-label">{title}</span>
+      {current.valid ? <strong className="hmi-value">{formatValue(current.value, decimals, language.code)}
+        {' '}<small>{text(`control.${id}.unit`, unit)}</small></strong> : <Quality problem={current.problem} tag={tag} />}
+    </div>
+    {trace && <svg role="img" aria-label={ui('sparklinePlot', { label: title, count: seconds })}
+      viewBox="-6 -6 612 172" preserveAspectRatio="none" dir="ltr">
+      <Trace series={trace} start={history.start} seconds={history.end - history.start} />
+    </svg>}
+    {response?.error ? <small role="status">{ui('trendHistoryUnavailable')}{trace &&
+      <> · {ui('trendLastHistory', { time: formatLocalDateTime(new Date(history.end * 1000), language.code) })}</>}</small>
+      : !trace ? <small>{response ? ui('sparklineEmpty') : ui('trendWaiting')}</small>
+      : <small>{ui(history.truncated ? 'trendLimited' : 'sparklineWindow', { count: seconds })}</small>}
+  </article>;
+}
+
 export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings, seconds = 300, recording, puck, live, catalog }) {
   const { text, ui, language } = useLocalization();
   label = text(`control.${id}.label`, label);
-  const [response, setResponse] = useState(null);
   const [windowSeconds, setWindowSeconds] = useState(seconds);
   const [windowInput, setWindowInput] = useState(String(seconds));
   const [endTime, setEndTime] = useState(null);
@@ -237,29 +301,9 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const parameters = new URLSearchParams({ seconds: windowSeconds, ...(endTime === null ? {} : { end: endTime }) });
   if (!capture) parameters.set('tags', names);
   const query = capture ? `/api/trend-captures/${capture.id}?${parameters}` : names ? `/api/history?${parameters}&trend_context=true` : '';
-  useEffect(() => {
-    if (!query) return;
-    let stopped = false, timer;
-    async function refresh() {
-      let retry = follow;
-      try {
-        const data = await api(query);
-        if (!isTrendHistory(data)) throw new Error('Invalid trend history response');
-        if (!stopped) setResponse({ query, data });
-      } catch (problem) {
-        const discard = [401, 403, 404].includes(problem.status);
-        retry = true;
-        if (!stopped) setResponse(previous => ({ query, error: true,
-          data: !discard && previous?.query === query ? previous.data : null }));
-      }
-      if (!stopped && retry) timer = setTimeout(refresh, 1000);
-    }
-    refresh();
-    return () => { stopped = true; clearTimeout(timer); };
-  }, [query, follow]);
-
-  const history = response?.query === query ? response.data : null;
-  const error = response?.query === query && response.error;
+  const response = useHistory(query, follow);
+  const history = response?.data;
+  const error = response?.error;
   const samplesByTag = useMemo(() => {
     const result = new Map();
     for (const row of history?.samples ?? []) {
@@ -308,12 +352,6 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     if (Number.isInteger(value) && value >= 1 && value <= 604800) changeWindow(value);
     else setWindowInput(String(windowSeconds));
   }
-  function formatValue(value, decimals) {
-    const options = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false };
-    try { return new Intl.NumberFormat(language.code, options).format(value); }
-    catch { return value.toFixed(decimals); }
-  }
-
   return <article className="hmi-control hmi-trend" data-control="trend">
     <span className="hmi-label">{label}</span>
     {!puck?.isEditing && <div className="trend-tools">
@@ -347,8 +385,8 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
         return <tr key={item.binding} data-trend-value={item.tag}>
         <th scope="row"><svg width="24" height="10" aria-hidden="true"><path d="M0 5H24" stroke={item.color} strokeWidth="2" strokeDasharray={item.dash} /></svg>{item.tag}</th>
         <td>{!current.valid ? <Quality problem={current.problem} tag={item.tag} />
-          : item.digital ? ui(current.value ? 'on' : 'off') : formatValue(current.value, item.decimals)}</td>
-        <td data-trend-cursor-value="">{atCursor === undefined ? '—' : item.digital ? ui(atCursor ? 'on' : 'off') : formatValue(atCursor, item.decimals)}</td>
+          : item.digital ? ui(current.value ? 'on' : 'off') : formatValue(current.value, item.decimals, language.code)}</td>
+        <td data-trend-cursor-value="">{atCursor === undefined ? '—' : item.digital ? ui(atCursor ? 'on' : 'off') : formatValue(atCursor, item.decimals, language.code)}</td>
         <td>{item.digital ? '0 / 1'
           : item.range ? <>{ui('trendRange', { low: item.range[0], high: item.range[1] })} <small>{ui(item.fixed ? 'trendFixed' : 'trendObserved')}</small></>
             : ui(item.fixed ? 'trendInvalidRange' : 'trendWaiting')}</td>

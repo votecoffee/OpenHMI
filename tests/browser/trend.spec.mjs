@@ -12,6 +12,51 @@ async function save(page, project, apply = true) {
   }
 }
 
+test('sparkline keeps live value and recent history quality separate', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    await save(page, { ...original.active, controls: [
+      { id: 'level_spark', kind: 'sparkline', label: 'Tank history', tag: 'TankLevel', unit: '%', seconds: 30, decimals: 2 },
+    ], layout: null });
+    let unavailable = false;
+    await page.route(url => url.pathname === '/api/history' && url.searchParams.get('tags') === 'TankLevel', route => {
+      expect(route.request().url()).toContain('seconds=30');
+      expect(route.request().url()).toContain('limit=1000');
+      return route.fulfill(unavailable ? { status: 503 } : { json: {
+        start: 100, end: 130, truncated: false,
+        samples: [
+          { epoch: 100, value: 10, quality: 'good' },
+          { epoch: 105, value: 20, quality: 'good' },
+          { epoch: 110, value: null, quality: 'bad' },
+          { epoch: 120, value: 30, quality: 'good' },
+          { epoch: 125, value: 40, quality: 'good' },
+        ].map(sample => ({ ...sample, tag: 'TankLevel' })),
+      } });
+    });
+    await page.goto('/runtime');
+    const card = page.locator('[data-control="sparkline"]');
+    const plot = card.getByRole('img', { name: 'Tank history, last 30 seconds' });
+    const traces = plot.locator('polyline');
+    await expect(traces).toHaveCount(2);
+    await expect(card).toContainText('42.00 %');
+    await expect(card).toContainText('Last 30 s');
+    await expect(traces.nth(0)).toHaveAttribute('points', /^0,/);
+    await expect(traces.nth(1)).toHaveAttribute('points', /^400,/);
+
+    const live = await (await page.request.get('/api/tags')).json();
+    live.samples.TankLevel = { quality: 'stale', age_seconds: 4 };
+    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await expect(card).toContainText('STALE DATA');
+    await expect(traces).toHaveCount(2);
+    unavailable = true;
+    await expect(card.getByRole('status')).toContainText('Showing last received history ending', { timeout: 10000 });
+    await expect(traces).toHaveCount(2);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('on-change trend holds prior values and leaves a gap after a missed heartbeat', async ({ page }) => {
   const original = await (await page.request.get('/api/project')).json();
   try {
