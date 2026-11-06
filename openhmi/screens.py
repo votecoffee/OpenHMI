@@ -32,7 +32,7 @@ def expanded_controls(project, screen_id=None):
                 item = deepcopy(member)
                 item['id'] = f'{base["id"]}__{member["id"]}'
                 item['_screen'] = identifier
-                for field in ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag'):
+                for field in ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag', 'setpoint_tag', 'tolerance_tag'):
                     if item.get(field, '').startswith('$.'):
                         item[field] = control['root_tag'] + item[field][1:]
                 if item.get('tags'):
@@ -65,7 +65,7 @@ def chart_tags(control):
 
 
 def referenced_tags(control):
-    fields = ('tag', 'visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag')
+    fields = ('tag', 'visible_tag', 'enabled_tag', 'color_tag', '_parent_visible', '_parent_enabled', 'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag', 'setpoint_tag', 'tolerance_tag')
     result = {control[field] for field in fields if control.get(field)}
     result.update(control.get('tags', []))
     for field in ('checks', 'lamps'):

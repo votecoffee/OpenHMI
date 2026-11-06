@@ -84,12 +84,51 @@ function TagQuality({ id, label, tag, show_age, puck }) {
   </article>;
 }
 
+function formatNumeric(value, decimals, locale, signed = false) {
+  const options = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false };
+  try {
+    return new Intl.NumberFormat(locale, { ...options, signDisplay: signed ? 'exceptZero' : 'auto' }).format(value);
+  } catch {
+    const formatted = value.toFixed(decimals);
+    return signed && Number(formatted) > 0 ? '+' + formatted : formatted;
+  }
+}
+
+function SetpointComparison({ id, label, tag, setpoint_tag, tolerance, tolerance_tag, unit, decimals }) {
+  const process = useValue(tag, 'number');
+  const setpoint = useValue(setpoint_tag, 'number');
+  const limit = useValue(tolerance_tag, 'number');
+  const { text, ui, language } = useLocalization();
+  const units = text(`control.${id}.unit`, unit);
+  const threshold = tolerance_tag ? limit.value : tolerance;
+  const limitOK = (!tolerance_tag || limit.valid) && Number.isFinite(threshold) && threshold >= 0;
+  const deviation = process.valid && setpoint.valid ? process.value - setpoint.value : NaN;
+  const hasDeviation = Number.isFinite(deviation);
+  // Allow for floating-point subtraction at the tolerance boundary.
+  const roundoff = threshold > 0 && hasDeviation
+    ? Number.EPSILON * Math.max(Math.abs(process.value), Math.abs(setpoint.value), threshold) : 0;
+  const outside = hasDeviation && limitOK && Math.abs(deviation) - threshold > roundoff;
+  const reading = (value, signed = false) => `${formatNumeric(value, decimals, language.code, signed)} ${units}`.trim();
+  return <article className="hmi-control" data-control="setpoint_comparison">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    <dl className="setpoint-readings">
+      <dt>{ui('comparisonProcess')}</dt><dd>{process.valid ? reading(process.value) : <Quality problem={process.problem} tag={tag} />}</dd>
+      <dt>{ui('comparisonSetpoint')}</dt><dd>{!setpoint_tag ? ui('comparisonChooseSetpoint')
+        : setpoint.valid ? reading(setpoint.value) : <Quality problem={setpoint.problem} tag={setpoint_tag} />}</dd>
+      <dt>{ui('comparisonDeviation')}</dt><dd>{hasDeviation ? reading(deviation, true) : '—'}</dd>
+      <dt>{ui('comparisonTolerance')}</dt><dd>{limitOK ? reading(threshold) : tolerance_tag && !limit.valid
+        ? <Quality problem={limit.problem} tag={tolerance_tag} /> : <Quality problem="badRange" />}</dd>
+    </dl>
+    <strong className={outside ? 'range-deviation' : undefined}>
+      {ui(!hasDeviation || !limitOK ? 'comparisonUnavailable' : outside ? 'comparisonOutside' : 'comparisonWithin')}
+    </strong>
+  </article>;
+}
+
 function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, language } = useLocalization();
-  let formatted;
-  try { formatted = valid ? new Intl.NumberFormat(language.code, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }).format(value) : ''; }
-  catch { formatted = valid ? value.toFixed(decimals) : ''; }
+  const formatted = valid ? formatNumeric(value, decimals, language.code) : '';
   return <article className="hmi-control hmi-numeric" data-control="numeric">
     <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
     {valid ? <strong className="hmi-value">{formatted} <small>{text(`control.${id}.unit`, unit)}</small></strong> : <Quality problem={problem} tag={tag} />}
@@ -195,9 +234,7 @@ function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_
   const { text, ui, language } = useLocalization();
   label = text(`control.${id}.label`, label);
   unit = text(`control.${id}.unit`, unit);
-  let formatted;
-  try { formatted = valid ? new Intl.NumberFormat(language.code, { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false }).format(value) : ''; }
-  catch { formatted = valid ? value.toFixed(decimals) : ''; }
+  const formatted = valid ? formatNumeric(value, decimals, language.code) : '';
   const configured = [minimum, maximum, normal_low, normal_high].every(Number.isFinite)
     && Number.isFinite(maximum - minimum) && minimum <= normal_low && normal_low < normal_high && normal_high <= maximum;
   const position = number => Math.max(0, Math.min(100, (number - minimum) / (maximum - minimum) * 100));
@@ -455,7 +492,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -552,6 +589,13 @@ export function createConfig(catalog) {
       Sparkline: { label: 'Sparkline', fields: { ...numericFields,
         seconds: { type: 'number', label: 'History window (seconds)', min: 5, max: 3600 } },
         defaultProps: { ...numericDefaults, label: 'Recent tank level', seconds: 60 }, render: props => <Sparkline {...props} /> },
+      SetpointComparison: { label: 'Setpoint comparison', fields: {
+        ...numericFields, tag: { ...numericFields.tag, label: 'Process value tag' },
+        setpoint_tag: browserTag('Setpoint tag', 'Choose a numeric tag', tag => tag.type === 'number'),
+        tolerance: { type: 'number', label: 'Tolerance', min: 0 },
+        tolerance_tag: limitTag('Tolerance from tag'),
+      }, defaultProps: { ...numericDefaults, label: 'Setpoint comparison', setpoint_tag: '', tolerance: 1, tolerance_tag: '' },
+      render: SetpointComparison },
       ProgressBar: { label: 'Progress bar', fields: { ...numericFields, ...scaleFields },
         defaultProps: { ...numericDefaults, label: 'Progress', minimum: 0, maximum: 100 }, render: ProgressBar },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
@@ -669,7 +713,7 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config, enable
   return <article className="hmi-faceplate" data-control="faceplate"><strong>{text(`control.${id}.label`, label)}</strong><div className="faceplate-grid">{definition.controls.map(control => {
     const resolved = { ...control, id: `${id}__${control.id}`, puck, instance_enabled_tag: enabled_tag };
     for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag',
-      'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag']) {
+      'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag', 'setpoint_tag', 'tolerance_tag']) {
       if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
     }
     for (const field of ['checks', 'lamps']) {

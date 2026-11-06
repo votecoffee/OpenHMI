@@ -192,6 +192,13 @@ class ProgressControl(NumericControl):
         return self
 
 
+class SetpointComparisonControl(NumericControl):
+    kind: Literal['setpoint_comparison']
+    setpoint_tag: str = Field(default='', max_length=200)
+    tolerance: float = Field(default=1.0, ge=0, allow_inf_nan=False)
+    tolerance_tag: str = Field(default='', max_length=200)
+
+
 class AnalogControl(NumericControl):
     kind: Literal["analog"]
     minimum: float = Field(default=0.0, allow_inf_nan=False)
@@ -500,7 +507,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

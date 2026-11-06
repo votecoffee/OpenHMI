@@ -273,6 +273,11 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if control['connection'] and control['connection'] not in routes:
                     raise HTTPException(422, 'PLC connection status requires an existing connection')
                 continue
+            if control['kind'] == 'setpoint_comparison':
+                tags = [control['tag'], control['setpoint_tag'], control['tolerance_tag']]
+                if any(tag and kinds.get(tag) not in ('number', 'integer') for tag in tags):
+                    raise HTTPException(422, 'Setpoint comparisons require numeric tags')
+                continue
             if control['kind'] == 'tag_quality':
                 if control['tag'] not in kinds:
                     raise HTTPException(422, 'Tag quality requires an existing tag')

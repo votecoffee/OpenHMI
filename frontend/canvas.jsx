@@ -18,6 +18,7 @@ function size(type) {
   if (type === 'RadialGauge') return { width: 176, height: 160 };
   if (type === 'DateTimeDisplay') return { width: 208, height: 56 };
   if (type === 'PlcConnectionStatus') return { width: 192, height: 88 };
+  if (type === 'SetpointComparison') return { width: 208, height: 148 };
   if (type === 'TagQuality') return { width: 176, height: 64 };
   if (type === 'LedDisplay') return { width: 176, height: 64 };
   if (type === 'DurationDisplay') return { width: 144, height: 56 };

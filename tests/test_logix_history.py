@@ -1065,6 +1065,7 @@ class LogixHistoryTests(unittest.TestCase):
 
     def test_faceplate_display_tags_join_screen_subscription(self):
         project = logix_project()
+        project['tags'].append({'name': 'SpeedTolerance', 'type': 'number', 'initial': 1.0})
         project['faceplates'] = [{'id': 'charts', 'name': 'Equipment charts', 'udt_type': 'MotorUDT',
                                   'members': {'Speed': 'number', 'Running': 'boolean'}, 'controls': [
             {'id': 'lamps', 'kind': 'stack_light', 'label': 'State', 'lamps': [{'tag': '$.Running', 'label': 'Running'}]},
@@ -1074,6 +1075,8 @@ class LogixHistoryTests(unittest.TestCase):
              'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}, {'tag': 'TankLevel'}]},
             {'id': 'pie', 'kind': 'pie', 'label': 'Shares', 'series': [{'tag': '$.Speed'}, {'tag': 'RecipeRevision'}]},
             {'id': 'xy', 'kind': 'xy', 'label': 'XY', 'series': [{'x_tag': '$.Speed', 'y_tag': 'AlarmWord'}]},
+            {'id': 'comparison', 'kind': 'setpoint_comparison', 'label': 'Deviation', 'tag': '$.Speed',
+             'setpoint_tag': 'LevelA', 'tolerance_tag': 'SpeedTolerance'},
         ]}]
         project['screens'].append({'id': 'charts', 'title': 'Charts', 'update_ms': 200, 'controls': [
             {'id': 'chartpanel', 'kind': 'faceplate', 'label': 'Charts', 'template': 'charts', 'root_tag': 'MotorA'},
@@ -1082,20 +1085,22 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(Project.model_validate(project).model_dump())
         driver.lease('charts-station', ['charts'], 1)
-        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'MotorA.Running', 'LevelA', 'TankLevel', 'RecipeRevision', 'AlarmWord')},
-                         {'MotorA.Speed': 200, 'MotorA.Running': 200, 'LevelA': 200, 'TankLevel': 200, 'RecipeRevision': 200, 'AlarmWord': 200})
+        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'MotorA.Running', 'LevelA', 'TankLevel', 'RecipeRevision', 'AlarmWord', 'SpeedTolerance')},
+                         {'MotorA.Speed': 200, 'MotorA.Running': 200, 'LevelA': 200, 'TankLevel': 200, 'RecipeRevision': 200, 'AlarmWord': 200, 'SpeedTolerance': 200})
         driver.poll(1)
         self.assertEqual(driver.connections['plc'].client.reads, [('Motor', 'Level')])
         # Apply changes to the template and scan rate while the same viewer is active.
         project['tags'].append({**project['tags'][1], 'name': 'LevelB'})
         for control in project['faceplates'][0]['controls']:
+            if control.get('setpoint_tag') == 'LevelA':
+                control['setpoint_tag'] = 'LevelB'
             for series in control.get('series', []):
                 if series.get('tag') == 'LevelA':
                     series['tag'] = 'LevelB'
         project['screens'][-1]['update_ms'] = 350
         driver.configure(Project.model_validate(project).model_dump())
         self.assertEqual(driver.demands(2),
-                         {'MotorA.Speed': 350, 'MotorA.Running': 350, 'LevelB': 350, 'TankLevel': 350, 'RecipeRevision': 350, 'AlarmWord': 350, 'ProcessAlarm': 250})
+                         {'MotorA.Speed': 350, 'MotorA.Running': 350, 'LevelB': 350, 'TankLevel': 350, 'RecipeRevision': 350, 'AlarmWord': 350, 'SpeedTolerance': 350, 'ProcessAlarm': 250})
         driver.poll(2)
         self.assertEqual(driver.sample_snapshot(2)['LevelB']['value'], 65.0)
         self.assertNotIn('LevelB', driver.demands(16))

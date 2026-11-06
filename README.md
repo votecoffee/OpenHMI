@@ -297,6 +297,10 @@ selected controller's affected tags in Diagnostics.
 A **Bitfield display** shows the hexadecimal word and selected, named bits
 0 to 31 from an unscaled integer tag. It accepts signed DINT and unsigned
 32-bit values and marks the bits unavailable when the word cannot be read.
+A **Setpoint comparison** shows a process value, setpoint and signed deviation
+in the same units. Set a tolerance in the designer or bind it to a numeric tag.
+The control reports whether the deviation is within tolerance when the
+required readings are available.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

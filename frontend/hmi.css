@@ -73,6 +73,8 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .quality-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; }
 .quality-details dt { font-weight: bold; }
 .quality-details dd { margin: 0; overflow-wrap: anywhere; }
+.setpoint-readings { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 8px; margin: 0; width: 100%; }
+.setpoint-readings dd { margin: 0; font-weight: bold; overflow-wrap: anywhere; }
 .hmi-bitfield { display: grid; gap: 3px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .hmi-bitfield li { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 5px; overflow-wrap: anywhere; }
 .bitfield-position { color: var(--hmi-muted); }

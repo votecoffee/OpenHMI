@@ -12,12 +12,14 @@ async function save(page, project, apply = true) {
   }
 }
 
-test('compact annotations and LED display survive canvas save and live apply', async ({ page }) => {
+test('compact annotations, LED and setpoint displays survive canvas save and live apply', async ({ page }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   try {
     await save(page, { ...original.active, controls: [], screens: [], layout: null,
-      tags: [{ name: 'Highlight', type: 'boolean', initial: true }, { name: 'PanelValue', type: 'number', initial: -4.2 }] });
+      tags: [{ name: 'Highlight', type: 'boolean', initial: true }, { name: 'PanelValue', type: 'number', initial: -4.2 },
+        { name: 'ProcessSample', type: 'number', initial: 1.1 }, { name: 'CompareSetpoint', type: 'number', initial: 1 },
+        { name: 'CompareTolerance', type: 'number', initial: 0.1 }] });
     await page.goto('/');
     await page.getByRole('button', { name: 'Enable freeform layout' }).click();
     const canvas = page.getByLabel('Freeform canvas', { exact: true });
@@ -48,6 +50,13 @@ test('compact annotations and LED display survive canvas save and live apply', a
     await fields.getByRole('spinbutton', { name: 'Digit positions', exact: true }).fill('3');
     await fields.getByRole('textbox', { name: 'Units', exact: true }).fill('psi');
 
+    await type.selectOption('SetpointComparison');
+    await source.dragTo(canvas, { targetPosition: { x: 456, y: 40 } });
+    await fields.getByRole('combobox', { name: 'Process value tag', exact: true }).selectOption({ label: 'ProcessSample' });
+    await fields.getByRole('combobox', { name: 'Setpoint tag', exact: true }).selectOption({ label: 'CompareSetpoint' });
+    await fields.getByRole('combobox', { name: 'Tolerance from tag', exact: true }).selectOption({ label: 'CompareTolerance' });
+    await fields.getByRole('textbox', { name: 'Units', exact: true }).fill('bar');
+
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
@@ -63,7 +72,7 @@ test('compact annotations and LED display survive canvas save and live apply', a
     await expect(arrow.locator('path')).toHaveAttribute('transform', 'rotate(90 12 12)');
     await expect(arrow).toHaveCSS('color', 'rgb(0, 40, 120)');
     const { active } = await (await page.request.get('/api/project')).json();
-    expect(active.controls.map(control => control.kind)).toEqual(['label', 'symbol', 'led_display']);
+    expect(active.controls.map(control => control.kind)).toEqual(['label', 'symbol', 'led_display', 'setpoint_comparison']);
     expect(active.controls.slice(0, 2).every(control => !Object.hasOwn(control, 'tag'))).toBe(true);
 
     const display = page.locator('[data-control="led_display"]');
@@ -71,9 +80,25 @@ test('compact annotations and LED display survive canvas save and live apply', a
     await expect(reading.locator('g')).toHaveCount(3);
     await expect(reading.locator('g').nth(0).locator('.led-lit')).toHaveCount(1);
     await expect(reading.locator('g').nth(1).locator('.led-dot')).toHaveCount(1);
+    const comparison = page.locator('[data-control="setpoint_comparison"]');
+    await expect(comparison).toContainText('+0.1 bar');
+    await expect(comparison).toContainText('Within tolerance');
     const live = await (await page.request.get('/api/tags')).json();
     live.values.PanelValue = 99.96;
+    live.values.ProcessSample = 1.2;
     await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await expect(comparison).toContainText('Outside tolerance');
+    await expect(comparison).toContainText('+0.2 bar');
+    live.samples.CompareSetpoint = { quality: 'stale', age_seconds: 4 };
+    await expect(comparison).toContainText('Comparison unavailable');
+    await expect(comparison).toContainText('STALE DATA');
+    await expect(comparison).toContainText('1.2 bar');
+    await expect(comparison).not.toContainText('+0.2 bar');
+    live.samples.CompareSetpoint = { quality: 'good' };
+    live.samples.CompareTolerance = { quality: 'bad', error: 'Test tolerance unavailable' };
+    await expect(comparison).toContainText('BAD DATA');
+    await expect(comparison).toContainText('+0.2 bar');
+    await expect(comparison).toContainText('Comparison unavailable');
     await expect(display).toContainText('DISPLAY OVERFLOW');
     await expect(display).toContainText('99.96 psi');
     await expect(display.getByRole('img')).toHaveCount(0);

@@ -2,7 +2,7 @@ export const controlTypes = {
   numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', connection_status: 'PlcConnectionStatus', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
-  input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar',
+  input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar', setpoint_comparison: 'SetpointComparison',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', date_time_display: 'DateTimeDisplay', duration: 'DurationDisplay', web_browser: 'WebBrowser',
@@ -67,6 +67,8 @@ export function toProject(data, settings = {}) {
       const numeric = { ...base, tag: props.tag, unit: props.unit, decimals: Number(props.decimals) };
       if (type === 'LedDisplay') return { ...numeric, digits: Number(props.digits) };
       if (type === 'Sparkline') return { ...numeric, seconds: Number(props.seconds ?? 60) };
+      if (type === 'SetpointComparison') return { ...numeric, setpoint_tag: props.setpoint_tag || '',
+        tolerance: Number(props.tolerance), tolerance_tag: props.tolerance_tag || '' };
       if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
       if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
       if (['AnalogRange', 'TankLevel', 'RadialGauge'].includes(type)) {
