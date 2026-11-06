@@ -13,6 +13,7 @@ from openhmi.historian import Historian, HistoryChanged
 from openhmi.runtime_models import HistorianSettings
 from openhmi.server import create_app
 from fastapi.testclient import TestClient
+from pycomm3 import Tag
 
 
 class FakePLC:
@@ -268,6 +269,57 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(20)['MotorA.Speed']['quality'], 'stale')
         driver.close()
         self.assertTrue(plc.closed)
+
+    def test_scan_isolates_a_malformed_slot_and_rejects_misaddressed_batches(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        connection = driver.connections['plc']
+        plc = connection.client
+
+        def read_slot(*addresses):
+            self.assertEqual(addresses, ('Motor', 'Level'))
+            return [SimpleNamespace(tag='Motor', error=None), Tag('Level', 40.0, 'REAL')]
+
+        with patch.object(plc, 'read', side_effect=read_slot):
+            driver.poll(2)
+        samples = driver.sample_snapshot(2)
+        self.assertEqual(samples['MotorA.Running']['quality'], 'bad')
+        self.assertIn('malformed tag result', samples['MotorA.Running']['error'])
+        self.assertEqual(samples['LevelA']['value'], 85.0)
+        self.assertIs(connection.client, plc)
+
+        with patch.object(plc, 'read', return_value=Tag('Level', 40.0, 'REAL')):
+            self.assertEqual(connection.read(['Level{1}'], now=2)[0].value, 40.0)
+
+        swapped = [Tag('Level', 50.0, 'REAL'), Tag('Motor', plc.values['Motor'], 'MotorUDT')]
+        with patch.object(plc, 'read', return_value=swapped):
+            driver.poll(3)
+        self.assertIsNone(connection.client)
+        self.assertIn('unexpected tag address', connection.error)
+        self.assertEqual(driver.sample_snapshot(3)['LevelA']['quality_reason'], 'disconnected')
+        driver.poll(4)
+        self.assertEqual(driver.sample_snapshot(4)['LevelA']['value'], 65.0)
+
+    def test_write_verification_checks_result_address_and_boolean_type(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.poll(1)
+        connection = driver.connections['plc']
+        plc = connection.client
+        with patch.object(plc, 'read', return_value=Tag('Motor.Running', 1, 'DINT')):
+            with self.assertRaisesRegex(ValueError, 'readback did not match'):
+                driver.write('MotorA.Running', [True])
+        self.assertIs(connection.client, plc)
+
+        with patch.object(plc, 'read', return_value=Tag('OtherLevel', 30.0, 'REAL')):
+            with self.assertRaisesRegex(ConnectionError, 'unexpected tag address'):
+                driver.write('LevelA', [65.0])
+        self.assertIsNone(connection.client)
+        self.assertEqual(plc.writes, [('Motor.Running', True), ('Level', 30.0)])
 
     def test_write_readback_and_disconnect_are_not_replayed(self):
         driver = RuntimeDriver(FakePLC)

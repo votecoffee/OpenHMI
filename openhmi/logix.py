@@ -60,6 +60,13 @@ def overlapping_addresses(first, second):
             or second.startswith((first + '.', first + '[')))
 
 
+def verify_result_address(address, result):
+    returned_address = getattr(result, 'tag', address)
+    # pycomm3 may omit the element count from the returned tag name.
+    if returned_address != address and returned_address != re.sub(r'\{\d+\}$', '', address):
+        raise ConnectionError('PLC returned a result for an unexpected tag address')
+
+
 class TagWriteError(ValueError):
     """A PLC tag response could not confirm the requested write."""
 
@@ -257,7 +264,10 @@ class LogixConnection:
                     returned = returned if isinstance(returned, list) else [returned]
                     if len(returned) != len(batch):
                         raise ConnectionError('PLC returned an incomplete tag batch')
-                    results.extend(returned)
+                    for address, result in zip(batch, returned):
+                        verify_result_address(address, result)
+                        # A malformed slot still leaves the other batch positions intact.
+                        results.append(result if hasattr(result, 'error') and hasattr(result, 'value') else None)
                     self.read_calls += 1
                     self.tags_read += len(batch)
                 self.error, self.failures = None, 0
@@ -272,10 +282,17 @@ class LogixConnection:
                 raise ConnectionError('PLC is disconnected')
             try:
                 result = self.client.write((address, value))
+                verify_result_address(address, result)
                 if result.error:
                     raise TagWriteError(f'PLC rejected write: {result.error}')
                 actual = self.client.read(address)
-                matches = math.isclose(actual.value, value, rel_tol=1e-6, abs_tol=1e-7) if type(actual.value) is float and type(value) in (int, float) else actual.value == value
+                verify_result_address(address, actual)
+                if type(value) is bool or type(actual.value) is bool:
+                    matches = actual.value is value
+                elif type(actual.value) is float and type(value) in (int, float):
+                    matches = math.isclose(actual.value, value, rel_tol=1e-6, abs_tol=1e-7)
+                else:
+                    matches = actual.value == value
                 if actual.error or not matches:
                     raise TagWriteError('PLC write readback did not match; command was not retried')
                 return actual.value
@@ -496,7 +513,7 @@ class RuntimeDriver(SimulatorDriver):
                     for alias, tag, member in self.address_aliases[key]:
                         try:
                             if result is None or result.error:
-                                raise ValueError(result.error if result is not None else 'PLC read failed')
+                                raise ValueError(result.error if result is not None else 'PLC adapter returned a malformed tag result')
                             value = member_value(result.value, member) if member else result.value
                             kind = tag['members'][member] if member else tag['type']
                             if not type_ok(value, kind):
@@ -611,7 +628,7 @@ class RuntimeDriver(SimulatorDriver):
             if not connection:
                 raise ConnectionError('PLC connection is disabled')
             result = connection.read([tag['address']])[0]
-            if result.error or not isinstance(result.value, dict):
+            if result is None or result.error or not isinstance(result.value, dict):
                 raise ValueError('Recipe verification root read failed')
             return result.value
 

@@ -11,7 +11,10 @@ socket timeout and program-tag discovery setting. Logical HMI tags map names to
 PLC addresses and types. Numeric tags may have scale/offset; writes reverse that
 mapping. Tags start read-only unless writing is deliberately enabled. PLC external
 access must also permit writes. A write is issued once, followed by readback;
-connection recovery never replays it. FLOAT readback uses a small numeric tolerance.
+connection recovery never replays it. Floating-point readback uses a small
+numeric tolerance. Boolean readback must return a Boolean. If the adapter
+identifies a result as belonging to a different address, the route reconnects
+and the write remains unconfirmed.
 This confirms a tag value, not a PLC application's command-complete acknowledgement.
 The adapter supports Boolean, integer, floating-point, string and declared UDT
 members. Add indexed scalar addresses for arrays; array root editors are not

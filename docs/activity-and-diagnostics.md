@@ -97,7 +97,9 @@ failures. Successful ticks reset that delay. PLC route and feature-specific
 status still describe their underlying data and transaction state.
 
 Tag rows show logical source/type, quality, observation timestamp, age and error.
-A tag-level read error records the failed observation time. Route failure
+A tag-level read error or malformed result in a known batch position marks
+that tag bad and records the failed observation time. A wrong result address
+or incomplete batch triggers route recovery. Route failure
 invalidates the cached samples and preserves their previous timestamps and ages.
 Bad/stale values are unavailable to controls and permits.
 Filtering/pagination bounds the display; JSON export includes at most 5,000 matching
