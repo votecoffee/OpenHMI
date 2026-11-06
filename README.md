@@ -274,6 +274,8 @@ waiting for the first usable sample of a requested PLC tag or UDT member.
 They also flag an established route whose requested samples are all unusable,
 even while its transport stays connected. Open a control's quality badge to see
 its logical tag, configured PLC address and route, and the reported fault.
+With diagnostics viewing permission, the badge can open a filtered Diagnostics
+tab while the original screen continues scanning.
 Per-route timing separates worker queue delay, route lock wait, adapter reads,
 scan start lateness and recovery.
 Filter diagnostic tags by name, sample quality, and PLC connection or local HMI

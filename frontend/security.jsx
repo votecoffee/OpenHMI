@@ -30,6 +30,10 @@ export function allowed(session, permission, groups = []) {
   return !!user?.permissions.includes(permission) && (!groups.length || user.permissions.includes('security.manage') || groups.some(group => user.groups.includes(group)));
 }
 
+export function canInspect(session, permission) {
+  return allowed(session, permission) || !!session?.user?.permissions.includes('security.manage');
+}
+
 export function SecurityBar({ session, refresh, plcConfigured }) {
   const ui = useUi();
   const [loginOpen, setLoginOpen] = useState(false), [keyboard, setKeyboard] = useState('');

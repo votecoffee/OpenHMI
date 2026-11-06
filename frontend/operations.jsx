@@ -1,11 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
 import { commandStates, isCommandPage, isCommandRecord } from './command-status.mjs';
-import { SecurityContext, allowed } from './security.jsx';
-
-function canInspect(session, permission) {
-  return allowed(session, permission) || !!session?.user?.permissions.includes('security.manage');
-}
+import { SecurityContext, allowed, canInspect } from './security.jsx';
 
 export function CommandConsole() {
   const { session } = useContext(SecurityContext);
@@ -236,10 +232,18 @@ function isDiagnosticsSnapshot(data, offset) {
 export function DiagnosticsConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'diagnostics.view');
-  const [filter, setFilter] = useState('');
-  const [quality, setQuality] = useState('all');
-  const [connection, setConnection] = useState('');
-  const [criteria, setCriteria] = useState({ search: '', quality: 'all', connection: '' });
+  const [criteria, setCriteria] = useState(() => {
+    const query = new URLSearchParams(location.search);
+    const connection = query.get('connection') || '';
+    return {
+      search: (query.get('search') || '').slice(0, 100),
+      quality: 'all',
+      connection: /^(?:[A-Za-z][A-Za-z0-9_-]{0,59}|:local)$/.test(connection) ? connection : '',
+    };
+  });
+  const [filter, setFilter] = useState(criteria.search);
+  const [quality, setQuality] = useState(criteria.quality);
+  const [connection, setConnection] = useState(criteria.connection);
   const [offset, setOffset] = useState(0);
   const [result, setResult] = useState(null);
   const current = result?.criteria === criteria && result.offset === offset ? result : null;
@@ -276,7 +280,7 @@ export function DiagnosticsConsole() {
     <p>Scan intervals are best effort. Counters are pycomm3 read calls/requested addresses, not wire-packet measurements.</p>
     {!!data?.workers?.length && <WorkerHealth workers={data.workers} />}
     <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setCriteria({ search: filter, quality, connection }); setOffset(0); }}>
-      <label>Tag filter<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
+      <label>Tag filter<input maxLength={100} value={filter} onChange={event => setFilter(event.target.value)} /></label>
       <label>Sample quality<select value={quality} onChange={event => setQuality(event.target.value)}>
         <option value="all">All qualities</option><option value="non-good">Needs attention</option>
         <option value="bad">Bad</option><option value="stale">Stale</option><option value="pending">Pending</option><option value="good">Good</option>

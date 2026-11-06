@@ -297,14 +297,26 @@ test('one missing PLC tag is marked on its control while the same route keeps up
     await expect(details).toContainText('LevelTypo');
     await expect(details).toContainText('offline-only/0');
     await expect(details).toContainText('Tag does not exist');
-    await page.keyboard.press('Escape');
-    await expect(badge).toBeFocused();
-
     const snapshot = async () => (await (await page.request.get('/api/tags')).json()).samples;
     const first = await snapshot();
     expect(first.LineLevel).toMatchObject({ quality: 'bad', value: null });
     expect(first.LineRunning).toMatchObject({ quality: 'good', value: true });
-    await expect.poll(async () => (await snapshot()).LineRunning.timestamp > first.LineRunning.timestamp).toBe(true);
+    const diagnosticsPage = page.context().waitForEvent('page');
+    await details.getByRole('link', { name: 'Open tag in Diagnostics (new tab)', exact: true }).click();
+    const diagnostics = await diagnosticsPage;
+    try {
+      await expect(diagnostics.getByRole('textbox', { name: 'Tag filter', exact: true })).toHaveValue('LineLevel');
+      await expect(diagnostics.getByRole('combobox', { name: 'Tag connection', exact: true })).toHaveValue('line');
+      const rows = diagnostics.locator('.diagnostics-tags tbody tr');
+      await expect(rows).toHaveCount(1);
+      await expect(rows).toContainText('LevelTypo');
+      await expect(rows).toContainText('Tag does not exist');
+      await expect.poll(async () => (await snapshot()).LineRunning.timestamp > first.LineRunning.timestamp).toBe(true);
+    } finally {
+      await diagnostics.close();
+    }
+    await page.keyboard.press('Escape');
+    await expect(badge).toBeFocused();
 
     project.tags[0].address = 'Level';
     await save(project);

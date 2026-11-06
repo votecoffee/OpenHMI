@@ -25,7 +25,7 @@ import { IdentitySettings } from './identity-settings.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
 import { AlarmConsole } from './alarm-console.jsx';
 import { RecipeWorkspace } from './recipes.jsx';
-import { SecurityContext, SecurityBar, SecurityAdmin, allowed } from './security.jsx';
+import { SecurityContext, SecurityBar, SecurityAdmin, allowed, canInspect } from './security.jsx';
 import { Popup } from './touch-entry.jsx';
 
 const editorOverrides = { headerActions: () => null };
@@ -496,7 +496,7 @@ function App({ initial, catalog }) {
     return () => { stopTags(); stopAlarms(); stopRecipe(); stopIdentity(); stopProject(); };
   }, [runtime]);
   const plcConfigured = active.project.connections?.some(connection => connection.enabled);
-  const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision }}>
+  const station = <SecurityContext.Provider value={{ session, refreshSession }}><Live.Provider value={{ ...live, project: active.project, activeRevision: active.revision, diagnosticsPermitted: canInspect(session, 'diagnostics.view') }}>
     <header className="app-header"><a className="brand" href="/">OpenHMI</a><span>Build it visually. Extend it with Python.</span>
       <ConnectionStatus details /></header>
     <SecurityBar session={session} refresh={refreshSession} plcConfigured={plcConfigured} />

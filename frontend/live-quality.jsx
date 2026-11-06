@@ -39,6 +39,7 @@ function plcBinding(project, tag) {
   if (!definition?.connection) return null;
   const connection = project.connections?.find(item => item.id === definition.connection);
   return {
+    id: definition.connection,
     address: definition.address + tag.slice(definition.name.length),
     connection: connection?.name || definition.connection,
     route: connection?.path,
@@ -63,6 +64,8 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   </>;
   if (!tag) return <span className="hmi-quality" title={title}>{badge}</span>;
   const source = opener ? plcBinding(live.project, tag) : null;
+  const diagnosticQuery = source && live.diagnosticsPermitted
+    ? new URLSearchParams({ search: tag.slice(0, 100), connection: source.id }) : null;
   return <>
     <button type="button" className="hmi-quality hmi-quality-inspect" title={title}
       aria-label={ui('tagInspectQuality', { tag, label })} aria-haspopup="dialog"
@@ -80,6 +83,7 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
         {timeText && <><dt>{ui('tagSourceTime')}</dt><dd>{timeText}</dd></>}
         {ageText && <><dt>{ui('tagAge')}</dt><dd>{ageText}</dd></>}
       </dl>
+      {diagnosticQuery && <a href={`/diagnostics?${diagnosticQuery}`} target="_blank" rel="noopener">{ui('tagOpenDiagnostics')}</a>}
     </Popup>}
   </>;
 }
