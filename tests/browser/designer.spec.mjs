@@ -405,6 +405,19 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await expect(header.getByText('Line PLC · Disconnected / retrying', { exact: true })).toBeVisible();
   await expect(header.getByText('Utility PLC · Connected', { exact: true })).toBeVisible();
   await expect(header.getByText('Spare PLC · Disabled', { exact: true })).toBeVisible();
+  await expect(header.getByRole('link', { name: /Inspect (Utility|Spare) PLC tags/ })).toHaveCount(0);
+  const routeLink = header.getByRole('link', { name: 'Inspect Line PLC tags in Diagnostics (new tab)', exact: true });
+  const diagnosticsPage = page.context().waitForEvent('page');
+  await routeLink.click();
+  const diagnostics = await diagnosticsPage;
+  try {
+    await expect(diagnostics.getByRole('combobox', { name: 'Tag connection', exact: true })).toHaveValue('line');
+    await expect(diagnostics.getByRole('combobox', { name: 'Sample quality', exact: true })).toHaveValue('non-good');
+    await expect(diagnostics.getByRole('link', { name: 'Export diagnostics JSON', exact: true }))
+      .toHaveAttribute('href', '/api/diagnostics.json?search=&quality=non-good&connection=line');
+  } finally {
+    await diagnostics.close();
+  }
   live = { ...live, connections: [{ id: 'line', connected: true, scan_overdue: true }, online[1]] };
   await expect(header.getByText('Line PLC · Scan overdue', { exact: true })).toBeVisible();
   await expect(station).toContainText('PLC scan overdue');

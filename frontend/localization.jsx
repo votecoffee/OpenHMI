@@ -87,6 +87,7 @@ export const uiText = {
   tagQualityBinding: 'Tag', tagQualityReason: 'Reason', tagSourceTime: 'Source time', tagAge: 'Sample age',
   tagPlcConnection: 'PLC connection', tagPlcAddress: 'PLC address', tagPlcRoute: 'PLC route',
   tagOpenDiagnostics: 'Open tag in Diagnostics (new tab)',
+  routeInspectTags: 'Inspect tags', routeOpenDiagnostics: 'Inspect {route} tags in Diagnostics (new tab)',
   tagSampleAge: '{age} s old', editDataUnavailable: 'Fresh data and an enabled control are required to write',
   badData: 'BAD DATA', badRange: 'BAD RANGE', on: 'ON', off: 'OFF', state: 'STATE', textShape: 'Text + shape',
   inactive: 'INACTIVE', active: 'ACTIVE', normal: 'Normal', outOfScale: 'OUT OF SCALE', outsideBand: 'OUTSIDE NORMAL BAND',

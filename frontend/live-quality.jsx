@@ -109,6 +109,10 @@ export function unavailableAlarmTriggers(live) {
   return (live.project?.alarms || []).filter(alarm => alarm.enabled && states?.[alarm.id]?.quality === 'bad');
 }
 
+const routeNeedsAttention = new Set([
+  'routeScanOverdue', 'routeRecovering', 'routeAwaitingData', 'routeDataUnavailable', 'routeRetrying',
+]);
+
 export function ConnectionStatus({ details = false }) {
   const live = useContext(Live);
   const ui = useUi();
@@ -146,7 +150,14 @@ export function ConnectionStatus({ details = false }) {
     <summary><span role="status">{label}</span></summary>
     <div className="route-status-list">
       <strong>{ui(live.connected ? 'runtimeOnline' : 'runtimeOffline')}</strong>
-      <ul>{routes.map(route => <li key={route.id}>{route.name} · {ui(route.state)}</li>)}</ul>
+      <ul>{routes.map(route => <li key={route.id}>
+        <span>{route.name} · {ui(route.state)}</span>
+        {live.diagnosticsPermitted && routeNeedsAttention.has(route.state) && <a
+          href={`/diagnostics?${new URLSearchParams({ connection: route.id, quality: 'non-good' })}`}
+          target="_blank" rel="noopener" aria-label={ui('routeOpenDiagnostics', { route: route.name })}>
+          {ui('routeInspectTags')}
+        </a>}
+      </li>)}</ul>
     </div>
   </details>;
 }

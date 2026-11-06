@@ -229,15 +229,20 @@ function isDiagnosticsSnapshot(data, offset) {
         .every(field => Number.isFinite(timing[field]))));
 }
 
+const diagnosticQualities = {
+  all: 'All qualities', 'non-good': 'Needs attention', bad: 'Bad', stale: 'Stale', pending: 'Pending', good: 'Good',
+};
+
 export function DiagnosticsConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'diagnostics.view');
   const [criteria, setCriteria] = useState(() => {
     const query = new URLSearchParams(location.search);
     const connection = query.get('connection') || '';
+    const quality = query.get('quality');
     return {
       search: (query.get('search') || '').slice(0, 100),
-      quality: 'all',
+      quality: Object.hasOwn(diagnosticQualities, quality) ? quality : 'all',
       connection: /^(?:[A-Za-z][A-Za-z0-9_-]{0,59}|:local)$/.test(connection) ? connection : '',
     };
   });
@@ -282,8 +287,7 @@ export function DiagnosticsConsole() {
     <h2>Tag quality</h2><form onSubmit={event => { event.preventDefault(); setCriteria({ search: filter, quality, connection }); setOffset(0); }}>
       <label>Tag filter<input maxLength={100} value={filter} onChange={event => setFilter(event.target.value)} /></label>
       <label>Sample quality<select value={quality} onChange={event => setQuality(event.target.value)}>
-        <option value="all">All qualities</option><option value="non-good">Needs attention</option>
-        <option value="bad">Bad</option><option value="stale">Stale</option><option value="pending">Pending</option><option value="good">Good</option>
+        {Object.entries(diagnosticQualities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></label>
       <label>Tag connection<select value={connection} onChange={event => setConnection(event.target.value)}>
         <option value="">All connections</option><option value=":local">Local HMI</option>
