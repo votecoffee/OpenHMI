@@ -84,7 +84,7 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   function withRoutes(project) {
     project.connections = configs;
     const button = project.controls.find(control => control.id === 'toggle');
-    Object.assign(button, { mode: 'toggle', target: 'MotorRunning' });
+    Object.assign(button, { mode: 'toggle', target: 'MotorRunning', enabled_tag: 'ActionEnable' });
   }
   await page.route('**/api/project', async route => {
     const response = await route.fetch(), data = await response.json();
@@ -99,7 +99,7 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
 
   const good = { quality: 'good' };
   const old = { timestamp: '2026-01-01T12:00:00Z', age_seconds: 3.25 };
-  const values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false };
+  const values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false, ActionEnable: true };
   const online = [{ id: 'line', connected: true }, { id: 'utility', connected: true }];
   let reachable = true;
   let live = { values, connections: online, samples: { TankLevel: good, MotorRunning: good } };
@@ -111,6 +111,22 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   const indicator = page.locator('[data-control="indicator"]');
   const button = page.getByRole('button', { name: 'Toggle simulated motor', exact: true });
   await expect(header).toContainText('PLC routes connected (2/2)');
+  await expect(button).toBeEnabled();
+
+  live = { ...live, values: { ...values, ActionEnable: false } };
+  await expect(page.getByText('Enable tag ActionEnable is off', { exact: true })).toBeVisible();
+  await expect(button).toBeDisabled();
+  live = { ...live, values, samples: { ...live.samples, ActionEnable: {
+    quality: 'bad', quality_reason: 'disconnected', error: 'Synthetic enable route loss',
+  } } };
+  const enableQuality = page.getByRole('button', { name: 'Inspect ActionEnable quality (Enable tag · PLC COMM LOSS)', exact: true });
+  await expect(button).toBeDisabled();
+  await enableQuality.press('Enter');
+  const enableDetails = page.getByRole('dialog', { name: 'Tag quality details' });
+  await expect(enableDetails).toContainText('Synthetic enable route loss');
+  await page.keyboard.press('Escape');
+  await expect(enableQuality).toBeFocused();
+  live = { ...live, samples: { TankLevel: good, MotorRunning: good } };
   await expect(button).toBeEnabled();
 
   live = { ...live, connections: [{ id: 'line', connected: false, error: 'Timeout' }, online[1]],

@@ -117,9 +117,16 @@ function ActionButton({ id, label, action, mode = 'python', command = '', target
   const permitTag = definition?.permit_member ? definition.root_tag + '.' + definition.permit_member : '';
   const enabled = enabled_tag ? tagValue(live, enabled_tag, 'boolean') : null;
   const permit = permitTag ? tagValue(live, permitTag, 'boolean') : null;
-  const targetState = targetTag ? tagValue(live, targetTag) : null;
-  const unavailable = !live.connected ? 'commLoss' : enabled?.problem || targetState?.problem || permit?.problem;
-  const unavailableTag = enabled?.problem ? enabled_tag : targetState?.problem ? targetTag : permitTag;
+  const targetState = targetTag ? tagValue(live, targetTag, mode === 'toggle' ? 'boolean' : undefined) : null;
+  const unavailableBinding = [
+    { state: enabled, tag: enabled_tag, label: 'editEnableBinding' },
+    { state: permit, tag: permitTag, label: 'actionPermitBinding' },
+    { state: targetState, tag: targetTag, label: mode === 'command' ? 'actionCommandBinding' : 'actionTargetBinding' },
+  ].find(binding => binding.state?.problem);
+  const unavailable = !live.connected ? 'commLoss' : unavailableBinding?.state.problem;
+  const unavailableLabel = unavailableBinding ? ui('editBindingProblem', {
+    binding: ui(unavailableBinding.label), quality: ui(unavailable),
+  }) : undefined;
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [failed, setFailed] = useState(false);
@@ -154,12 +161,14 @@ function ActionButton({ id, label, action, mode = 'python', command = '', target
     finally { setBusy(false); }
   }
   return <article className="hmi-control hmi-command security-protected" data-control="button">
-    <button className="hmi-action" disabled={puck?.isEditing || !!unavailable || busy || !permitted || !!enabled && enabled.value !== true || !!permit && permit.value !== true || mode === 'command' && !!transaction && ['prepared', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
+    <button className="hmi-action" disabled={puck?.isEditing || !!unavailable || busy || !permitted || !!enabled && enabled.value !== true || !!permit && permit.value !== true || mode === 'command' && !!transaction && ['prepared', 'staging', 'requested', 'accepted', 'uncertain'].includes(transaction.state)} onClick={invoke}>
       {busy ? ui('working') : text(`control.${id}.label`, label)}
     </button><span className={failed ? 'hmi-quality' : 'command-feedback'}>
       {busy ? ui('pending') : puck?.isEditing ? ui('configureAction') : feedback || (!permitted ? 'Sign in with an authorized HMI group' : '')}
     </span>
-    {unavailable && !puck?.isEditing && <Quality problem={unavailable} tag={unavailableTag} />}
+    {unavailable && !puck?.isEditing && <Quality problem={unavailable} tag={unavailableBinding?.tag} text={unavailableLabel} />}
+    {!puck?.isEditing && enabled?.valid && enabled.value === false && <small>{ui('editEnableOff', { tag: enabled_tag })}</small>}
+    {!puck?.isEditing && permit?.valid && permit.value === false && <small>{ui('actionPermitOff', { tag: permitTag })}</small>}
     {!permitted && !puck?.isEditing && <SecurityLock label={label} permission="runtime.operate" groups={security_groups} additionalGroups={definition?.security_groups || []} />}
     {mode === 'command' && permitted && !puck?.isEditing && transaction && <>
       <span className="command-feedback" role="status">PLC command: {transaction.state} · sequence {transaction.sequence}{transaction.result_code !== null ? ` · result ${transaction.result_code}` : ''}{transaction.unavailable ? ' · status unavailable; verify before retrying' : ''}</span>
@@ -326,7 +335,7 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === ActionButton;
     component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
       {renderer(props)}
     </Conditional>;

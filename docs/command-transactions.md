@@ -80,7 +80,9 @@ the same member contract; never implicitly enable or target a live machine.
 ## Persistence, errors and recovery
 
 The server checks control conditions, HMI permission/groups, the optional PLC
-permit and source quality. It reserves the channel in SQL, links the reservation
+permit and source quality. The action button shows when its enable or PLC permit
+tag is off. An unavailable binding has an inspectable quality badge. The server
+reserves the channel in SQL, links the reservation
 to the authenticated operator journal's operation ID, and commits dispatch
 markers before touching the driver. SQL/journal failure before those markers
 prevents dispatch. A readback/connection failure after dispatch is **uncertain**;

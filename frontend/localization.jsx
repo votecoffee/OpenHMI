@@ -36,6 +36,8 @@ export const uiText = {
   editLimitsInvalid: 'Edit limits are invalid', editMinimum: 'Minimum', editMaximum: 'Maximum',
   editMinLength: 'Minimum length', editMaxLength: 'Maximum length', editEnableBinding: 'Enable tag',
   editBindingProblem: '{binding} · {quality}', editEnableOff: 'Enable tag {tag} is off',
+  actionPermitBinding: 'PLC permit', actionPermitOff: 'PLC permit {tag} is off',
+  actionCommandBinding: 'Command channel', actionTargetBinding: 'Target tag',
   editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',
   editRevisionChanged: 'The applied project changed. Reopen the keypad or clear and re-enter the value.',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',

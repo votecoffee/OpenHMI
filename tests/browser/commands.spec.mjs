@@ -40,8 +40,26 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await page.getByRole('combobox', { name: 'PLC command contract', exact: true }).selectOption({ label: 'Demo cycle' });
   await page.getByRole('button', { name: 'Apply live', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+  let permitStale = false;
+  await page.route('**/api/tags', async route => {
+    const response = await route.fetch();
+    const state = await response.json();
+    state.values['CycleCommand.Permit'] = false;
+    if (permitStale) state.samples['CycleCommand.Permit'] = { quality: 'stale', error: 'Synthetic stale permit' };
+    await route.fulfill({ response, json: state });
+  });
   await page.goto('/runtime');
   const request = page.getByRole('button', { name: 'Request demo cycle', exact: true });
+  await expect(page.getByText('PLC permit CycleCommand.Permit is off', { exact: true })).toBeVisible();
+  await expect(request).toBeDisabled();
+  permitStale = true;
+  await page.getByRole('button', { name: 'Inspect CycleCommand.Permit quality (PLC permit · STALE DATA)', exact: true }).click();
+  const permitDetails = page.getByRole('dialog', { name: 'Tag quality details' });
+  await expect(permitDetails).toContainText('Synthetic stale permit');
+  await permitDetails.getByRole('button', { name: 'Close Tag quality details' }).click();
+  await expect(request).toBeDisabled();
+  await page.unroute('**/api/tags');
+  await expect(request).toBeEnabled();
   await request.click();
   const command = page.locator('[data-control="button"]').filter({ has: request });
   await expect(command).toContainText('PLC command: requested');
