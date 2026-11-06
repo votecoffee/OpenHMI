@@ -70,8 +70,8 @@ and [bench acceptance #3](https://github.com/votecoffee/OpenHMI/issues/3).
 browser-to-runtime reachability from individual PLC routes. The header names
 affected routes during partial outages. Bound displays, charts, current trend
 readouts and edit controls distinguish waiting, held, disabled, disconnected,
-recovering, stale and bad data. Inspect a quality badge for the source time,
-age and reason when available. Stale values remain unavailable for display and
+recovering, stale and bad data. Tap a bound quality badge or focus it and press
+Enter to inspect the source time, age and reason when available. Stale values remain unavailable for display and
 permit decisions. Preserve gaps and quality in history and trends. Loss of a
 sample must never appear as an alarm returning to normal. Verify partial outages
 and fresh recovery on the target display in dense screens and popups.
@@ -119,11 +119,10 @@ Inject timeouts, repeated disconnects, controller reboot, malformed results,
 unavailable storage, handler failures and process restarts in an isolated
 test profile. Verify the runtime stays available through recoverable faults,
 healthy routes and unrelated features continue, and operator quality reflects
-the fault. A proposed starting gate is a 24-hour offline load and fault soak
-with zero unexpected exits and zero command replay or duplication. Agree
-resource, latency and recovery bounds for the test profile before running it.
-The [offline reliability drills](runtime-soak.md) cover repeated synthetic
-PLC faults, read-only storage and a forced runtime process exit after command
+the fault. Use focused fault and restart checks during current development.
+Endurance testing is deferred until the runtime is more mature.
+The [offline restart drill](runtime-soak.md#forced-process-restart-drill)
+covers a forced runtime process exit after command
 dispatch with the HTTP response held. The restart drill verifies applied
 project, audit and command persistence against an independent write receipt.
 Confirm the relevant cases on the designated Windows station with the

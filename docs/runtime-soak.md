@@ -1,5 +1,8 @@
 # Offline runtime fault rehearsal
 
+Soak testing is deferred until a later maturity checkpoint. The forced process
+restart drill below remains available as a focused recovery check.
+
 Run from a source checkout with the test dependencies installed
 (openhmi[test]). Choose a new evidence folder. The runner creates its own
 project and two synthetic PLC routes. It uses in-process ASGI requests,

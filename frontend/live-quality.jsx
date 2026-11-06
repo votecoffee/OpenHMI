@@ -1,5 +1,6 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { formatLocalDateTime, useLocalization, useUi } from './localization.jsx';
+import { Popup } from './touch-entry.jsx';
 
 export const Live = createContext({ values: {}, connected: false });
 
@@ -31,15 +32,31 @@ export function Quality({ problem, tag, text }) {
   const { language } = useLocalization() || { language: { code: 'en' } };
   const ui = useUi();
   const sample = live.samples?.[tag];
+  const [opener, setOpener] = useState(null);
   const age = sample?.age_seconds;
   const sourceTime = sample?.timestamp && new Date(sample.timestamp);
   const ageText = Number.isFinite(age) ? ui('tagSampleAge', { age: age.toFixed(1) }) : '';
+  const timeText = sourceTime && Number.isFinite(sourceTime.getTime()) ? formatLocalDateTime(sourceTime, language.code) : '';
   const label = text ?? ui(problem);
-  const title = [label, sample?.error, ageText, sourceTime && formatLocalDateTime(sourceTime, language.code)]
-    .filter(Boolean).join(' · ');
-  return <span className="hmi-quality" title={title}><span aria-hidden="true">×</span> {label}
+  const title = [label, sample?.error, ageText, timeText].filter(Boolean).join(' · ');
+  const badge = <><span aria-hidden="true">×</span> {label}
     {problem === 'tagStale' && ageText && <small>{ageText}</small>}
-  </span>;
+  </>;
+  if (!tag) return <span className="hmi-quality" title={title}>{badge}</span>;
+  return <>
+    <button type="button" className="hmi-quality hmi-quality-inspect" title={title}
+      aria-label={ui('tagInspectQuality', { tag, label })} aria-haspopup="dialog"
+      onClick={event => setOpener(event.currentTarget)}>{badge}</button>
+    {opener && <Popup title={ui('tagQualityDetails')} opener={opener} close={() => setOpener(null)}>
+      <dl className="quality-details">
+        <dt>{ui('tagQualityBinding')}</dt><dd>{tag}</dd>
+        <dt>{ui('status')}</dt><dd>{label}</dd>
+        {sample?.error && <><dt>{ui('tagQualityReason')}</dt><dd>{sample.error}</dd></>}
+        {timeText && <><dt>{ui('tagSourceTime')}</dt><dd>{timeText}</dd></>}
+        {ageText && <><dt>{ui('tagAge')}</dt><dd>{ageText}</dd></>}
+      </dl>
+    </Popup>}
+  </>;
 }
 
 export function ConnectionStatus({ details = false }) {

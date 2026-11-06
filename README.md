@@ -435,9 +435,9 @@ PLC data quality, and Windows runtime resilience. The no-code
 or PLC STRING selection and an optional PLC refresh trigger. See the
 [runtime readiness roadmap](docs/runtime-readiness-roadmap.md) for the driver
 assessment, product references, and acceptance gates. The
-[offline reliability drills](docs/runtime-soak.md) exercise recovery under
-load and check that pending commands reconcile without replay after a forced
-runtime process exit. Managed Windows [package launch](docs/package-management.md)
+[offline restart drill](docs/runtime-soak.md#forced-process-restart-drill) checks
+that pending commands reconcile without replay after a forced runtime process
+exit. Endurance testing is deferred. Managed Windows [package launch](docs/package-management.md)
 also provides a configurable Ctrl+C shutdown deadline and an opt-in exit
 watchdog that starts recovery with PLC acquisition held.
 
