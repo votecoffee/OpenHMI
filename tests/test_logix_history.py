@@ -348,7 +348,19 @@ class LogixHistoryTests(unittest.TestCase):
                          {'MotorA.Speed': 200, 'LevelA': 200, 'TankLevel': 200})
         driver.poll(1)
         self.assertEqual(driver.connections['plc'].client.reads, [('Motor', 'Level')])
-        self.assertNotIn('LevelA', driver.demands(16))
+        # Apply changes to the template and scan rate while the same viewer is active.
+        project['tags'].append({**project['tags'][1], 'name': 'LevelB'})
+        for control in project['faceplates'][0]['controls']:
+            for series in control.get('series', []):
+                if series['tag'] == 'LevelA':
+                    series['tag'] = 'LevelB'
+        project['screens'][-1]['update_ms'] = 350
+        driver.configure(Project.model_validate(project).model_dump())
+        self.assertEqual(driver.demands(2),
+                         {'MotorA.Speed': 350, 'LevelB': 350, 'TankLevel': 350, 'ProcessAlarm': 250})
+        driver.poll(2)
+        self.assertEqual(driver.sample_snapshot(2)['LevelB']['value'], 65.0)
+        self.assertNotIn('LevelB', driver.demands(16))
 
     def test_background_history_deadband_quality_and_query(self):
         store = ProjectStore()

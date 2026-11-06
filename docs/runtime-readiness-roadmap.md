@@ -44,11 +44,11 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
    multiple routes, and a slow or disconnected route. Label calls and requested
    addresses separately from packet counts measured by a capture or controller
    diagnostics. Agree load and latency bounds for the intended project profile.
-3. **Reduce avoidable work.** Profile repeated control expansion, alias matching
-   and tag metadata discovery on reconnect. Cache resolved demand and alias
-   indexes with explicit invalidation when project bindings change. Keep a
-   bounded schedule that coalesces missed polls. Tune batching and metadata
-   initialization using evidence from the profile and type checks.
+3. **Reduce avoidable work.** The driver resolves screen and faceplate tag
+   bindings once per applied project. Each poll still accounts for active
+   viewer leases, previews and background demand. Profile physical address
+   grouping and metadata discovery on reconnect before tuning batching or
+   metadata initialization.
 4. **Document the supported tag contract.** Exercise BOOL, integer, REAL and
    STRING values, controller and program scopes, nested UDT members and arrays,
    packed bits, fragmented reads, and tag-level failures. Check string capacity,

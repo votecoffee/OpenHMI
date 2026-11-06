@@ -227,6 +227,7 @@ class RuntimeDriver(SimulatorDriver):
         self.connections, self.definitions, self.sources, self.samples = {}, {}, {}, {}
         self.address_aliases = {}
         self.project = None
+        self._screen_demands = {}
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self.local_names = set()
@@ -234,6 +235,13 @@ class RuntimeDriver(SimulatorDriver):
 
     def configure(self, project):
         with self.io_lock:
+            project = deepcopy(project)
+            screens = screen_map(project)
+            screen_tags = {identifier: {} for identifier in screens}
+            for control in expanded_controls(project):
+                screen_tags[control['_screen']].update(dict.fromkeys(referenced_tags(control)))
+            screen_demands = {identifier: (screen.get('update_ms', 500), tuple(screen_tags[identifier]))
+                              for identifier, screen in screens.items()}
             retired = []
             with self.lock:
                 configs = {config['id']: config for config in project.get('connections', []) if config['enabled'] and not self.plc_hold}
@@ -270,7 +278,8 @@ class RuntimeDriver(SimulatorDriver):
                     if tag['connection']:
                         key = (tag['connection'], tag['address'])
                         self.address_aliases.setdefault(key, []).append((alias, tag, member))
-                self.project = deepcopy(project)
+                self.project = project
+                self._screen_demands = screen_demands
                 self.deadlines.clear()
             for connection in retired:
                 connection.close()
@@ -278,8 +287,7 @@ class RuntimeDriver(SimulatorDriver):
     def lease(self, client, screens, now=None, preview_root=''):
         now = time.monotonic() if now is None else now
         with self.lock:
-            known = screen_map(self.project)
-            if any(screen not in known for screen in screens):
+            if any(screen not in self._screen_demands for screen in screens):
                 raise ValueError('Unknown subscription screen')
             if preview_root and (preview_root not in self.definitions or self.definitions[preview_root]['type'] != 'struct'):
                 raise ValueError('Faceplate preview requires a configured UDT tag')
@@ -295,15 +303,16 @@ class RuntimeDriver(SimulatorDriver):
         project = self.project
         if not project:
             return rates
-        screens = screen_map(project)
-        wanted = set().union(*(value[0] for value in self.leases.values() if value[1] > now)) if self.leases else set()
-        for lease in self.leases.values():
-            if lease[1] > now and lease[2]:
-                demand(lease[2], 500)
-        for identifier in wanted & screens.keys():
-            for control in expanded_controls(project, identifier):
-                for tag in referenced_tags(control):
-                    demand(tag, screens[identifier].get('update_ms', 500))
+        wanted = set()
+        for screens, expires_at, preview_root in self.leases.values():
+            if expires_at > now:
+                wanted.update(screens)
+                if preview_root:
+                    demand(preview_root, 500)
+        for identifier in wanted & self._screen_demands.keys():
+            rate, tags = self._screen_demands[identifier]
+            for tag in tags:
+                demand(tag, rate)
         for alarm in project.get('alarms', []):
             if alarm['enabled']:
                 demand(alarm['tag'], 250)
