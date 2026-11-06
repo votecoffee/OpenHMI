@@ -354,7 +354,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if kind not in ('number', 'integer', 'boolean', 'string') or (mode == 'toggle' and kind != 'boolean'):
                         raise HTTPException(422, 'Action target type is incompatible')
             else:
-                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'gauge', 'progress', 'sparkline', 'duration', 'led_display', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
+                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'gauge', 'progress', 'position_image', 'sparkline', 'duration', 'led_display', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
                 if kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 

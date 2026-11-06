@@ -114,13 +114,14 @@ test('compact annotations, LED and setpoint displays survive canvas save and liv
   }
 });
 
-test('Boolean and multi-state image uploads switch with tag values and quality', async ({ page }) => {
+test('Boolean, multi-state and position images follow tags and quality', async ({ page }) => {
   test.setTimeout(60000);
   const other = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGM0Di1ngAEmOAsvBwAyjgEHv03a3gAAAABJRU5ErkJggg==', 'base64');
   const original = await (await page.request.get('/api/project')).json();
   try {
     await save(page, { ...original.active, controls: [], screens: [], layout: null,
-      tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }, { name: 'FixtureState', type: 'integer', initial: 1 }] });
+      tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }, { name: 'FixtureState', type: 'integer', initial: 1 },
+        { name: 'AxisTravel', type: 'number', initial: 25 }] });
     await page.goto('/');
     await page.getByRole('button', { name: 'Enable freeform layout' }).click();
     const canvas = page.getByLabel('Freeform canvas', { exact: true });
@@ -153,6 +154,15 @@ test('Boolean and multi-state image uploads switch with tag values and quality',
       await row.getByLabel('Upload Image', { exact: true }).setInputFiles({ name: label + '.png', mimeType: 'image/png', buffer });
       await row.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
     }
+    await palette.getByRole('combobox', { name: 'Control type' }).selectOption('PositionImage');
+    await palette.getByRole('button', { name: 'Add or drag control' }).dragTo(canvas, { targetPosition: { x: 400, y: 40 } });
+    await fields.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'AxisTravel' });
+    await fields.getByRole('textbox', { name: 'Units', exact: true }).fill('mm');
+    await fields.getByRole('combobox', { name: 'Travel direction', exact: true }).selectOption({ label: 'Right to left' });
+    await fields.getByRole('combobox', { name: 'Show label and state text', exact: true }).selectOption({ label: 'No' });
+    const travelImage = fields.getByRole('group', { name: 'Position image', exact: true });
+    await travelImage.getByLabel('Upload Position image', { exact: true }).setInputFiles({ name: 'Carriage.png', mimeType: 'image/png', buffer: other });
+    await travelImage.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const { active } = await (await page.request.get('/api/project')).json();
@@ -168,6 +178,15 @@ test('Boolean and multi-state image uploads switch with tag values and quality',
     await expect(opened).toHaveJSProperty('naturalWidth', 1);
     const multi = page.locator('[data-control="multi_state_image"]');
     await expect(multi.getByRole('img', { name: 'Fixture: Clamping', exact: true })).toHaveJSProperty('naturalWidth', 1);
+    const position = page.locator('[data-control="position_image"]');
+    const marker = position.locator('.position-marker');
+    const track = position.locator('.position-travel');
+    await expect(position.getByRole('img', { name: 'Axis position: 25.0 mm', exact: true })).toHaveJSProperty('naturalWidth', 4);
+    const offset = async () => {
+      const path = await track.boundingBox(), point = await marker.boundingBox();
+      return (point.x - path.x) / (path.width - point.width);
+    };
+    await expect.poll(offset).toBeCloseTo(0.75);
     const live = await (await page.request.get('/api/tags')).json();
     live.values.ValveOpen = false;
     live.values.FixtureState = 2;
@@ -185,6 +204,17 @@ test('Boolean and multi-state image uploads switch with tag values and quality',
     live.samples.ValveOpen = { quality: 'stale', age_seconds: 4 };
     await expect(control).toContainText('STALE DATA');
     await expect(control.locator('img')).toHaveCount(0);
+    live.values.AxisTravel = 0;
+    await expect.poll(offset).toBeCloseTo(1);
+    live.values.AxisTravel = 100;
+    await expect.poll(offset).toBeCloseTo(0);
+    live.values.AxisTravel = 120;
+    await expect(position).toContainText('120.0 mm');
+    await expect(position).toContainText('OUT OF SCALE');
+    await expect(marker).toHaveCount(0);
+    live.samples.AxisTravel = { quality: 'stale', age_seconds: 4 };
+    await expect(position).toContainText('STALE DATA');
+    await expect(marker).toHaveCount(0);
   } finally {
     await save(page, original.active);
     await save(page, original.draft, false);

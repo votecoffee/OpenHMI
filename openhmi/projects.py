@@ -210,8 +210,16 @@ class ProgressControl(NumericControl):
     @model_validator(mode='after')
     def ordered_scale(self):
         if not 0 < self.maximum - self.minimum < math.inf:
-            raise ValueError('Progress scale must have a positive, finite span')
+            raise ValueError('Scale must have a positive, finite span')
         return self
+
+
+class PositionImageControl(ProgressControl):
+    kind: Literal['position_image']
+    image: str = Field(default='', pattern=r'^(?:[a-f0-9]{64})?$')
+    direction: Literal['left_to_right', 'right_to_left', 'bottom_to_top', 'top_to_bottom'] = 'left_to_right'
+    size_percent: int = Field(default=25, ge=10, le=60)
+    show_label: bool = True
 
 
 class SetpointComparisonControl(NumericControl):
@@ -529,7 +537,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | StateImageControl | MultiStateImageControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | StateImageControl | MultiStateImageControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | PositionImageControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

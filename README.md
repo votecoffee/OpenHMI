@@ -309,6 +309,10 @@ instead of a state image. Project backups include the images.
 Use **Multi-state image** to map 2 to 32 integer codes to named images. It uses
 the same image upload and backup workflow and shows unmapped codes explicitly,
 even with captions hidden.
+A **Position image** moves an uploaded image or a default marker along a
+horizontal or vertical path. Bind a numeric position tag and set its travel
+range, direction and marker size. On freeform screens, place the control over
+an image of the machine. Out-of-range or unavailable readings hide the marker.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

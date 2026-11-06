@@ -8,7 +8,7 @@ import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
 import { WebBrowser } from './web-browser.jsx';
-import { ImageField, ImageStatesFields, MultiStateImage, StateImage } from './state-image.jsx';
+import { ImageField, ImageStatesFields, MultiStateImage, ProjectPicture, StateImage } from './state-image.jsx';
 import { DateTimeLimit, EditControl, formatUtcEpoch, MAX_UTC_EPOCH } from './edit-control.jsx';
 import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { Bitfield, BitfieldFields, MultiState, ModeSelector, PermissiveList, StackLight, StackLightFields, StateFields, PermissiveFields } from './machine-state.jsx';
@@ -162,6 +162,39 @@ function ScreenSymbol({ id, label, symbol, size, rotation }) {
       <path d={annotationSymbols[symbol]?.path} transform={`rotate(${rotation} 12 12)`} />
     </svg>
   </div>;
+}
+
+function PositionImage({ id, label, tag, unit, decimals, minimum, maximum, image, direction, size_percent, show_label, puck }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui, language } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const units = text(`control.${id}.unit`, unit);
+  const reading = valid ? `${formatNumeric(value, decimals, language.code)} ${units}`.trim() : '';
+  const span = maximum - minimum;
+  const configured = Number.isFinite(span) && span > 0;
+  const outside = valid && configured && (value < minimum || value > maximum);
+  const caption = show_label || puck?.isEditing;
+  const vertical = direction === 'top_to_bottom' || direction === 'bottom_to_top';
+  const reverse = direction === 'right_to_left' || direction === 'bottom_to_top';
+  const fraction = (value - minimum) / span;
+  const graphicLabel = caption ? '' : `${title}: ${reading}`;
+  return <article className="hmi-control hmi-image-control" data-control="position_image">
+    {caption && <span className="hmi-label">{title}</span>}
+    {!valid ? <Quality problem={problem} tag={tag} /> : <>
+      {(caption || outside) && <strong>{reading}</strong>}
+      {!configured ? <Quality problem="badRange" /> : outside
+        ? <strong className="range-deviation">{ui('outOfScale')}</strong>
+        : <div className={`position-travel ${vertical ? 'vertical' : 'horizontal'}`}>
+          <div className="position-marker" style={{
+            '--position': `${(reverse ? 1 - fraction : fraction) * 100}%`, '--marker-size': `${size_percent}%`,
+          }}>
+            {image ? <ProjectPicture key={image} identifier={image} alt={graphicLabel} />
+              : <span className="position-default" role={graphicLabel ? 'img' : undefined}
+                aria-label={graphicLabel || undefined} aria-hidden={!graphicLabel}>◆</span>}
+          </div>
+        </div>}
+    </>}
+  </article>;
 }
 
 function ProgressBar({ id, label, tag, unit, decimals, minimum, maximum, puck }) {
@@ -496,7 +529,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage', 'MultiStateImage'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage', 'MultiStateImage', 'PositionImage'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -581,6 +614,16 @@ export function createConfig(catalog) {
         show_label: showImageLabel,
       }, defaultProps: { label: 'Machine image', tag: 'MotorRunning', on_image: '', off_image: '',
         on_text: 'ON', off_text: 'OFF', show_label: true }, render: props => <StateImage {...props} /> },
+      PositionImage: { label: 'Position image', fields: {
+        ...numericFields, ...scaleFields, show_label: showImageLabel,
+        direction: { type: 'select', label: 'Travel direction', options: [
+          { label: 'Left to right', value: 'left_to_right' }, { label: 'Right to left', value: 'right_to_left' },
+          { label: 'Bottom to top', value: 'bottom_to_top' }, { label: 'Top to bottom', value: 'top_to_bottom' },
+        ] },
+        size_percent: { type: 'number', label: 'Marker size (%)', min: 10, max: 60 },
+        image: { type: 'custom', render: props => <ImageField key={props.id} {...props} label="Position image" /> },
+      }, defaultProps: { ...numericDefaults, label: 'Axis position', minimum: 0, maximum: 100, direction: 'left_to_right',
+        size_percent: 25, image: '', show_label: true }, render: PositionImage },
       MultiStateImage: { label: 'Multi-state image', fields: {
         label: labelField, tag: browserTag('Tag', 'Choose an unscaled integer tag', integerTag),
         states: { type: 'custom', render: props => <ImageStatesFields key={props.id} {...props} /> },

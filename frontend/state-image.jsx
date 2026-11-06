@@ -63,7 +63,7 @@ export function ImageStatesFields({ id, value = [], onChange, readOnly }) {
   </fieldset>;
 }
 
-function StatePicture({ identifier, alt }) {
+export function ProjectPicture({ identifier, alt }) {
   const { ui } = useLocalization();
   const [failed, setFailed] = useState(false);
   return failed ? <strong className="range-deviation">{ui('stateImageUnavailable')}</strong>
@@ -72,11 +72,11 @@ function StatePicture({ identifier, alt }) {
 }
 
 function ImageReadout({ kind, title, tag, problem, stateText, image, caption, unknown = false }) {
-  return <article className="hmi-control hmi-state-image" data-control={kind}>
+  return <article className="hmi-control hmi-image-control" data-control={kind}>
     {caption && <span className="hmi-label">{title}</span>}
     {problem ? <Quality problem={problem} tag={tag} /> : <>
       {(caption || unknown) && <strong>{stateText}</strong>}
-      {image && <StatePicture key={image} identifier={image} alt={caption ? '' : `${title}: ${stateText}`} />}
+      {image && <ProjectPicture key={image} identifier={image} alt={caption ? '' : `${title}: ${stateText}`} />}
     </>}
   </article>;
 }
