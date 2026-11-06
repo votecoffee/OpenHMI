@@ -116,6 +116,40 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   await expect(unavailable).toHaveCount(0);
 });
 
+test('invalid tag replies fail closed and recover without reloading', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const good = { values: { TankLevel: 42, MotorRunning: true }, samples: { TankLevel: { quality: 'good' } }, connections: [] };
+  let payload = good;
+  await page.route('**/api/tags', route => route.fulfill({ body: JSON.stringify(payload), contentType: 'application/json' }));
+  await page.goto('/runtime');
+  const numeric = page.locator('[data-control="numeric"]');
+  const header = page.locator('.app-header .connection');
+  await expect(numeric).toContainText('42.0');
+
+  payload = { ...good, samples: { TankLevel: null } };
+  await expect(numeric).toContainText('BAD DATA');
+  await expect(numeric).not.toContainText('42.0');
+  await expect(header).toHaveText('Simulator connected');
+  await expect(page.locator('[data-control="indicator"]')).toContainText('ON');
+
+  payload = { ...good, samples: { TankLevel: { quality: 'stale', error: { reason: 'lost' }, timestamp: {} } } };
+  await numeric.getByRole('button', { name: 'Inspect TankLevel quality (STALE DATA)' }).click();
+  const details = page.getByRole('dialog', { name: 'Tag quality details' });
+  await expect(details).toContainText('STALE DATA');
+  await page.keyboard.press('Escape');
+
+  for (const invalid of [null, { ...good, values: [] }, { ...good, samples: [] }, { ...good, connections: [null] }]) {
+    payload = invalid;
+    await expect(header).toHaveText('Simulator disconnected');
+    await expect(numeric).toContainText('COMM LOSS');
+    payload = good;
+    await expect(header).toHaveText('Simulator connected');
+    await expect(numeric).toContainText('42.0');
+  }
+  expect(errors).toEqual([]);
+});
+
 test('a stalled recipe status request does not delay alarms, layout or identity', async ({ page }) => {
   let releaseRecipe;
   const recipePending = new Promise(resolve => { releaseRecipe = resolve; });

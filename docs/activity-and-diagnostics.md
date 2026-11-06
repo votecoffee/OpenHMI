@@ -99,7 +99,10 @@ status still describe their underlying data and transaction state.
 The browser polls tags, alarms, recipe selection, identity and the applied
 layout independently. Each poll finishes or times out before the next request
 for that endpoint starts. A delayed response leaves the other status updates
-and their recovery indicators running.
+and their recovery indicators running. An invalid tag status response uses the
+same communication-loss state as a failed tag request. Malformed quality for
+an individual sample shows bad data for that binding while other bindings
+remain available.
 
 Tag rows show logical source/type, quality, observation timestamp, age and error.
 A tag-level read error or malformed result in a known batch position marks

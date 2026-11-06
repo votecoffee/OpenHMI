@@ -30,6 +30,10 @@ import { Popup } from './touch-entry.jsx';
 
 const editorOverrides = { headerActions: () => null };
 
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function ScreenView({ screen, config }) {
   const data = toEditor(screen);
   return <ScreenControls.Provider value={screen.controls}>
@@ -349,8 +353,13 @@ function App({ initial, catalog }) {
     }
 
     const stopTags = poll('/api/tags', tags => {
-      setLive(previous => ({ ...previous, values: tags.values || {}, samples: tags.samples || {}, connected: true,
-        connections: tags.connections || [], plcHold: !!tags.plc_hold }));
+      const { values, samples = {}, connections = [], plc_hold: plcHold = false } = tags ?? {};
+      if (!isRecord(values) || !isRecord(samples) || typeof plcHold !== 'boolean'
+        || !Array.isArray(connections) || connections.some(route =>
+          typeof route?.id !== 'string' || typeof route.connected !== 'boolean')) {
+        throw new Error('Invalid tag status response');
+      }
+      setLive(previous => ({ ...previous, values, samples, connections, plcHold, connected: true }));
     }, () => {
       setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false, connections: [], plcHold: false }));
     });

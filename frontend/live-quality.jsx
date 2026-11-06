@@ -10,13 +10,15 @@ const problems = {
 };
 
 export function sampleQualityProblem(sample) {
-  return sample.quality === 'good' ? null : problems[sample.quality_reason || sample.quality] || 'badData';
+  if (sample?.quality === 'good') return null;
+  const reason = sample?.quality_reason || sample?.quality;
+  return typeof reason === 'string' && Object.hasOwn(problems, reason) ? problems[reason] : 'badData';
 }
 
 export function tagQuality(live, tag) {
   if (!live.connected) return 'commLoss';
-  const sample = live.samples?.[tag];
-  if (sample) return sampleQualityProblem(sample);
+  const sample = live.samples && Object.hasOwn(live.samples, tag) ? live.samples[tag] : undefined;
+  if (sample !== undefined) return sampleQualityProblem(sample);
   return Object.hasOwn(live.values, tag) ? null : 'badData';
 }
 
@@ -38,11 +40,12 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   const sample = suppliedSample ?? live.samples?.[tag];
   const [opener, setOpener] = useState(null);
   const age = sample?.age_seconds;
-  const sourceTime = sample?.timestamp && new Date(sample.timestamp);
+  const sourceTime = typeof sample?.timestamp === 'string' ? new Date(sample.timestamp) : null;
+  const reason = typeof sample?.error === 'string' ? sample.error : '';
   const ageText = Number.isFinite(age) ? ui('tagSampleAge', { age: age.toFixed(1) }) : '';
   const timeText = sourceTime && Number.isFinite(sourceTime.getTime()) ? formatLocalDateTime(sourceTime, language.code) : '';
   const label = text ?? ui(problem);
-  const title = [label, sample?.error, ageText, timeText].filter(Boolean).join(' · ');
+  const title = [label, reason, ageText, timeText].filter(Boolean).join(' · ');
   const badge = <><span aria-hidden="true">×</span> {label}
     {problem === 'tagStale' && ageText && <small>{ageText}</small>}
   </>;
@@ -55,7 +58,7 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
       <dl className="quality-details">
         <dt>{ui('tagQualityBinding')}</dt><dd>{tag}</dd>
         <dt>{ui('status')}</dt><dd>{label}</dd>
-        {sample?.error && <><dt>{ui('tagQualityReason')}</dt><dd>{sample.error}</dd></>}
+        {reason && <><dt>{ui('tagQualityReason')}</dt><dd>{reason}</dd></>}
         {timeText && <><dt>{ui('tagSourceTime')}</dt><dd>{timeText}</dd></>}
         {ageText && <><dt>{ui('tagAge')}</dt><dd>{ageText}</dd></>}
       </dl>
