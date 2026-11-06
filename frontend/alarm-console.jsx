@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './controls.jsx';
-import { Live, Quality, sampleQualityProblem, tagQuality, unavailableAlarmTriggers } from './live-quality.jsx';
+import { Live, Quality, sampleQualityProblem, tagQuality, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
@@ -44,6 +44,7 @@ export function AlarmConsole() {
   const alarms = live.alarms || {};
   const monitorAvailable = live.alarmConnected && !alarms.error;
   const unavailable = monitorAvailable ? unavailableAlarmTriggers(live) : [];
+  const waiting = monitorAvailable && alarmEvaluationPending(live);
   useEffect(() => {
     let stopped = false, timer;
     async function refresh() {
@@ -103,6 +104,7 @@ export function AlarmConsole() {
   return <section className="alarm-console" aria-label="Alarm console">
     <div className="alarm-console-heading"><h1>{ui('alarmStatus')}</h1><LanguageSelector /></div>
     {!monitorAvailable ? <p role="alert">{ui('alarmUnavailable')}</p> : <p>{ui('activeAlarms', { active: alarms.active_count, unack: alarms.unacknowledged_count })}</p>}
+    {waiting && <p role="status">{ui('alarmEvaluationWaiting')}</p>}
     {unavailable.length > 0 && <section aria-label={ui('alarmUnavailableTriggers')}>
       <h2>{ui('alarmUnavailableTriggers')}</h2>
       <p>{ui('alarmUnavailableTriggersHint')}</p>
@@ -132,7 +134,7 @@ export function AlarmConsole() {
         <td>{alarm.retired_at ? ui('retired') : alarm.active ? ui('active') : ui('returned')} / {alarm.acknowledged_at ? ui('acknowledged') : ui('unacknowledged')}{alarm.quality === 'bad' && <> / {ui('badData')}</>}
           {alarm.acknowledged_at && <small>{ui('acknowledgedBy')}: {alarm.acknowledged_by || ui('legacyIdentity')}</small>}{alarm.shelf && <small>{ui('shelved')} · {timestamp(alarm.shelf.expires_at)}</small>}</td><td>{timestamp(alarm.raised_at)}</td>
         <td><button disabled={busy || !!error || !canAcknowledge || !!alarm.acknowledged_at} onClick={() => acknowledge(alarm.occurrence_id)} aria-label={`${ui('acknowledge')} ${alarmMessage(alarm, language)}`}>{ui('acknowledge')}</button><button aria-label={ui('inspectAlarm', { id: alarm.occurrence_id })} onClick={() => inspect(alarm.occurrence_id)}>{ui('alarmDetails')}</button></td></tr>)}</tbody></table>
-    {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end && applied.shelving === 'unshelved' ? ui(!monitorAvailable || unavailable.length ? 'noRecordedAlarmsInView'
+    {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end && applied.shelving === 'unshelved' ? ui(!monitorAvailable || waiting || unavailable.length ? 'noRecordedAlarmsInView'
       : alarms.shelved_occurrence_count ? 'noUnshelvedAlarms' : 'noOutstanding') : ui('alarmFilteredEmpty')}</p>}
     <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
     <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />

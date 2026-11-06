@@ -63,7 +63,18 @@ export function Quality({ problem, tag, text, sample: suppliedSample }) {
   </>;
 }
 
+function alarmSnapshotMatchesProject(live) {
+  const sampled = live.alarms?.sampled_revision;
+  return sampled === undefined || live.activeRevision == null || sampled === live.activeRevision;
+}
+
+export function alarmEvaluationPending(live) {
+  return !alarmSnapshotMatchesProject(live)
+    || (live.project?.alarms || []).some(alarm => alarm.enabled && !live.alarms?.states?.[alarm.id]?.quality);
+}
+
 export function unavailableAlarmTriggers(live) {
+  if (!alarmSnapshotMatchesProject(live)) return [];
   const states = live.alarms?.states;
   return (live.project?.alarms || []).filter(alarm => alarm.enabled && states?.[alarm.id]?.quality === 'bad');
 }

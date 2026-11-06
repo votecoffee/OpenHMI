@@ -30,6 +30,7 @@ class AlarmMonitor:
         self.store, self.sample_values = store, sample_values
         self.lock = RLock()
         self.last_sample_at = None
+        self.sampled_revision = None
         self.error = None
         with store.transaction() as db:
             db.execute("CREATE TABLE IF NOT EXISTS alarm_state (alarm_id TEXT PRIMARY KEY, signature TEXT, occurrence_id INTEGER, condition INTEGER, quality TEXT)")
@@ -54,7 +55,8 @@ class AlarmMonitor:
             # Copy driver data before acquiring the database lock (fixed lock order).
             values = self.sample_values()
             with self.store.transaction() as db:
-                project = Project.model_validate(self.store._read()["active"])
+                active = self.store._read()
+                project = Project.model_validate(active["active"])
                 definitions = {definition.id: definition for definition in project.alarms if definition.enabled}
                 now = utc_now()
                 self.shelves.reconcile(db, definitions, now)
@@ -101,7 +103,7 @@ class AlarmMonitor:
                 db.execute('DELETE FROM alarm_acknowledgement WHERE occurrence_id NOT IN (SELECT id FROM alarm_occurrence)')
                 db.execute('DELETE FROM alarm_note WHERE occurrence_id NOT IN (SELECT id FROM alarm_occurrence)')
                 db.execute('DELETE FROM alarm_event_context WHERE event_id NOT IN (SELECT id FROM alarm_event)')
-            self.last_sample_at, self.error = now, None
+            self.last_sample_at, self.sampled_revision, self.error = now, active["active_revision"], None
 
     @staticmethod
     def _signature(definition):
@@ -157,7 +159,7 @@ class AlarmMonitor:
                 row['shelf'] = self.shelves.for_occurrence(row, shelves)
             annunciated = [row for row in outstanding if not row['shelf']]
             history = [{"id": row[0], "occurrence_id": row[1], "alarm_id": row[2], "event": row[3], "timestamp": row[4]} for row in db.execute("SELECT * FROM alarm_event ORDER BY id DESC")]
-            return {"last_sample_at": self.last_sample_at, "error": self.error, "states": states,
+            return {"last_sample_at": self.last_sample_at, "sampled_revision": self.sampled_revision, "error": self.error, "states": states,
                     "active_count": sum(row["active"] for row in outstanding),
                     "unacknowledged_count": sum(row["acknowledged_at"] is None for row in outstanding),
                     'shelved_count': len(shelves), 'shelved_occurrence_count': len(outstanding) - len(annunciated),

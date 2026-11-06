@@ -36,6 +36,16 @@ class AlarmWorkflowTests(unittest.TestCase):
         saved = self.app.state.store.save(SaveRequest(expected_revision=state['draft_revision'], project=project))
         self.app.state.store.apply(RevisionRequest(expected_revision=saved['draft_revision']))
 
+    def test_alarm_snapshot_identifies_the_revision_last_evaluated(self):
+        first = self.app.state.store.snapshot()['active_revision']
+        self.assertEqual(self.client.get('/api/alarms').json()['sampled_revision'], first)
+        self.apply(lambda project: setattr(project, 'title', 'Changed alarm project'))
+        current = self.app.state.store.snapshot()['active_revision']
+        self.assertGreater(current, first)
+        self.assertEqual(self.client.get('/api/alarms').json()['sampled_revision'], first)
+        self.monitor.sample()
+        self.assertEqual(self.client.get('/api/alarms').json()['sampled_revision'], current)
+
     def test_detail_explains_cached_trigger_loss_without_returning_the_alarm(self):
         identifier = self.raise_alarm()
         driver = self.app.state.driver

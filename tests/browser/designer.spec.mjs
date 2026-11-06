@@ -50,13 +50,18 @@ test('no-code live editing, autosave, apply to an open viewer and Python action'
 
 test('analog context, redundant alarm priority and data quality remain explicit', async ({ page }) => {
   let values = { TankLevel: 42.0, MotorRunning: true, ProcessAlarm: false };
-  let alarms = { states: { process_alarm: { quality: 'good', condition: 0 } }, outstanding: [], active_count: 0, unacknowledged_count: 0 };
+  const { active_revision: revision } = await (await page.request.get('/api/project')).json();
+  let alarms = { sampled_revision: revision, states: {}, outstanding: [], active_count: 0, unacknowledged_count: 0 };
   let samples = {};
   await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values, samples } }));
   await page.route('**/api/alarms', route => route.fulfill({ json: alarms }));
   await page.goto('/runtime');
   await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
-  await expect(page.getByLabel('Screen alarm status')).toContainText('No active or unacknowledged alarms');
+  const banner = page.getByLabel('Screen alarm status');
+  await expect(banner).toContainText('Waiting for alarm evaluation');
+  await expect(banner).not.toContainText('No alarms configured');
+  alarms = { ...alarms, states: { process_alarm: { quality: 'good', condition: 0 } } };
+  await expect(banner).toContainText('No active or unacknowledged alarms');
   await expect(page.locator('[data-control="analog"]')).toContainText('Normal 20–80 %');
   if (process.env.OPENHMI_NORMAL_SCREENSHOT) await page.screenshot({ path: process.env.OPENHMI_NORMAL_SCREENSHOT, fullPage: true });
   values = { TankLevel: 120.0, MotorRunning: false, ProcessAlarm: true };
@@ -72,7 +77,11 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   alarms = { ...alarms, states: { process_alarm: { quality: 'bad' } } };
   await expect(page.locator('[data-control="analog"]')).toContainText('BAD DATA');
   await expect(page.locator('[data-control="indicator"]')).toContainText('BAD DATA');
-  const banner = page.getByLabel('Screen alarm status');
+  alarms = { ...alarms, sampled_revision: revision - 1 };
+  await expect(banner).toContainText('Waiting for alarm evaluation');
+  await expect(banner).toContainText('P2 Process alarm');
+  await expect(banner).not.toContainText('Unavailable alarm triggers');
+  alarms = { ...alarms, sampled_revision: revision };
   const triggerWarning = banner.getByRole('link', { name: 'Unavailable alarm triggers (1)', exact: true });
   await expect(triggerWarning).toBeVisible();
   await expect(banner).toContainText('P2 Process alarm');

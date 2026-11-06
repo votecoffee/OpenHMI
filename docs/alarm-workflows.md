@@ -43,6 +43,9 @@ Select the alarm message in the runtime banner to open the details for that
 occurrence directly. Focus moves to the details heading when the data loads.
 If a trigger cannot be evaluated, the banner links to the affected definitions
 in the alarm console, including triggers that have no recorded occurrence.
+The banner shows that evaluation is pending until the monitor has sampled
+the applied revision and evaluated its enabled triggers. Known alarm
+occurrences remain visible during that interval.
 
 **Alarm details** shows the captured cause and recovery steps, related-screen navigation,
 first acknowledgement and append-only operator notes. Trigger quality/time comes
