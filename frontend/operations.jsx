@@ -6,7 +6,21 @@ function canInspect(session, permission) {
   return allowed(session, permission) || !!session?.user?.permissions.includes('security.manage');
 }
 
-const commandStates = ['unresolved', 'prepared', 'staging', 'requested', 'accepted', 'uncertain', 'completed', 'failed', 'interrupted'];
+const commandStates = ['prepared', 'staging', 'requested', 'accepted', 'uncertain', 'completed', 'failed', 'interrupted'];
+
+function isCommandRecord(item) {
+  return Number.isSafeInteger(item?.id) && item.id > 0 && Number.isSafeInteger(item.sequence)
+    && typeof item.command_id === 'string' && typeof item.operation_id === 'string' && typeof item.created_at === 'string'
+    && commandStates.includes(item.state) && (item.result_code === null || Number.isSafeInteger(item.result_code))
+    && (item.error === null || typeof item.error === 'string')
+    && Array.isArray(item.events) && item.events.every(event => typeof event?.timestamp === 'string'
+      && commandStates.includes(event.state) && typeof event.detail === 'string');
+}
+
+function isCommandPage(page) {
+  return Array.isArray(page?.items) && page.items.every(isCommandRecord) && typeof page.has_more === 'boolean'
+    && (page.has_more ? Number.isSafeInteger(page.next_before_id) && page.next_before_id > 0 : page.next_before_id === null);
+}
 
 export function CommandConsole() {
   const { session } = useContext(SecurityContext);
@@ -23,24 +37,27 @@ export function CommandConsole() {
   if (applied.state) parameters.set('state', applied.state);
   if (before) parameters.set('before_id', before);
   const endpoint = exact ? `/api/commands/${identifier}` : `/api/commands?${parameters}`;
-  const { data, error } = response?.endpoint === endpoint ? response : {};
+  const { data, error, receivedAt } = response?.endpoint === endpoint ? response : {};
   useEffect(() => {
-    if (!permitted || !valid) return;
+    if (!permitted || !valid) { setResponse(null); return; }
     let stopped = false, timer;
     async function refresh() {
       try {
         const result = await api(endpoint);
-        if (!stopped) setResponse({ endpoint, data: exact ? { items: [result] } : result });
-      }
-      catch (problem) {
-        if (!stopped) setResponse(previous => ({
-          endpoint, data: previous?.endpoint === endpoint ? previous.data : null, error: problem.message,
-        }));
+        const readable = exact ? isCommandRecord(result) && String(result.id) === identifier : isCommandPage(result);
+        if (!readable) throw new Error('Invalid command status response');
+        if (!stopped) setResponse({ endpoint, data: exact ? { items: [result] } : result, receivedAt: new Date() });
+      } catch (problem) {
+        const discard = [401, 403].includes(problem.status) || (exact && problem.status === 404);
+        if (!stopped) setResponse(previous => {
+          const retain = !discard && previous?.endpoint === endpoint;
+          return { ...(retain ? previous : { endpoint }), error: problem.message };
+        });
       }
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [permitted, valid, endpoint, exact]);
+  }, [permitted, valid, endpoint, exact, identifier]);
   if (!permitted) return <p>Sign in with runtime operation permission to inspect command transactions.</p>;
   return <section className="engineering operations" aria-label="PLC command transactions"><h1>PLC command transactions</h1>
     {exact && <p><a href="/commands">All command transactions</a></p>}
@@ -55,17 +72,18 @@ export function CommandConsole() {
         onChange={event => setFilters({ ...filters, command: event.target.value })} /></label>
       <label>Transaction state<select aria-label="Transaction state" value={filters.state} onChange={event => setFilters({ ...filters, state: event.target.value })}>
         <option value="">All states</option>
-        {commandStates.map(state => <option key={state} value={state}>{state === 'unresolved' ? 'All unresolved' : state}</option>)}
+        {['unresolved', ...commandStates].map(state => <option key={state} value={state}>{state === 'unresolved' ? 'All unresolved' : state}</option>)}
       </select></label>
       <button>Apply command filters</button>
     </form>}
-    {error && <p role="alert">Status unavailable: {error}. Retained rows may be outdated.</p>}
+    {error && <p role="alert">Command status unavailable. {error}
+      {data && <> Showing last received command status from {receivedAt.toLocaleTimeString()}.</>}</p>}
     <table className="activity-table"><thead><tr><th>Transaction / command</th><th>Sequence / state</th><th>Result</th><th>Evidence</th></tr></thead><tbody>{data?.items.map(item => <tr key={item.id}>
       <td>{exact ? `#${item.id}` : <a href={`/commands?transaction=${item.id}`}>#{item.id}</a>} · {item.command_id}<br /><small>{item.created_at}</small></td><td>{item.sequence} · {item.state}</td><td>{item.result_code ?? 'Not completed'}</td><td>
         <details open={exact || undefined}><summary>Transaction details</summary><p>Operation {item.operation_id}</p><p>{item.error}</p>{item.events.map((event, i) => <p key={i}>{event.timestamp} · {event.state} · {event.detail}</p>)}<a href={`/activity?search=${encodeURIComponent(item.operation_id)}`}>Operator activity</a></details>
       </td></tr>)}</tbody></table>
     {data && !data.items.length && <p>{applied.command || applied.state ? 'No command transactions match these filters.' : 'No command transactions recorded.'}</p>}
-    {!exact && <><button onClick={() => setBefore(null)}>Newest commands</button> <button disabled={!data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older commands</button></>}
+    {!exact && <><button onClick={() => setBefore(null)}>Newest commands</button> <button disabled={!!error || !data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older commands</button></>}
   </section>;
 }
 

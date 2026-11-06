@@ -63,7 +63,10 @@ are rejected. Trusted Python and other PLC clients remain outside this boundary.
    The command button also links to the latest transaction for its contract.
    Filter history by exact command ID and transaction state. **All unresolved**
    includes prepared, staging, requested, accepted and uncertain transactions.
-   The list updates as transactions change state.
+   The list updates as transactions change state. If status is unavailable or
+   malformed, the list or detail view shows when it last received valid data
+   for that view. Access denial clears retained results. Forward paging through
+   older records resumes when the current page is readable again.
    Use **Download transaction JSON** in the detail view to save the stored
    transaction and its event timeline for commissioning records. The download
    includes the project ID and export time and performs no controller access.
