@@ -271,6 +271,8 @@ its operation IDs also appear in API response headers. **Diagnostics** shows
 connection/scan counters, tag quality/age and errors without requesting new scan
 tags or writing equipment. The runtime header and Diagnostics identify routes
 waiting for the first usable sample of a requested PLC tag or UDT member.
+They also flag an established route whose requested samples are all unusable,
+even while its transport stays connected.
 Per-route timing separates worker queue delay, route lock wait, adapter reads,
 scan start lateness and recovery.
 Diagnostics also shows background worker health and retry state. Grant `activity.view` / `diagnostics.view` through HMI

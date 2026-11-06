@@ -69,6 +69,7 @@ export const uiText = {
   plcScanOverdue: 'PLC scan overdue', routeScanOverdue: 'Scan overdue',
   plcRecovering: 'PLC recovery in progress', routeRecovering: 'Reconnected / waiting for good data',
   plcAwaitingData: 'Waiting for initial PLC data', routeAwaitingData: 'Connected / waiting for first good data',
+  plcDataUnavailable: 'PLC data unavailable', routeDataUnavailable: 'Connected / no usable data',
   plcOffline: 'PLC communication lost', plcConnecting: 'Connecting to PLC', plcDisabled: 'PLC routes disabled',
   plcHeld: 'PLC acquisition held', routeConnected: 'Connected', routeConnecting: 'Connecting',
   routeRetrying: 'Disconnected / retrying', routeUnknown: 'Status unavailable', routeHeld: 'Held', routeDisabled: 'Disabled',

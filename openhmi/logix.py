@@ -332,7 +332,7 @@ class RuntimeDriver(SimulatorDriver):
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self._refresh_after = {}
-        self._demanded_aliases = set()
+        self._demanded_aliases = {}
         self._lease_sequences = {}
         self.local_names = set()
         self.plc_hold = False
@@ -460,14 +460,14 @@ class RuntimeDriver(SimulatorDriver):
                         logging.exception('PLC scan failed for route %s', identifier)
 
             grouped = {}
-            demands = self.demands(now)
-            self._demanded_aliases = set(demands)
-            for alias, rate in demands.items():
+            demanded_aliases = defaultdict(dict)
+            for alias, rate in self.demands(now).items():
                 root, _ = self.sources.get(alias, (None, ''))
                 tag = self.definitions.get(root)
                 if tag and tag['connection']:
                     key = (tag['connection'], tag['address'])
                     grouped[key] = min(rate, grouped.get(key, rate))
+                    demanded_aliases[tag['connection']][alias] = key
             for key, previous_rate in self.last_rates.items():
                 rate = grouped.get(key)
                 if rate is None:
@@ -490,6 +490,7 @@ class RuntimeDriver(SimulatorDriver):
             for key in grouped.keys() - self.last_rates.keys():
                 self._refresh_after[key] = now
             self.last_rates = grouped
+            self._demanded_aliases = demanded_aliases
 
             for identifier, connection in self.connections.items():
                 if identifier in self._scans:
@@ -560,6 +561,7 @@ class RuntimeDriver(SimulatorDriver):
                 if self._closing or self.project is not project:
                     return
                 awaiting_usable = not connection.has_usable_sample or connection.outage_started is not None
+                demanded_aliases = self._demanded_aliases.get(identifier, {})
                 for address, (result, acquired, timestamp) in zip(due, results):
                     key = (identifier, address)
                     rate = self.last_rates.get(key)
@@ -598,7 +600,7 @@ class RuntimeDriver(SimulatorDriver):
                             'failure_generation': connection.failure_generation,
                         }
                         # One physical UDT read can populate aliases no consumer requested.
-                        if (awaiting_usable and alias in self._demanded_aliases and sample['quality'] == 'good'
+                        if (awaiting_usable and alias in demanded_aliases and sample['quality'] == 'good'
                                 and scan_finished - acquired <= freshness_seconds(rate)):
                             connection.has_usable_sample = True
                             awaiting_usable = False
@@ -772,6 +774,15 @@ class RuntimeDriver(SimulatorDriver):
             return int(value)
         return value
 
+    def _has_usable_data(self, identifier, generation, now):
+        for alias, key in self._demanded_aliases.get(identifier, {}).items():
+            sample = self.samples.get(alias)
+            if (sample is not None and sample['quality'] == 'good' and key not in self._refresh_after
+                    and sample.get('failure_generation', 0) == generation
+                    and now - sample['monotonic'] <= freshness_seconds(sample['rate_ms'])):
+                return True
+        return False
+
     def status(self, *, include_timing=False, now=None):
         now = time.monotonic() if now is None else now
         with self.lock:
@@ -790,6 +801,8 @@ class RuntimeDriver(SimulatorDriver):
                                'scan_age_seconds': age,
                                'recovering': recovering,
                                'awaiting_data': active and not recovering and not connection.has_usable_sample,
+                               'data_unavailable': (active and not recovering and connection.has_usable_sample
+                                                    and not self._has_usable_data(identifier, connection.failure_generation, now)),
                                'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
                                'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
                                'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)} for rate, addresses in sorted(groups.items())],

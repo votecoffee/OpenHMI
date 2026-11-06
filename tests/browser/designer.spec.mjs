@@ -331,10 +331,12 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await expect(numeric).toContainText('42.0');
   await expect(button).toBeDisabled();
 
-  live = { ...live, connections: online, samples: {
+  live = { ...live, connections: [{ ...online[0], data_unavailable: true }, online[1]], samples: {
     TankLevel: { ...old, quality: 'stale', error: 'PLC sample is stale' },
     MotorRunning: { ...old, quality: 'bad', quality_reason: 'recovering' },
   } };
+  await expect(station).toContainText('PLC data unavailable');
+  await expect(header.getByText('Line PLC · Connected / no usable data', { exact: true })).toBeVisible();
   await expect(numeric).toContainText('STALE DATA');
   await expect(numeric.getByText('3.3 s old', { exact: true })).toBeVisible();
   const quality = numeric.getByRole('button', { name: 'Inspect TankLevel quality (STALE DATA)' });

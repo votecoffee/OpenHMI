@@ -307,6 +307,39 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(status['timings']['recovery']['last_ms'], 1200)
         self.assertEqual(driver.sample_snapshot(3.2)['MotorA.Speed']['value'], 50.0)
 
+    def test_established_route_reports_when_no_requested_data_is_usable(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['fast'], 1)
+        driver.poll(1)
+        self.assertFalse(driver.status(now=1)[0]['data_unavailable'])
+        self.assertTrue(driver.status(now=2.01)[0]['data_unavailable'])
+        self.assertEqual(driver.sample_snapshot(2.01)['MotorA.Speed']['quality'], 'stale')
+
+        plc = driver.connections['plc'].client
+        plc.values['Motor']['Speed'] = 'invalid speed'
+        driver.poll(3)
+        status = driver.status(now=3)[0]
+        self.assertTrue(status['connected'])
+        self.assertTrue(status['data_unavailable'])
+        self.assertFalse(status['recovering'])
+        self.assertEqual(driver.sample_snapshot(3)['MotorA.Running']['quality'], 'good')
+
+        driver.lease('viewer', ['fast', 'slow'], 4)
+        driver.poll(4)
+        self.assertFalse(driver.status(now=4)[0]['data_unavailable'])
+        self.assertEqual(driver.sample_snapshot(4)['MotorA.Speed']['quality'], 'bad')
+
+        driver.lease('viewer', ['fast'], 5)
+        plc.values['Motor']['Speed'] = 50.0
+        driver.poll(5)
+        self.assertFalse(driver.status(now=5)[0]['data_unavailable'])
+
+        driver.lease('viewer', [], 7)
+        driver.poll(7)
+        self.assertFalse(driver.status(now=7)[0]['data_unavailable'])
+
     def test_route_recovery_waits_for_usable_data_after_reconnect(self):
         reject = False
 

@@ -76,6 +76,7 @@ def add_operations_routes(app, journal, security, driver, workers):
                 'scan overdue' if status.get('scan_overdue') else
                 'recovering' if status.get('recovering') else
                 'waiting for first good data' if status.get('awaiting_data') else
+                'no usable data' if status.get('data_unavailable') else
                 'connected' if status.get('connected') else 'disconnected'
             )
             connections.append({'id': config['id'], 'name': config['name'], 'path': config['path'], 'state': state,
