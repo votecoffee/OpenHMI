@@ -295,18 +295,42 @@ function App({ initial, catalog }) {
   }, []);
   const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...visiblePopups.map(({ id }) => id)].join(',') : '' : editorSubscription.screen;
   useEffect(() => {
-    let stopped = false, timer;
-    async function heartbeat() {
-      try {
-        await api('/api/subscriptions', json('POST', {
-          client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [],
-          preview_root: runtime ? '' : editorSubscription.root,
+    const screens = leasedScreens ? leasedScreens.split(',') : [];
+    const previewRoot = runtime ? '' : editorSubscription.root;
+    let generation = 0, timer;
+    function subscribe(nextScreens, nextPreview, keepalive = false) {
+      return api('/api/subscriptions', {
+        ...json('POST', {
+          client: clientId.current, screens: nextScreens, preview_root: nextPreview,
           sequence: ++subscriptionSequence.current,
-        }));
-      } catch {}
-      if (!stopped) timer = setTimeout(heartbeat, 5000);
+        }),
+        keepalive,
+      });
     }
-    heartbeat(); return () => { stopped = true; clearTimeout(timer); };
+    async function heartbeat() {
+      const currentGeneration = generation;
+      try { await subscribe(screens, previewRoot); } catch {}
+      if (generation === currentGeneration) timer = setTimeout(heartbeat, 5000);
+    }
+    function stopHeartbeat() {
+      generation++;
+      clearTimeout(timer);
+    }
+    function release() {
+      stopHeartbeat();
+      if (screens.length || previewRoot) subscribe([], '', true).catch(() => {});
+    }
+    function restore(event) {
+      if (event.persisted) heartbeat();
+    }
+    window.addEventListener('pagehide', release);
+    window.addEventListener('pageshow', restore);
+    heartbeat();
+    return () => {
+      stopHeartbeat();
+      window.removeEventListener('pagehide', release);
+      window.removeEventListener('pageshow', restore);
+    };
   }, [leasedScreens, editorSubscription.root, runtime]);
   useEffect(() => {
     let stopped = false;

@@ -46,7 +46,10 @@ Specific equipment faceplates are intentionally left for later design.
 
 Each screen has an update interval, bounded to 100–60,000 ms. Viewers lease the
 screen/popups they currently use. Leases expire after 15 seconds unless refreshed.
-An empty subscription releases the viewer. Browser requests carry a sequence
+An empty subscription releases the viewer. When the page is left, the browser
+tries to send a release. The 15-second timeout still applies if it cannot.
+A page restored from the browser's back/forward cache renews its lease.
+Browser requests carry a sequence
 number so a delayed heartbeat cannot replace a newer request for the same
 viewer. The runtime remembers the last sequence for its 2,000 most recently
 updated sequenced clients, including released viewers. When demand for an

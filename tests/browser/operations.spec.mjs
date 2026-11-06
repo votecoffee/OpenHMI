@@ -62,7 +62,30 @@ test('protected operator journal, denial attribution, filters, export and diagno
   await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
   await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Operator activity', exact: true })).toBeVisible();
+  const activeLease = after => page.waitForResponse(response => {
+    const request = response.request();
+    if (!request.url().endsWith('/api/subscriptions') || request.method() !== 'POST') return false;
+    const body = request.postDataJSON();
+    return body.screens.includes('overview') && (!after || body.client === after.client && body.sequence > after.sequence);
+  });
+  const releasedLease = lease => page.waitForResponse(response => {
+    const request = response.request();
+    if (!request.url().endsWith('/api/subscriptions') || request.method() !== 'POST') return false;
+    const body = request.postDataJSON();
+    return body.client === lease.client && !body.screens.length && body.sequence > lease.sequence;
+  });
+  const initialLease = activeLease();
   await page.goto('/runtime');
+  const initial = (await initialLease).request().postDataJSON();
+  const hidden = releasedLease(initial);
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })));
+  const hiddenResponse = await hidden;
+  expect(hiddenResponse.ok()).toBe(true);
+  const restored = activeLease(hiddenResponse.request().postDataJSON());
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  const restoredResponse = await restored;
+  expect(restoredResponse.ok()).toBe(true);
+
   await page.getByRole('button', { name: 'Toggle simulated motor', exact: true }).click();
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   const successful = page.locator('.activity-table tbody tr').filter({ hasText: 'toggle' }).first();
