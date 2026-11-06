@@ -10,6 +10,34 @@ The [driver readiness roadmap](runtime-readiness-roadmap.md#m2--controllogix-acq
 defines the fault profile, supported tag checks and measurements. Agree the
 scan, acquisition age, recovery and controller load limits for this bench.
 
+## Run the offline scan baseline
+
+From a source checkout with OpenHMI installed, create a report at a new path in
+the existing local evidence directory.
+
+```powershell
+New-Item -ItemType Directory -Force .local | Out-Null
+python scripts/benchmark-logix.py --output .local/driver-baseline.json
+```
+
+The baseline uses the actual driver scheduler and a synthetic adapter. It runs
+the same workload on one route and then on two routes, with fixed adapter delays
+of 3 ms and 80 ms. Two viewers request 100 ms and 500 ms updates. Each route has
+24 scalar addresses, a shared UDT, an indexed element and separate alarm and
+historian demand. The tool checks that overlapping aliases and UDT members
+collapse into one address, then injects a disconnect on the slower route and
+checks that the primary route keeps good sample quality while it recovers.
+
+The JSON report includes per-alias good sample age, quality observation counts,
+scheduler dispatch time, adapter read time, scan lateness, read calls,
+requested addresses and route recovery time. Timing summaries use bounded
+nearest-rank p50/p95/p99 windows. Route counters and rolling scan timings include
+the initial warm-up and are cumulative within a scenario. Sample age is observed
+at the scheduler tick, so observations can reuse the same acquired sample.
+Compare runs on the same host and record concurrent workload. The numbers describe
+synthetic adapter calls and scheduler behavior. Wire packets, PLC load, metadata
+upload cost and production scan limits require the controller bench below.
+
 ## Prepare the read-only project
 
 From a source checkout, create a bench project and backup using the reviewed

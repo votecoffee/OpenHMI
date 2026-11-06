@@ -36,8 +36,11 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
 2. **Measure before tuning.** The current schedule includes scan duration and
    the polling loop delay. Diagnostics now reports rolling p50/p95/p99 for
    scan duration and start lateness, successful opens and loss to first good
-   data. Record these along with requested rates, representative tag ages,
-   controller load and errors on the bench. Test mixed-rate screens, overlapping aliases, alarm/history demand,
+   data. Use the [offline scan baseline](plc-bench-acceptance.md#run-the-offline-scan-baseline)
+   to compare single-route and mixed-rate two-route scheduling with a simulated
+   disconnect. On the bench, record these timings with requested rates, tag ages,
+   controller load and errors. Test mixed-rate screens, overlapping aliases,
+   alarm/history demand,
    multiple routes, and a slow or disconnected route. Label calls and requested
    addresses separately from packet counts measured by a capture or controller
    diagnostics. Agree load and latency bounds for the intended project profile.
