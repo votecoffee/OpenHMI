@@ -55,6 +55,7 @@ export const uiText = {
   barcodeEntry: '{label} scan entry', barcodeFocus: 'Focus this field, then scan or enter a code.',
   barcodeSubmit: 'Submit code', barcodeClear: 'Clear code', barcodeSingleLine: 'Enter one nonempty barcode line.',
   dateTimeEntry: '{label} new date and time (UTC)', dateTimeRange: 'UTC range: {low} to {high}',
+  durationInvalid: 'Invalid duration',
   dateTimeInvalid: 'Invalid UTC timestamp',
   sliderDraft: 'Proposed value: {value}',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',

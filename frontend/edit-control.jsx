@@ -8,7 +8,10 @@ import { api, json } from './api.mjs';
 export const MAX_UTC_EPOCH = 253402300799;
 const validUtcEpoch = epoch => Number.isSafeInteger(epoch) && epoch >= 0 && epoch <= MAX_UTC_EPOCH;
 const utcFieldValue = epoch => validUtcEpoch(epoch) ? new Date(epoch * 1000).toISOString().slice(0, 19) : '';
-const utcReadout = epoch => utcFieldValue(epoch).replace('T', ' ') + ' UTC';
+export function formatUtcEpoch(epoch) {
+  const field = utcFieldValue(epoch);
+  return field ? field.replace('T', ' ') + ' UTC' : '';
+}
 
 function readUtcField(value) {
   if (!value) return null;
@@ -104,7 +107,7 @@ export function EditControl(props) {
   return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : dateTime ? 'date_time' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
     {!valid ? <Quality problem={problem} tag={tag} /> : dateTime && !validUtcEpoch(value)
       ? <strong className="range-deviation">{ui('dateTimeInvalid')}</strong>
-      : <strong className="hmi-value">{dateTime ? utcReadout(value) : text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong>}
+      : <strong className="hmi-value">{dateTime ? formatUtcEpoch(value) : text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong>}
     <small>{!limits.valid ? ui(limitProblem) : dateTime
       ? ui('dateTimeRange', { low: utcFieldValue(low).replace('T', ' '), high: utcFieldValue(high).replace('T', ' ') })
       : ui(text ? 'textLength' : 'numericRange', limits)}</small>

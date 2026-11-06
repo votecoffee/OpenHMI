@@ -8,7 +8,7 @@ import { LoadedRecipe } from './recipes.jsx';
 import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.jsx';
 
 import { WebBrowser } from './web-browser.jsx';
-import { DateTimeLimit, EditControl, MAX_UTC_EPOCH } from './edit-control.jsx';
+import { DateTimeLimit, EditControl, formatUtcEpoch, MAX_UTC_EPOCH } from './edit-control.jsx';
 import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Sparkline, Trend, TrendFields } from './trend.jsx';
@@ -90,6 +90,30 @@ function ProgressBar({ id, label, tag, unit, decimals, minimum, maximum, puck })
       <div className="analog-scale"><span>{minimum}</span>
         {outside && <strong>{ui('outOfScale')}</strong>}<span>{maximum}</span></div>
     </>}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
+function formatDuration(value, sourceUnit, decimals) {
+  const scale = 10 ** decimals;
+  const ticks = Math.round(value * (sourceUnit === 'milliseconds' ? scale / 1000 : scale));
+  if (value < 0 || !Number.isSafeInteger(ticks)) return '';
+  const fraction = ticks % scale;
+  const whole = (ticks - fraction) / scale;
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor(whole / 60) % 60;
+  const clock = [hours, minutes, whole % 60].map(part => String(part).padStart(2, '0')).join(':');
+  return decimals ? clock + '.' + String(fraction).padStart(decimals, '0') : clock;
+}
+
+function TimeDisplay({ id, label, tag, puck, source_unit, decimals = 0, duration = false }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui } = useLocalization();
+  const reading = valid ? (duration ? formatDuration(value, source_unit, decimals) : formatUtcEpoch(value)) : '';
+  return <article className="hmi-control hmi-time-display" data-control={duration ? 'duration' : 'date_time_display'}>
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {!valid ? <Quality problem={problem} tag={tag} /> : reading ? <strong className="hmi-value">{reading}</strong>
+      : <strong className="range-deviation">{ui(duration ? 'durationInvalid' : 'dateTimeInvalid')}</strong>}
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
@@ -381,7 +405,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -464,6 +488,17 @@ export function createConfig(catalog) {
       ProgressBar: { label: 'Progress bar', fields: { ...numericFields, ...scaleFields },
         defaultProps: { ...numericDefaults, label: 'Progress', minimum: 0, maximum: 100 }, render: ProgressBar },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
+      DateTimeDisplay: { label: 'Date/time display', fields: {
+        label: labelField, tag: browserTag('Tag', 'Choose an unscaled integer tag', integerTag),
+      }, defaultProps: { label: 'UTC timestamp', tag: catalog.tags.find(integerTag)?.name || 'AlarmWord' }, render: TimeDisplay },
+      DurationDisplay: { label: 'Duration display', fields: {
+        label: labelField, tag: tagField('number'),
+        source_unit: { type: 'select', label: 'Source units', options: [
+          { label: 'Milliseconds', value: 'milliseconds' }, { label: 'Seconds', value: 'seconds' },
+        ] },
+        decimals: { type: 'select', label: 'Fractional places', options: [0, 1, 2, 3].map(value => ({ label: String(value), value })) },
+      }, defaultProps: { label: 'Elapsed time', tag: 'TankLevel', source_unit: 'milliseconds', decimals: 0 },
+      render: props => <TimeDisplay {...props} duration /> },
       TextDisplay: { label: 'Text display', fields: { label: labelField, tag: tagField('string') },
         defaultProps: { label: 'Status text', tag: 'OperatorText' }, render: TextDisplay },
       TextInput: { label: 'Text input', fields: textFields, defaultProps: textDefaults, render: TextInput },

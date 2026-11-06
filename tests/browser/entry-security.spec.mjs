@@ -31,6 +31,8 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { name: 'TravelLimit', type: 'number', initial: 5.5 },
         { name: 'Scan', type: 'string', initial: '', writable: true },
         { name: 'MaintenanceTime', type: 'integer', initial: Date.parse('2027-03-14T00:00:00Z') / 1000, writable: true },
+        { name: 'Elapsed', type: 'integer', initial: 90061234 },
+        { name: 'CycleSeconds', type: 'number', initial: 59.9999 },
       ],
       controls: [
         { id: 'color', kind: 'radio_group', tag: 'ColorChoice', label: 'Color',
@@ -43,27 +45,32 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
         { id: 'scan', kind: 'barcode_input', tag: 'Scan', label: 'Part scan', max_length: 8 },
         { id: 'maintenance', kind: 'date_time', tag: 'MaintenanceTime', label: 'Maintenance time',
           minimum: Date.parse('2027-03-14T00:00:00Z') / 1000, maximum: Date.parse('2027-03-15T00:00:00Z') / 1000 },
+        { id: 'time_readout', kind: 'date_time_display', tag: 'MaintenanceTime', label: 'Recorded timestamp' },
+        { id: 'elapsed', kind: 'duration', tag: 'Elapsed', label: 'Total elapsed', decimals: 3 },
+        { id: 'cycle', kind: 'duration', tag: 'CycleSeconds', label: 'Cycle', source_unit: 'seconds', decimals: 3 },
       ],
     });
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Date/time input', exact: true })).toBeVisible();
-    await page.locator('[data-control="date_time"] .hmi-label').click();
-    const latest = page.getByRole('textbox', { name: 'Latest (UTC)', exact: true });
-    await expect(latest).toHaveValue('2027-03-15T00:00');
-    await latest.fill('2027-03-14T20:00');
-    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     const block = page.getByRole('button', { name: 'Dropdown', exact: true });
     await block.scrollIntoViewIfNeeded();
     const source = await block.boundingBox();
     const target = await page.locator('.hmi-grid').boundingBox();
     await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
     await page.mouse.down();
-    await page.mouse.move(target.x + 100, target.y + 90, { steps: 10 });
-    await page.mouse.move(target.x + 110, target.y + 100, { steps: 2 });
+    await page.mouse.move(target.x + 100, target.y + 30, { steps: 10 });
+    await page.mouse.move(target.x + 110, target.y + 17, { steps: 2 });
     await page.mouse.up();
     await expect(page.locator('[data-control="dropdown"]')).toHaveCount(1);
     await page.locator('[data-control="dropdown"] .hmi-label').click();
     await page.getByRole('textbox', { name: 'Choice label', exact: true }).nth(1).fill('Fast');
+    await page.locator('[data-control="date_time"] .hmi-label').click();
+    const latest = page.getByRole('textbox', { name: 'Latest (UTC)', exact: true });
+    await expect(page.getByRole('button', { name: 'Date/time display', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Duration display', exact: true })).toBeVisible();
+    await expect(latest).toHaveValue('2027-03-15T00:00');
+    await latest.fill('2027-03-14T20:00');
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
@@ -139,6 +146,12 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await picker.fill('2027-03-14T02:30:45');
     await time.getByRole('button', { name: 'Write value', exact: true }).click();
     await expect(time).toContainText('2027-03-14 02:30:45 UTC');
+    const timestamp = page.locator('[data-control="date_time_display"]');
+    const elapsed = page.locator('[data-control="duration"]').filter({ hasText: 'Total elapsed' });
+    const cycle = page.locator('[data-control="duration"]').filter({ hasText: 'Cycle' });
+    await expect(timestamp).toContainText('2027-03-14 02:30:45 UTC');
+    await expect(elapsed).toContainText('25:01:01.234');
+    await expect(cycle).toContainText('00:01:00.000');
 
     const data = await (await page.request.get('/api/tags')).json();
     expect(data.values).toMatchObject({
@@ -149,6 +162,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     data.samples.Travel = { quality: 'stale', age_seconds: 4 };
     data.samples.Scan = { quality: 'stale', age_seconds: 4 };
     data.samples.MaintenanceTime = { quality: 'stale', age_seconds: 4 };
+    data.values.Elapsed = -1;
     await page.route('**/api/tags', route => route.fulfill({ json: data }));
     await expect(page.locator('[data-control="checkbox"]')).toContainText('STALE DATA');
     await expect(checkbox).toBeHidden();
@@ -157,6 +171,9 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
     await expect(progress).toBeHidden();
     await expect(scan).toBeDisabled();
     await expect(picker).toBeDisabled();
+    await expect(timestamp).toContainText('STALE DATA');
+    await expect(elapsed).toContainText('Invalid duration');
+    await expect(cycle).toContainText('00:01:00.000');
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);

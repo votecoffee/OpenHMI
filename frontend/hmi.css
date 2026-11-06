@@ -73,7 +73,7 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .hmi-progress progress { width: 100%; height: 14px; accent-color: var(--hmi-live); }
 .hmi-date-time { display: flex; gap: 6px; flex-wrap: wrap; max-width: 100%; }
 .hmi-date-time input { min-height: 32px; min-width: 0; max-width: 100%; font: inherit; }
-[data-control="date_time"] .hmi-value { font-size: 16px; }
+[data-control="date_time"] .hmi-value, .hmi-time-display .hmi-value { font-size: 16px; overflow-wrap: anywhere; }
 .hmi-barcode { display: flex; width: 100%; gap: 6px; flex-wrap: wrap; }
 .hmi-barcode input { box-sizing: border-box; flex: 1 0 100%; min-width: 0; min-height: 32px; }
 .hmi-slider { width: 100%; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

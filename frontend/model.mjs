@@ -5,7 +5,7 @@ export const controlTypes = {
   input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
-  faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', web_browser: 'WebBrowser',
+  faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', date_time_display: 'DateTimeDisplay', duration: 'DurationDisplay', web_browser: 'WebBrowser',
   multi_state: 'MultiState', mode_selector: 'ModeSelector', permissives: 'PermissiveList',
 };
 const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type]) => [type, kind]));
@@ -52,7 +52,8 @@ export function toProject(data, settings = {}) {
       if (type === 'DateTimeInput') return { ...base, tag: props.tag,
         minimum: props.minimum, maximum: props.maximum, minimum_tag: props.minimum_tag || '',
         maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
-      if (type === 'TextDisplay') return { ...base, tag: props.tag };
+      if (type === 'TextDisplay' || type === 'DateTimeDisplay') return { ...base, tag: props.tag };
+      if (type === 'DurationDisplay') return { ...base, tag: props.tag, source_unit: props.source_unit, decimals: Number(props.decimals) };
       if (type === 'Dropdown' || type === 'RadioGroup') return { ...base, tag: props.tag, options: props.options, security_groups: props.security_groups || [] };
       if (type === 'Checkbox' || type === 'ToggleSwitch') return { ...base, tag: props.tag, security_groups: props.security_groups || [] };
       if (['TextInput', 'TextArea', 'BarcodeInput'].includes(type)) return { ...base, tag: props.tag, min_length: Number(props.min_length ?? 0), max_length: Number(props.max_length ?? 82), min_length_tag: props.min_length_tag || '', max_length_tag: props.max_length_tag || '', security_groups: props.security_groups || [] };

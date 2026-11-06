@@ -104,6 +104,18 @@ class SparklineControl(NumericControl):
     seconds: int = Field(default=60, ge=5, le=3600)
 
 
+class DateTimeDisplayControl(ControlBase):
+    kind: Literal['date_time_display']
+    tag: str = Field(min_length=1, max_length=200)
+
+
+class DurationDisplayControl(ControlBase):
+    kind: Literal['duration']
+    tag: str = Field(min_length=1, max_length=200)
+    source_unit: Literal['seconds', 'milliseconds'] = 'milliseconds'
+    decimals: int = Field(default=0, ge=0, le=3)
+
+
 class TextDisplayControl(ControlBase):
     kind: Literal['text']
     tag: str = Field(min_length=1, max_length=200)
@@ -436,7 +448,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | DateTimeControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

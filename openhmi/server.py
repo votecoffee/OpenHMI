@@ -269,6 +269,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if not target or not target.writable or kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Control requires a configured writable tag of type {' or '.join(expected)}: {control['tag']}")
                 continue
+            if control['kind'] == 'date_time_display':
+                if kinds.get(control['tag']) != 'integer':
+                    raise HTTPException(422, 'Date/time display requires an unscaled integer tag')
+                continue
             if control['kind'] in ('multi_state', 'mode_selector'):
                 if kinds.get(control['tag']) != 'integer':
                     raise HTTPException(422, 'Machine states require an unscaled integer tag')
@@ -329,7 +333,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if kind not in ('number', 'integer', 'boolean', 'string') or (mode == 'toggle' and kind != 'boolean'):
                         raise HTTPException(422, 'Action target type is incompatible')
             else:
-                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'gauge', 'progress', 'sparkline', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
+                expected = ('number', 'integer') if control['kind'] in ('numeric', 'analog', 'tank', 'gauge', 'progress', 'sparkline', 'duration', 'input') else ('string',) if control['kind'] in ('text', 'text_input') else ('boolean',)
                 if kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Unknown or incompatible tag: {control['tag']}")
 

@@ -199,8 +199,12 @@ class SecurityTests(unittest.TestCase):
             {'name': 'MaintenanceTime', 'type': 'integer', 'initial': 1000, 'writable': True},
             {'name': 'LatestTime', 'type': 'number', 'initial': 3600, 'writable': True},
         ]
-        project['controls'].append({'id': 'maintenance', 'kind': 'date_time', 'tag': 'MaintenanceTime',
-                                    'label': 'Maintenance time', 'minimum': 1000, 'maximum_tag': 'LatestTime'})
+        project['controls'] += [
+            {'id': 'maintenance', 'kind': 'date_time', 'tag': 'MaintenanceTime',
+             'label': 'Maintenance time', 'minimum': 1000, 'maximum_tag': 'LatestTime'},
+            {'id': 'timestamp', 'kind': 'date_time_display', 'tag': 'MaintenanceTime', 'label': 'Timestamp'},
+            {'id': 'duration', 'kind': 'duration', 'tag': 'LatestTime', 'label': 'Duration'},
+        ]
         saved = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': project})
         saved.raise_for_status()
         applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -214,6 +218,8 @@ class SecurityTests(unittest.TestCase):
         self.client.put(url, json=request).raise_for_status()
         driver = self.app.state.driver
         self.assertEqual(driver.read('MaintenanceTime'), [1600])
+        for control in ('timestamp', 'duration'):
+            self.assertEqual(self.client.put(f'/api/controls/{control}/value', json=request).status_code, 404)
         driver.write('LatestTime', [3600.5])
         self.assertEqual(self.client.put(url, json=request).status_code, 409)
         driver.write('LatestTime', [1500.0])

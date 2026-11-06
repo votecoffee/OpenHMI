@@ -276,6 +276,10 @@ Bind it to a writable, unscaled integer tag that stores whole Unix epoch
 seconds. Configure the earliest and latest UTC times in the HMI or bind them
 to numeric tags containing epoch seconds. The PLC tag type determines its
 actual storage range.
+The read-only **Date/time display** uses the same UTC epoch-seconds format.
+A **Duration display** formats a numeric timer in seconds or milliseconds as
+hours, minutes and seconds, with optional fractional seconds. Hours continue
+past 24 for long-running counters.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,
