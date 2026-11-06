@@ -47,6 +47,33 @@ function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   </article>;
 }
 
+const annotationSymbols = {
+  arrow: { label: 'Arrow', path: 'M4 12h15m-6-6 6 6-6 6' },
+  info: { label: 'Information', path: 'M12 11v6m0-10v.2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z' },
+  warning: { label: 'Warning', path: 'M12 3 22 21H2zm0 7v4m0 3v.2' },
+  check: { label: 'Check mark', path: 'm4 12 5 5L20 6' },
+  circle: { label: 'Circle', path: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z' },
+  diamond: { label: 'Diamond', path: 'm12 2 10 10-10 10L2 12z' },
+};
+
+function StaticLabel({ id, label, font_size, alignment, weight }) {
+  const { text } = useLocalization();
+  return <div className="hmi-annotation hmi-static-label" data-control="label"
+    style={{ fontSize: font_size, textAlign: alignment, fontWeight: weight }}>
+    {text(`control.${id}.label`, label)}
+  </div>;
+}
+
+function ScreenSymbol({ id, label, symbol, size, rotation }) {
+  const { text } = useLocalization();
+  return <div className="hmi-annotation hmi-symbol" data-control="symbol">
+    <svg role="img" aria-label={text(`control.${id}.label`, label)} viewBox="0 0 24 24" width={size} height={size}
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d={annotationSymbols[symbol]?.path} transform={`rotate(${rotation} 12 12)`} />
+    </svg>
+  </div>;
+}
+
 function ProgressBar({ id, label, tag, unit, decimals, minimum, maximum, puck }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, ui } = useLocalization();
@@ -282,7 +309,7 @@ function Conditional({ children, visible_tag, enabled_tag, color_tag, active_col
   if (!puck?.isEditing && visible_tag && !isTrue(visible_tag)) return null;
   const enabled = !puck?.isEditing && enabled_tag ? tagValue(live, enabled_tag, 'boolean') : null;
   const disabled = enabled != null && (!enabled.valid || enabled.value !== true);
-  return <div className="binding-frame" style={color_tag && isTrue(color_tag) ? { '--hmi-live': active_color } : {}}>
+  return <div className="binding-frame" style={color_tag && isTrue(color_tag) ? { '--hmi-live': active_color, '--hmi-annotation-color': active_color } : {}}>
     {disabled && (enabled.valid ? <small>{ui('editEnableOff', { tag: enabled_tag })}</small>
       : <Quality tag={enabled_tag} problem={enabled.problem}
         text={ui('editBindingProblem', { binding: ui('editEnableBinding'), quality: ui(enabled.problem) })} />)}
@@ -352,6 +379,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} radar={radar} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar'];
   const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -362,8 +390,9 @@ export function createConfig(catalog) {
     },
     categories: {
       hmi: { title: 'High performance HMI', components: Object.values(controlTypes)
-        .filter(type => !chartTypes.includes(type) && !inputTypes.includes(type) && (type !== 'Faceplate' || catalog.faceplates?.length)) },
+        .filter(type => !chartTypes.includes(type) && !inputTypes.includes(type) && !displayTypes.includes(type) && (type !== 'Faceplate' || catalog.faceplates?.length)) },
       inputs: { title: 'Inputs', components: inputTypes },
+      display: { title: 'Display', components: displayTypes },
       charts: { title: 'Live charts', components: chartTypes },
     },
     components: {
@@ -410,6 +439,23 @@ export function createConfig(catalog) {
         defaultProps: { ...numericDefaults, label: 'Setpoint slider', unit: '', tag: catalog.tags.find(sliderTag)?.name || '',
           minimum: 0, maximum: 100, security_groups: [] },
         render: props => <EditControl {...props} slider sliderInteger={!!catalog.tags.find(tag => tag.name === props.tag)?.integer} /> },
+      StaticLabel: { label: 'Static label', fields: {
+        label: labelField, font_size: { type: 'number', label: 'Font size (px)', min: 8, max: 72 },
+        alignment: { type: 'select', label: 'Text alignment', options: [
+          { label: 'Start', value: 'start' }, { label: 'Center', value: 'center' }, { label: 'End', value: 'end' },
+        ] },
+        weight: { type: 'select', label: 'Text weight', options: [
+          { label: 'Normal', value: 'normal' }, { label: 'Bold', value: 'bold' },
+        ] },
+      }, defaultProps: { label: 'Machine section', font_size: 16, alignment: 'start', weight: 'normal' }, render: StaticLabel },
+      ScreenSymbol: { label: 'Symbol', fields: {
+        label: { type: 'text', label: 'Accessible label' },
+        symbol: { type: 'select', label: 'Shape', options: Object.entries(annotationSymbols)
+          .map(([value, { label }]) => ({ value, label })) },
+        size: { type: 'number', label: 'Symbol size (px)', min: 12, max: 96 },
+        rotation: { type: 'select', label: 'Rotation', options: [0, 90, 180, 270]
+          .map(value => ({ value, label: String(value) + ' degrees' })) },
+      }, defaultProps: { label: 'Direction of travel', symbol: 'arrow', size: 28, rotation: 0 }, render: ScreenSymbol },
       ProgressBar: { label: 'Progress bar', fields: { ...numericFields, ...scaleFields },
         defaultProps: { ...numericDefaults, label: 'Progress', minimum: 0, maximum: 100 }, render: ProgressBar },
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },

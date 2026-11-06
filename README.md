@@ -263,6 +263,12 @@ scan with a keyboard-wedge scanner configured to append Enter, or enter a code
 manually and select **Submit code**. The input preserves leading zeros and
 spaces, applies the configured text limits, and clears after a verified write.
 
+In the **Display** palette, add a **Static label** for a heading or callout and
+a **Symbol** for an arrow or annotation. Set label size, alignment and weight,
+or choose a symbol shape, size and rotation. Both support translations and
+optional Boolean visibility and color bindings. Place them over a machine image
+in freeform layout for a compact diagram.
+
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See
 [runtime, UDT and history semantics](docs/runtime-and-projects.md) for quality,

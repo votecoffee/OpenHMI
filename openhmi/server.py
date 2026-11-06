@@ -255,7 +255,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             required = control.get('security_groups', [])
             if not set(required) <= known_groups:
                 raise HTTPException(422, 'Control references an unknown HMI security group')
-            if control['kind'] in ('recipe', 'current_user'):
+            if control['kind'] in ('recipe', 'current_user', 'label', 'symbol'):
                 continue
             if control['kind'] in PALETTE_INPUTS:
                 target, _ = sources.get(control['tag'], (None, ''))

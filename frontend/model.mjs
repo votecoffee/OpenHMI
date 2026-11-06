@@ -1,7 +1,7 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', bar: 'BarGraph', radar: 'RadarChart', alarm: 'AlarmIndicator',
-  recipe: 'SelectedRecipe',
+  recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol',
   input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
@@ -43,6 +43,8 @@ export function toProject(data, settings = {}) {
       if (type === 'ModeSelector') return { ...base, tag: props.tag, confirmed_tag: props.confirmed_tag,
         states: props.states, presentation: props.presentation || 'dropdown', security_groups: props.security_groups || [] };
       if (type === 'PermissiveList') return { ...base, checks: props.checks };
+      if (type === 'StaticLabel') return { ...base, font_size: Number(props.font_size), alignment: props.alignment, weight: props.weight };
+      if (type === 'ScreenSymbol') return { ...base, symbol: props.symbol, size: Number(props.size), rotation: Number(props.rotation) };
       if (type === 'TextDisplay') return { ...base, tag: props.tag };
       if (type === 'Dropdown' || type === 'RadioGroup') return { ...base, tag: props.tag, options: props.options, security_groups: props.security_groups || [] };
       if (type === 'Checkbox' || type === 'ToggleSwitch') return { ...base, tag: props.tag, security_groups: props.security_groups || [] };

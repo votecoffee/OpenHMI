@@ -14,6 +14,8 @@ const settings = (layout, key, value) => ({ ...layout, [key]: value });
 const lookup = (map, key) => map && Object.hasOwn(map, key) ? map[key] : undefined;
 
 function size(type) {
+  if (type === 'StaticLabel') return { width: 144, height: 32 };
+  if (type === 'ScreenSymbol') return { width: 48, height: 48 };
   if (type === 'Trend') return { width: 480, height: 320 };
   if (type === 'WebBrowser') return { width: 400, height: 280 };
   if (['TankLevel', 'BarGraph', 'RadarChart', 'Faceplate'].includes(type)) return { width: 240, height: 240 };

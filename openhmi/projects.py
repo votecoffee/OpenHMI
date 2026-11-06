@@ -84,6 +84,20 @@ class NumericControl(ControlBase):
     decimals: int = Field(default=1, ge=0, le=4)
 
 
+class LabelControl(ControlBase):
+    kind: Literal['label']
+    font_size: int = Field(default=16, ge=8, le=72)
+    alignment: Literal['start', 'center', 'end'] = 'start'
+    weight: Literal['normal', 'bold'] = 'normal'
+
+
+class SymbolControl(ControlBase):
+    kind: Literal['symbol']
+    symbol: Literal['arrow', 'info', 'warning', 'check', 'circle', 'diamond'] = 'arrow'
+    size: int = Field(default=28, ge=12, le=96)
+    rotation: Literal[0, 90, 180, 270] = 0
+
+
 class TextDisplayControl(ControlBase):
     kind: Literal['text']
     tag: str = Field(min_length=1, max_length=200)
@@ -358,7 +372,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

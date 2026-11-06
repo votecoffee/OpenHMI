@@ -12,6 +12,58 @@ async function save(page, project, apply = true) {
   }
 }
 
+test('compact static labels and symbols survive canvas save and live apply', async ({ page }) => {
+  test.setTimeout(60000);
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    await save(page, { ...original.active, controls: [], screens: [], layout: null,
+      tags: [{ name: 'Highlight', type: 'boolean', initial: true }] });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Enable freeform layout' }).click();
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    const palette = page.getByRole('group', { name: 'Control palette' });
+    const type = palette.getByRole('combobox', { name: 'Control type' });
+    const source = palette.getByRole('button', { name: 'Add or drag control' });
+    const fields = page.getByRole('group', { name: 'Control properties' });
+
+    await type.selectOption('StaticLabel');
+    await source.dragTo(canvas, { targetPosition: { x: 24, y: 40 } });
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('height', '32px');
+    await fields.getByRole('textbox', { name: 'Label', exact: true }).fill('Part exit');
+    await fields.getByRole('spinbutton', { name: 'Font size (px)', exact: true }).fill('18');
+    await fields.getByRole('combobox', { name: 'Text weight', exact: true }).selectOption({ label: 'Bold' });
+    await fields.getByRole('combobox', { name: 'Text alignment', exact: true }).selectOption({ label: 'Center' });
+
+    await type.selectOption('ScreenSymbol');
+    await source.dragTo(canvas, { targetPosition: { x: 192, y: 40 } });
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('height', '48px');
+    await fields.getByRole('textbox', { name: 'Accessible label', exact: true }).fill('Exit direction');
+    await fields.getByRole('combobox', { name: 'Rotation', exact: true }).selectOption({ label: '90 degrees' });
+    await fields.getByRole('combobox', { name: 'Color when tag is true', exact: true }).selectOption({ label: 'Highlight' });
+
+    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+
+    await page.goto('/runtime');
+    const label = page.locator('[data-control="label"]');
+    const arrow = page.getByRole('img', { name: 'Exit direction', exact: true });
+    await expect(label).toHaveText('Part exit');
+    await expect(label).toHaveCSS('font-size', '18px');
+    await expect(label).toHaveCSS('font-weight', '700');
+    await expect(label).toHaveCSS('text-align', 'center');
+    await expect(arrow.locator('path')).toHaveAttribute('transform', 'rotate(90 12 12)');
+    await expect(arrow).toHaveCSS('color', 'rgb(0, 40, 120)');
+    const { active } = await (await page.request.get('/api/project')).json();
+    expect(active.controls.map(control => control.kind)).toEqual(['label', 'symbol']);
+    expect(active.controls.every(control => !Object.hasOwn(control, 'tag'))).toBe(true);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('runtime fit width preserves canvas alignment, controls and trend cursor', async ({ page }) => {
   await page.setViewportSize({ width: 620, height: 780 });
   const original = await (await page.request.get('/api/project')).json();
