@@ -270,6 +270,41 @@ class LogixHistoryTests(unittest.TestCase):
         driver.close()
         self.assertTrue(plc.closed)
 
+    def test_faster_screen_demand_survives_an_in_flight_older_sample(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.poll(0)
+        connection = driver.connections['plc']
+        read = connection.read
+        received, release = Event(), Event()
+        self.addCleanup(release.set)
+
+        def delay_commit(*args, **kwargs):
+            result = read(*args, **kwargs)
+            received.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release the scan')
+            return result
+
+        driver.lease('slow-viewer', ['slow'], 1)
+        with patch.object(connection, 'read', side_effect=delay_commit):
+            driver.poll(1, wait=False)
+            self.assertTrue(received.wait(5))
+            scan = driver._scans['plc']
+            driver.lease('fast-viewer', ['fast'], 1.02)
+            driver.poll(1.02, wait=False)
+            self.assertIs(driver._scans['plc'], scan)
+            release.set()
+            scan.result(timeout=5)
+
+        connection.client.values['Motor']['Speed'] = 50.0
+        driver.poll(1.03)
+        self.assertEqual(connection.client.reads, [('Motor', 'Level'), ('Motor',)])
+        self.assertEqual(driver.sample_snapshot(1.03)['MotorA.Speed']['value'], 50.0)
+        driver.poll(1.04)
+        self.assertEqual(len(connection.client.reads), 2)
+
     def test_out_of_order_subscriptions_cannot_restore_released_demand(self):
         app = create_app()
         driver = app.state.driver

@@ -62,6 +62,8 @@ address. Multiple UDT members are acquired through a single root
 UDT read. Alarm tags demand 250 ms; historian tags demand their sampling interval,
 independent of viewers. Idle screen tags are not kept on a scan solely because
 their screen exists.
+If faster demand arrives during a scan, a sample received before that demand
+leaves the address due for the next scan.
 
 Due addresses share a single pycomm3 connection per configured PLC and are read
 in batches. pycomm3 splits requests to fit EtherNet/IP Multiple Service Packets

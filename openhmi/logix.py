@@ -532,7 +532,10 @@ class RuntimeDriver(SimulatorDriver):
                     rate = self.last_rates.get(key)
                     if rate is None:
                         continue
-                    self.deadlines[key] = scan_finished + rate / 1000
+                    pending_deadline = self.deadlines.get(key)
+                    # A sample received before a faster demand arrived cannot satisfy its refresh.
+                    if pending_deadline is None or pending_deadline <= acquired:
+                        self.deadlines[key] = scan_finished + rate / 1000
                     for alias, tag, member in self.address_aliases[key]:
                         try:
                             if result is None or result.error:
