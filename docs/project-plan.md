@@ -23,7 +23,7 @@ The integrated Python IDE and deliberate Python hot reload are deferred.
 | --- | --- | --- | --- |
 | M0 — Verified software baseline | Complete software checkpoint | Existing visual/runtime/project foundations verified at `8a2deb5`: 34 Python tests, 9 browser tests and package checks. No hardware/domain acceptance implied. | [M0](https://github.com/votecoffee/OpenHMI/milestone/1) |
 | M1 — Operational traceability and diagnostics | Complete software checkpoint | Durable journal and readable diagnostics delivered; 44 Python tests and 10 browser tests passed. Hardware/domain acceptance remains separate. | [M1](https://github.com/votecoffee/OpenHMI/milestone/2), [#5](https://github.com/votecoffee/OpenHMI/issues/5), [#6](https://github.com/votecoffee/OpenHMI/issues/6) |
-| M2 — ControlLogix driver readiness and bench acceptance | Driver hardening and bench acceptance open | Isolate routes, improve scheduling and quality propagation, and measure supported types, scan/load and reconnect. Start hardware acceptance with an identified read-only bench. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#12](https://github.com/votecoffee/OpenHMI/issues/12), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
+| M2 — ControlLogix driver readiness and bench acceptance | Offline baseline delivered; bench validation next | Grouped polling, route isolation and quality propagation are available. Measure supported tag types, scan/load and reconnect on an identified read-only bench. | [M2](https://github.com/votecoffee/OpenHMI/milestone/3), [#12](https://github.com/votecoffee/OpenHMI/issues/12), [#3](https://github.com/votecoffee/OpenHMI/issues/3) |
 | M3 — PLC transactions and recipe deployment | Offline software delivered; hardware acceptance open | Guarded command handshakes, versioned recipe staging and PLC copy verification, durable lifecycle/history and evidence exports are available. Validate the named PLC contracts after M2. | [M3](https://github.com/votecoffee/OpenHMI/milestone/4), [#7](https://github.com/votecoffee/OpenHMI/issues/7), [#8](https://github.com/votecoffee/OpenHMI/issues/8) |
 | M4 — Project revisions and recovery | Complete software checkpoint | Applied history, identity-aware diff/merge, staged rollback and browser/server recovery with validated migration/restore; 81 Python and 14 browser tests passed. | [M4](https://github.com/votecoffee/OpenHMI/milestone/5), [#1](https://github.com/votecoffee/OpenHMI/issues/1) |
 | M5 — Operator workflows and equipment library | Operator baseline delivered; quality, camera and equipment acceptance open | Alarm review/recovery, trends, chart controls, localization, touch entry and generic UDT faceplates are available. Per-route and per-binding quality and the PLC-bound browser/camera control are available. Select equipment faceplates and review workflows on the target display. | [M5](https://github.com/votecoffee/OpenHMI/milestone/6), [#13](https://github.com/votecoffee/OpenHMI/issues/13), [#14](https://github.com/votecoffee/OpenHMI/issues/14), [#4](https://github.com/votecoffee/OpenHMI/issues/4) |
@@ -110,8 +110,8 @@ protection. Add migration checks and restore drills without overwriting original
 or replaying commands. Screen rollback does not roll back PLC memory.
 
 M5 adds [operator data quality and the PLC-bound camera control](runtime-readiness-roadmap.md#m5--operator-quality-and-camera-control).
-The camera prototype can proceed with local fixtures while driver readiness
-work is underway. Validate the approved camera on the operator station.
+The browser/camera control is available. When a camera is in pilot scope,
+validate the approved camera on the operator station.
 
 M5 delivers [alarm operator workflows](alarm-workflows.md) with filtered review,
 first-user acknowledgement, guidance, notes, event export and timed shelving. It still selects
@@ -143,22 +143,40 @@ alarms/history, live engineering, language/display behavior and recovery. Record
 results, limitations and owner acceptance. Passing software tests alone does not
 close a bench, domain or pilot acceptance gate.
 
-## Execution order and inputs
+## Pilot execution order
 
-1. Start M2 route isolation and measurement. Define and test the M5 data
-   quality contract alongside it.
-2. Prototype the M5 browser/camera control with controlled fixtures in parallel.
-   Continue operator workflow review and select equipment faceplates with the owner.
-3. Complete the read-only M2 bench gate, then validate approved M3 command and
-   recipe contracts on the nominated controller.
-4. Run the M6 resilience qualification and complete the Windows station pilot
-   after its relevant driver, PLC contract and operator gates.
-5. Use pilot feedback to rank the post-pilot candidates. M7 stays deferred.
+The pilot should prove that an automation developer can build and change a
+useful HMI live with drag-and-drop controls and no Python code for routine work.
+Trusted Python remains available for custom behavior. The next checkpoint is
+one repeatable operator workflow on a fixed Windows package and project backup.
 
-The owner will supply the bench controller/route/read-only tags, intended PLC
-transaction/recipe structure, equipment choices, Windows/group environment and
-pilot machine/display/acceptance owner when those milestones are ready. Software
-implementation continues on work that does not require those inputs.
+1. **Prepare the candidate.** Record the source commit, Windows package hash
+   and reference project backup hash. On a disposable copy, rehearse placing
+   and binding controls, applying a change to an open viewer, restoring a
+   backup and recovering from a focused runtime restart. The walkthrough
+   should include an alarm with recovery steps, a trend and a protected edit.
+2. **Run the M2 read-only bench.** Agree the controller, firmware, route,
+   tag list and scan/load limits. Measure mixed screen rates and shared reads,
+   one bad binding while healthy tags continue, and approved communication
+   loss and recovery. Record source timestamps, controller load and the
+   agreed limits. Use results to decide which driver changes are needed.
+3. **Check the target station and PLC contracts.** Review the reference
+   workflow with an operator on the intended display and accounts. Cover
+   dense layout, touch entry, alarms, trends and language switching. On
+   separately approved M3 test channels, verify command completion and
+   recipe staging, production status and PLC-copy readback. Include the camera
+   and selected equipment faceplates when they are part of the trial.
+4. **Complete the M6 pilot.** Record the clean Windows install, approved
+   identity mappings, backup/restore, restart, PLC recovery and unresolved
+   operations in the pilot matrix. Close gates with recorded observations and
+   owner sign-off.
+
+Candidate packaging and local rehearsal can start while the owner identifies
+the bench and target Windows station. Hardware fault drills and write tests
+require an agreed boundary. Prioritize failed acceptance checks and
+reproducible reliability defects until the pilot. Rank additional Diagnostics
+features, equipment templates and driver tuning using pilot evidence. The
+integrated Python IDE and endurance testing stay deferred.
 
 No calendar dates, controller access or named human assignments are assumed.
 Use small verified commits and frequent pushes to `main`; keep the README and

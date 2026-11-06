@@ -2,8 +2,10 @@
 
 The ControlLogix driver has a working software baseline. Production readiness
 and optimization remain open until the supported controller, tag and load
-profiles are measured. The next work prioritizes reliable acquisition and
-truthful operator feedback. The camera control can be prototyped independently.
+profiles are measured. Route isolation, data-quality presentation and the
+browser/camera control are available for acceptance. Follow the
+[pilot execution order](project-plan.md#pilot-execution-order) and use measured
+failures to prioritize further changes.
 
 ## Product references
 
