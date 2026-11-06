@@ -57,8 +57,11 @@ outcome inspection; idempotent PLC application transactions belong to M3.
 ## Viewing, export and retention
 
 The page filters by user, outcome, control/tag/operation ID and time range. Newest
-pages refresh every five seconds; older pages use ID-based pagination. API time
-filters require a UTC offset; browser date fields are converted to UTC. CSV export
+pages refresh every five seconds. Older pages use ID-based pagination and retry
+if a request fails. If an activity response fails or is malformed, the journal
+labels the last received results for the current filter and page with their
+receipt time. An access denial clears the results. API time filters require a
+UTC offset; browser date fields are converted to UTC. CSV export
 uses the active filters, is limited to 20,000 records and reports truncation in
 `X-OpenHMI-Truncated`. Formula-like CSV text is exported as literal text.
 

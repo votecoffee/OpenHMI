@@ -97,6 +97,49 @@ test('diagnostics keeps readable results through bad polls and clears them on de
   expect(errors).toEqual([]);
 });
 
+test('activity preserves the current page through malformed replies and retries an older page', async ({ page }) => {
+  test.setTimeout(60000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const login = await page.request.post('/api/security/login', { data: { name: 'admin', password: 'SecurityTestOnly-2026!' } });
+  expect(login.ok()).toBe(true);
+  const journal = await (await page.request.get('/api/activity')).json();
+  const stamp = '2026-01-01T00:00:00+00:00';
+  const entry = { id: 2, operation_id: 'newer-record', started_at: stamp, finished_at: stamp,
+    actor: 'admin', provider: 'local', groups: ['Administrators'], operation: 'button_action', entity: 'toggle',
+    phase: 'finalized', status: 'succeeded', context: {}, outcome: null, error: null };
+  const newest = { ...journal, items: [entry], has_more: true, next_before_id: 2 };
+  const older = { ...journal, items: [{ ...entry, id: 1, operation_id: 'older-record' }], has_more: false, next_before_id: null };
+  let reply = { json: newest };
+  let olderReply = { status: 503, json: { detail: 'Synthetic older page outage' } };
+  await page.route('**/api/activity?*', route => route.fulfill(new URL(route.request().url()).searchParams.has('before_id') ? olderReply : reply));
+  await page.goto('/activity');
+  const panel = page.getByRole('region', { name: 'Operator activity', exact: true });
+  const warning = panel.getByRole('alert');
+  const rows = panel.locator('.activity-table tbody');
+  const olderButton = panel.getByRole('button', { name: 'Older activity', exact: true });
+  await expect(rows).toContainText('newer-record');
+  await expect(olderButton).toBeEnabled();
+
+  reply = { json: { ...newest, items: [{ ...entry, groups: {} }] } };
+  await expect(warning).toContainText('Showing last received activity', { timeout: 8000 });
+  await expect(rows).toContainText('newer-record');
+  await expect(olderButton).toBeDisabled();
+  reply = { status: 403, body: 'Forbidden', contentType: 'text/plain' };
+  await expect(warning).toContainText('HTTP 403', { timeout: 8000 });
+  await expect(rows.locator('tr')).toHaveCount(0);
+  reply = { json: newest };
+  await expect(olderButton).toBeEnabled({ timeout: 8000 });
+
+  await olderButton.click();
+  await expect(warning).toContainText('Synthetic older page outage');
+  await expect(rows.locator('tr')).toHaveCount(0);
+  olderReply = { json: older };
+  await expect(rows).toContainText('older-record', { timeout: 8000 });
+  await expect(warning).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test('protected operator journal, denial attribution, filters, export and diagnostics', async ({ page }) => {
   test.setTimeout(120000);
   const errors = [];

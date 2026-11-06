@@ -80,41 +80,79 @@ function activityParams(filters, before) {
   return query;
 }
 
+const activityOutcomes = ['pending', 'succeeded', 'denied', 'rejected', 'uncertain', 'interrupted'];
+
+function isActivityRecord(item) {
+  const isObject = value => value != null && typeof value === 'object' && !Array.isArray(value);
+  const optionalText = value => value == null || typeof value === 'string';
+  if (!isObject(item) || !activityOutcomes.includes(item.status) || !isObject(item.context)
+    || !['operation_id', 'started_at', 'actor', 'provider', 'operation', 'entity', 'phase']
+      .every(key => typeof item[key] === 'string')) return false;
+  const { context, outcome } = item;
+  return Array.isArray(item.groups) && item.groups.every(group => typeof group === 'string')
+    && [item.finished_at, item.error, context.tag, context.target, context.before?.quality, context.before?.timestamp]
+      .every(optionalText)
+    && (outcome === null || (isObject(outcome) && optionalText(outcome.verification)
+      && optionalText(outcome.observed_at) && (outcome.count == null || Number.isSafeInteger(outcome.count))));
+}
+
+function isActivityPage(page) {
+  return Array.isArray(page?.items) && page.items.every(isActivityRecord) && typeof page.has_more === 'boolean'
+    && (page.has_more ? Number.isSafeInteger(page.next_before_id) && page.next_before_id > 0 : page.next_before_id === null)
+    && [page.pending_finalizations, page.retention_days, page.max_resolved_rows]
+      .every(value => Number.isSafeInteger(value) && value >= 0);
+}
+
 export function ActivityConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'activity.view');
   const [filters, setFilters] = useState({ actor: '', status: '', search: new URLSearchParams(location.search).get('search') || '', start: '', end: '' });
   const [applied, setApplied] = useState(filters);
   const [before, setBefore] = useState(null);
-  const [data, setData] = useState(null);
-  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState(null);
   const [refresh, setRefresh] = useState(0);
+  const endpoint = `/api/activity?${activityParams(applied, before)}`;
+  const current = response?.endpoint === endpoint ? response : null;
+  const { data, message, receivedAt } = current ?? {};
   useEffect(() => {
-    if (!permitted) { setData(null); return; }
+    if (!permitted) { setResponse(null); return; }
     let stopped = false, timer;
     async function tick() {
-      try { const result = await api(`/api/activity?${activityParams(applied, before)}`); if (!stopped) { setData(result); setMessage(''); } }
-      catch (error) { if (!stopped) setMessage(error.message); }
-      if (!stopped && !before) timer = setTimeout(tick, 5000);
+      let retry = !before;
+      try {
+        const result = await api(endpoint);
+        if (!isActivityPage(result)) throw new Error('Invalid activity response');
+        if (!stopped) setResponse({ endpoint, data: result, receivedAt: new Date() });
+      } catch (error) {
+        retry = true;
+        const denied = [401, 403].includes(error.status);
+        if (!stopped) setResponse(previous => {
+          const retain = !denied && previous?.endpoint === endpoint;
+          return { ...(retain ? previous : { endpoint }), message: error.message };
+        });
+      }
+      if (!stopped && retry) timer = setTimeout(tick, 5000);
     }
     tick(); return () => { stopped = true; clearTimeout(timer); };
-  }, [permitted, applied, before, refresh]);
+  }, [permitted, endpoint, applied, before, refresh]);
   function value(key, text) { setFilters(previous => ({ ...previous, [key]: text })); }
   if (!permitted) return <section className="engineering"><h1>Operator activity</h1><p>Sign in with activity viewing permission to inspect the operator journal.</p></section>;
   return <section className="engineering operations" aria-label="Operator activity"><h1>Operator activity</h1>
     <p>Attempts are recorded before dispatch. Confirmed outcomes describe the indicated verification; tag readback or a Python callback return does not mean equipment completed a command.</p>
     <form className="operations-filters" onSubmit={event => { event.preventDefault(); setApplied({ ...filters }); setBefore(null); }}>
       <label>User<input value={filters.actor} onChange={event => value('actor', event.target.value)} /></label>
-      <label>Outcome<select value={filters.status} onChange={event => value('status', event.target.value)}><option value="">All outcomes</option>{['pending', 'succeeded', 'denied', 'rejected', 'uncertain', 'interrupted'].map(status => <option key={status}>{status}</option>)}</select></label>
+      <label>Outcome<select value={filters.status} onChange={event => value('status', event.target.value)}><option value="">All outcomes</option>{activityOutcomes.map(status => <option key={status}>{status}</option>)}</select></label>
       <label>Control, tag or operation ID<input value={filters.search} onChange={event => value('search', event.target.value)} /></label>
       <label>From<input type="datetime-local" value={filters.start} onChange={event => value('start', event.target.value)} /></label>
       <label>To<input type="datetime-local" value={filters.end} onChange={event => value('end', event.target.value)} /></label>
       <button>Apply activity filters</button>
     </form>
-    <div className="operations-actions"><button onClick={() => { setBefore(null); setRefresh(value => value + 1); }}>Newest activity</button><button disabled={!data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older activity</button>
+    <div className="operations-actions"><button onClick={() => { setBefore(null); setRefresh(value => value + 1); }}>Newest activity</button><button disabled={!!message || !data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older activity</button>
       <a href={`/api/activity.csv?${activityParams(applied)}`}>Export activity CSV</a></div>
-    {message && <p role="alert">{message}</p>}
-    {data?.pending_finalizations > 0 && <p role="status">{data.pending_finalizations} journal finalizations are pending. Commands are not replayed to repair the journal.</p>}
+    {message && <p role="alert">Activity unavailable. {message}
+      {data && <> Showing last received activity from {receivedAt.toLocaleTimeString()}.</>}</p>}
+    {!current && <p role="status">Waiting for operator activity.</p>}
+    {data?.pending_finalizations > 0 && <p role="status">{message && 'Last received status: '}{data.pending_finalizations} journal finalizations are pending. Commands are not replayed to repair the journal.</p>}
     <table className="activity-table"><thead><tr><th>Time / operation ID</th><th>User</th><th>Operation / target</th><th>Outcome</th><th>Details</th></tr></thead><tbody>{data?.items.map(item => <tr key={item.operation_id} data-outcome={item.status}>
       <td>{new Date(item.started_at).toLocaleString()}<br /><small>{item.operation_id}</small></td><td>{item.actor}<br /><small>{item.provider} · {item.groups.join(', ')}</small></td>
       <td>{item.operation}<br />{item.context.tag || item.context.target || item.entity}</td><td><strong>{item.status}</strong><br /><small>{item.phase}</small></td>
