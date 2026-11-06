@@ -13,7 +13,7 @@ import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Sparkline, Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
-import { ChartFields, GaugeGraphic, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
+import { ChartFields, GaugeGraphic, PieChart, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
 
 export const ScreenControls = createContext([]);
 
@@ -376,12 +376,12 @@ export function createConfig(catalog) {
   const analogFields = { ...numericFields, ...scaleFields,
     normal_low: { type: 'number', label: 'Normal low' }, normal_high: { type: 'number', label: 'Normal high' } };
   const analogDefaults = { ...numericDefaults, minimum: 0, maximum: 100, normal_low: 20, normal_high: 80 };
-  const chartField = radar => ({ type: 'custom', render: ({ value, onChange }) =>
-    <ChartFields value={value} onChange={onChange} catalog={catalog} radar={radar} /> });
+  const chartField = kind => ({ type: 'custom', render: ({ value, onChange }) =>
+    <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline'];
-  const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart'];
+  const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
@@ -486,10 +486,13 @@ export function createConfig(catalog) {
         defaultProps: analogDefaults, render: props => <AnalogRange {...props} kind="tank" /> },
       RadialGauge: { label: 'Radial gauge', fields: analogFields,
         defaultProps: { ...analogDefaults, label: 'Tank level gauge' }, render: props => <AnalogRange {...props} kind="gauge" /> },
-      BarGraph: { label: 'Bar graph', fields: { label: labelField, ...scaleFields, unit: numericFields.unit, series: chartField(false) },
+      BarGraph: { label: 'Bar graph', fields: { label: labelField, ...scaleFields, unit: numericFields.unit, series: chartField('bar') },
         defaultProps: { label: 'Process comparison', minimum: 0, maximum: 100, unit: '', series: [chartSeries('TankLevel', false)] },
         render: LiveChart },
-      RadarChart: { label: 'Radar chart', fields: { label: labelField, series: chartField(true) },
+      PieChart: { label: 'Pie chart', fields: { label: labelField, unit: numericFields.unit, series: chartField('pie') },
+        defaultProps: { label: 'Part totals', unit: '', series: ['TankLevel', 'RecipeRevision'].map(tag => chartSeries(tag, false)) },
+        render: props => <PieChart {...props} /> },
+      RadarChart: { label: 'Radar chart', fields: { label: labelField, series: chartField('radar') },
         defaultProps: { label: 'Process profile', series: catalog.tags.filter(tag => tag.type === 'number').slice(0, 3).map(tag => chartSeries(tag.name, true)) },
         render: props => <LiveChart {...props} radar /> },
       AlarmIndicator: {

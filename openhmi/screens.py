@@ -41,7 +41,7 @@ def expanded_controls(project, screen_id=None):
                     for field in ('start_tag', 'stop_tag'):
                         if item.get('recording'):
                             item['recording'][field] = resolve(item['recording'][field])
-                if item['kind'] in ('bar', 'radar'):
+                if item['kind'] in ('bar', 'radar', 'pie'):
                     for series in item['series']:
                         if series['tag'].startswith('$.'):
                             series['tag'] = control['root_tag'] + series['tag'][1:]
@@ -60,7 +60,7 @@ def referenced_tags(control):
     result = {control[field] for field in fields if control.get(field)}
     result.update(control.get('tags', []))
     result.update(check['tag'] for check in control.get('checks', []))
-    if control['kind'] in ('bar', 'radar'):
+    if control['kind'] in ('bar', 'radar', 'pie'):
         result.update(series['tag'] for series in control['series'])
     if control.get('mode') in ('set', 'toggle') and control.get('target'):
         result.add(control['target'])

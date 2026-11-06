@@ -186,6 +186,18 @@ class BarGraphControl(ControlBase):
         return self
 
 
+class PieControl(ControlBase):
+    kind: Literal['pie']
+    series: list[ChartSeries] = Field(min_length=2, max_length=8)
+    unit: str = Field(default='', max_length=30)
+
+    @model_validator(mode='after')
+    def distinct_tags(self):
+        if len({item.tag for item in self.series}) != len(self.series):
+            raise ValueError('Pie slices require distinct tags')
+        return self
+
+
 class AlarmControl(ControlBase):
     kind: Literal["alarm"]
     tag: str = Field(min_length=1, max_length=200)
@@ -381,7 +393,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

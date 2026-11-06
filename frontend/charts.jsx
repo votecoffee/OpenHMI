@@ -1,5 +1,5 @@
-import React from 'react';
-import { tagValue, Quality } from './live-quality.jsx';
+import React, { useContext } from 'react';
+import { Live, tagValue, Quality } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import './charts.css';
 
@@ -12,16 +12,19 @@ export function chartSeries(tag, radar) {
   return { tag, label: '', decimals: 1, ...(radar ? { unit: '', minimum: 0, maximum: 100 } : {}) };
 }
 
-export function ChartFields({ value = [], onChange, catalog, radar }) {
+export function ChartFields({ value = [], onChange, catalog, kind }) {
+  const radar = kind === 'radar', pie = kind === 'pie';
   const tags = catalog.tags.filter(tag => tag.type === 'number');
-  const minimum = radar ? 3 : 1, maximum = radar ? 8 : 12;
+  const minimum = radar ? 3 : pie ? 2 : 1, maximum = kind === 'bar' ? 12 : 8;
+  const rowName = radar ? 'axis' : pie ? 'slice' : 'bar';
   const nextTag = tags.find(item => !value.some(row => row.tag === item.name));
   const edit = (index, key, next) => onChange(value.map((row, i) => i === index ? { ...row, [key]: next } : row));
-  return <fieldset className="chart-fields"><legend>{radar ? 'Radar axes' : 'Bar series'}</legend>
-    {value.map((row, index) => <fieldset key={index}><legend>{radar ? 'Axis' : 'Bar'} {index + 1}</legend>
+  return <fieldset className="chart-fields"><legend>{radar ? 'Radar axes' : pie ? 'Pie slices' : 'Bar series'}</legend>
+    {value.map((row, index) => <fieldset key={index}><legend>{rowName[0].toUpperCase() + rowName.slice(1)} {index + 1}</legend>
       <label>Tag<select value={row.tag} onChange={event => edit(index, 'tag', event.target.value)}>
         {!tags.some(tag => tag.name === row.tag) && <option value={row.tag}>{row.tag}</option>}
-        {tags.map(tag => <option key={tag.name} value={tag.name}>{tag.name}</option>)}
+        {tags.filter(tag => !pie || tag.name === row.tag || !value.some(item => item.tag === tag.name))
+          .map(tag => <option key={tag.name} value={tag.name}>{tag.name}</option>)}
       </select></label>
       <label>Series label<input maxLength={100} value={row.label ?? ''} onChange={event => edit(index, 'label', event.target.value)} /></label>
       <label>Decimal places<select value={row.decimals} onChange={event => edit(index, 'decimals', Number(event.target.value))}>
@@ -34,10 +37,10 @@ export function ChartFields({ value = [], onChange, catalog, radar }) {
             onChange={event => edit(index, field, Number.isFinite(event.target.valueAsNumber) ? event.target.valueAsNumber : null)} />
         </label>)}
       </>}
-      <button type="button" disabled={value.length <= minimum} onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove {radar ? 'axis' : 'bar'}</button>
+      <button type="button" disabled={value.length <= minimum} onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove {rowName}</button>
     </fieldset>)}
     <button type="button" disabled={value.length >= maximum || !nextTag}
-      onClick={() => onChange([...value, chartSeries(nextTag.name, radar)])}>Add {radar ? 'axis' : 'bar'}</button>
+      onClick={() => onChange([...value, chartSeries(nextTag.name, radar)])}>Add {rowName}</button>
   </fieldset>;
 }
 
@@ -96,6 +99,66 @@ function RadarPlot({ rows, label }) {
     {profile.every(Boolean) && <polygon data-radar-profile="" className="radar-profile" points={profile.map(point => point.join(',')).join(' ')} />}
     {profile.map((point, index) => point && <circle key={index} className="radar-dot" cx={point[0]} cy={point[1]} r="3" />)}
   </svg>;
+}
+
+const pieColors = ['#364e64', '#694d35', '#3b6055', '#5b4d70', '#765355', '#435965', '#655b36', '#495947'];
+
+function PiePlot({ shares, label }) {
+  const point = (fraction, radius) => {
+    const angle = (fraction - 0.25) * 2 * Math.PI;
+    return [50 + radius * Math.cos(angle), 50 + radius * Math.sin(angle)];
+  };
+  let edge = 0;
+  return <svg className="pie-plot" role="img" aria-label={label} viewBox="0 0 100 100">
+    {shares.map((share, index) => {
+      if (share === 0) return null;
+      const start = edge;
+      edge += share;
+      const [x, y] = point(start + share / 2, share === 1 ? 0 : 29);
+      return <g key={index} data-pie-slice={index + 1} fill={pieColors[index]}>
+        {share === 1 ? <circle cx="50" cy="50" r="44" /> : <path d={
+          `M50,50 L${point(start, 44)} A44,44 0 ${share > 0.5 ? 1 : 0} 1 ${point(edge, 44)} Z`
+        } />}
+        {share >= 0.1 && <text x={x} y={y} textAnchor="middle" dominantBaseline="central">{index + 1}</text>}
+      </g>;
+    })}
+  </svg>;
+}
+
+export function PieChart({ id, label, series = [], unit, puck }) {
+  const live = useContext(Live);
+  const { text, ui, language } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const units = text(`control.${id}.unit`, unit);
+  const rows = series.map((item, index) => ({
+    ...item, ...tagValue(live, item.tag, 'number'),
+    label: text(`control.${id}.series.${index}.label`, item.label || item.tag),
+  }));
+  const complete = rows.length >= 2 && rows.every(row => row.valid && row.value >= 0);
+  const peak = complete ? Math.max(...rows.map(row => row.value)) : 0;
+  // Scale before summing so finite input values cannot overflow the total.
+  const weights = peak > 0 ? rows.map(row => row.value / peak) : [];
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const shares = weights.map(weight => weight / total);
+  return <article className="hmi-control hmi-chart" data-control="pie">
+    <span className="hmi-label">{title}</span>
+    {!shares.length && <small role="status">{ui(complete ? 'pieZero' : 'pieUnavailable')}</small>}
+    <div className="radar-content">
+      {!!shares.length && <PiePlot shares={shares} label={ui('piePlot', { label: title })} />}
+      <ul className="chart-series">
+        {rows.map((row, index) => <li key={index} data-chart-tag={row.tag}>
+          <div className="chart-row">
+            <span><span className="pie-key" style={{ backgroundColor: pieColors[index] }}>{index + 1}</span> {row.label}</span>
+            {row.valid ? <strong className="chart-value">{readout(row.value, row.decimals, language.code)} {units}</strong>
+              : <Quality problem={row.problem} tag={row.tag} />}
+            {shares.length > 0 && <span className="pie-share">{readout(shares[index] * 100, 1, language.code)}%</span>}
+          </div>
+          {row.valid && row.value < 0 && <strong className="range-deviation">{ui('pieNegative')}</strong>}
+          {puck?.isEditing && <span className="hmi-source">{row.tag}</span>}
+        </li>)}
+      </ul>
+    </div>
+  </article>;
 }
 
 export function ProcessChart({ id, label, series = [], minimum, maximum, unit, radar, live, puck }) {

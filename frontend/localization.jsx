@@ -19,6 +19,8 @@ export const uiText = {
   trendHistoryUnavailable: 'History unavailable', trendLastHistory: 'Showing last received history ending {time}',
   trendSelectTags: 'Select trend tags.',
   trendNoSamples: 'No recorded good samples in this window. Check acquisition settings and tag quality.',
+  pieUnavailable: 'Pie unavailable. Check slice values.', pieNegative: 'Negative slice value', pieZero: 'All slice values are zero',
+  piePlot: '{label} proportions',
   sparklineEmpty: 'No recent good samples', sparklineWindow: 'Last {count} s',
   sparklinePlot: '{label}, last {count} seconds',
   trendLimited: 'Result limited. Shorten the time range.',

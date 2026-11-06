@@ -234,8 +234,13 @@ keeps its running copy; test recipes carry production status false. See the
 7. In the **Live charts** palette section, drop in a **Tank level indicator**
    for a live fill and normal band, a **Radial gauge** for a dial with a normal
    band, a **Bar graph** to compare numeric tags on
-   one scale, or a **Radar chart** with independently scaled axes. Set tags,
+   one scale, a **Radar chart** with independently scaled axes, or a **Pie chart**
+   for shares of a total. Set tags,
    labels, units and precision in the designer. See the [control catalog](docs/hmi-style-guide.md#initial-catalog).
+
+A **Pie chart** compares 2 to 8 distinct numeric tags in the same units. Each
+slice shows its value and share. Missing, stale, or negative inputs suppress
+the pie and its percentages. An all-zero set shows a separate empty state.
 
 Use **Multi-state indicator** to map an integer tag to named states with a symbol
 and color. **Permissive / interlock list** shows which Boolean checks are ready,

@@ -10,6 +10,11 @@
 .bar-zero { width: 1px; background: #555; }
 .radar-content { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; width: 100%; }
 .radar-content .chart-series { flex: 1 1 180px; min-width: 0; }
+.pie-plot { display: block; width: min(100%, 160px); margin-inline: auto; }
+.pie-plot path, .pie-plot circle { stroke: var(--hmi-background); stroke-width: 1; }
+.pie-plot text { fill: #fff; font: bold 8px sans-serif; }
+.pie-key { display: inline-block; min-width: 1.5em; text-align: center; color: #fff; }
+.pie-share { font-variant-numeric: tabular-nums; }
 .radar-plot { display: block; width: min(100%, 240px); margin-inline: auto; }
 .radar-plot text { font: 13px sans-serif; fill: #333; }
 .radar-grid { fill: none; stroke: #888; }

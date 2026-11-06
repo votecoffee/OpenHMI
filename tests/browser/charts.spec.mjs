@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.use({ actionTimeout: 8000 });
 
-test('drag live tank, gauge, bar and radar controls onto a screen and handle bad data', async ({ page, context }) => {
+test('drag live tank, gauge, bar, radar and pie controls onto a screen and handle bad data', async ({ page, context }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   async function save(project, apply = true) {
@@ -31,9 +31,10 @@ test('drag live tank, gauge, bar and radar controls onto a screen and handle bad
     await save({ ...original.active, columns: 1, tags: [
       { name: 'ChartFlow', type: 'number', initial: -25 },
       { name: 'ChartPressure', type: 'number', initial: 50 },
+      { name: 'ChartParts', type: 'number', initial: 150 },
     ] });
     await page.goto('/');
-    for (const [name, kind] of [['Tank level indicator', 'tank'], ['Radial gauge', 'gauge'], ['Bar graph', 'bar'], ['Radar chart', 'radar']]) {
+    for (const [name, kind] of [['Tank level indicator', 'tank'], ['Radial gauge', 'gauge'], ['Bar graph', 'bar'], ['Radar chart', 'radar'], ['Pie chart', 'pie']]) {
       await drop(name);
       await expect(page.locator(`[data-control="${kind}"]`)).toHaveCount(1);
       await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
@@ -56,12 +57,20 @@ test('drag live tank, gauge, bar and radar controls onto a screen and handle bad
     await third.getByRole('combobox', { name: 'Tag', exact: true }).selectOption('ChartPressure');
     await third.getByLabel('Axis maximum').fill('200');
     await third.getByLabel('Units').fill('psi');
+    await page.locator('[data-control="pie"] .hmi-label').click();
+    const slices = page.getByRole('group', { name: 'Pie slices', exact: true });
+    const firstSlice = slices.getByRole('group', { name: 'Slice 1', exact: true });
+    const secondSlice = slices.getByRole('group', { name: 'Slice 2', exact: true });
+    await firstSlice.getByRole('combobox', { name: 'Tag', exact: true }).selectOption('ChartPressure');
+    await secondSlice.getByRole('combobox', { name: 'Tag', exact: true }).selectOption('ChartParts');
+    await expect(secondSlice.getByRole('combobox', { name: 'Tag', exact: true }).locator('option[value="ChartPressure"]')).toHaveCount(0);
+    await firstSlice.getByLabel('Series label').fill('Accepted');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
     const controls = (await (await page.request.get('/api/project')).json()).active.controls;
     expect(controls.find(item => item.kind === 'radar').series[2]).toMatchObject({ tag: 'ChartPressure', maximum: 200, unit: 'psi' });
 
-    let values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false, AlarmWord: 10, RecipeRevision: 1, ChartFlow: -25, ChartPressure: 50 };
+    let values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false, AlarmWord: 10, RecipeRevision: 1, ChartFlow: -25, ChartPressure: 50, ChartParts: 150 };
     const viewer = await context.newPage();
     await viewer.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
     await viewer.goto('/runtime');
@@ -79,6 +88,13 @@ test('drag live tank, gauge, bar and radar controls onto a screen and handle bad
     await expect(bar.locator('[data-bar-fill]')).toHaveAttribute('style', /left: 37.5%; width: 12.5%/);
     await expect(radar.locator('[data-radar-profile]')).toBeVisible();
     await expect(radar.locator('[data-chart-tag="ChartPressure"]')).toContainText('50.0 psi');
+    const pie = viewer.locator('[data-control="pie"]');
+    const plot = pie.getByRole('img', { name: 'Part totals proportions', exact: true });
+    const accepted = pie.locator('[data-chart-tag="ChartPressure"]');
+    await expect(plot.locator('[data-pie-slice]')).toHaveCount(2);
+    await expect(accepted).toContainText('Accepted');
+    await expect(accepted.locator('.pie-share')).toHaveText('25.0%');
+    await expect(pie.locator('[data-chart-tag="ChartParts"] .pie-share')).toHaveText('75.0%');
     if (process.env.OPENHMI_CHARTS_SCREENSHOT) await viewer.screenshot({ path: process.env.OPENHMI_CHARTS_SCREENSHOT, fullPage: true });
 
     values = { ...values, ChartPressure: 90 };
@@ -98,6 +114,19 @@ test('drag live tank, gauge, bar and radar controls onto a screen and handle bad
     await expect(radar.locator('[data-radar-profile]')).toHaveCount(0);
     await expect(radar.locator('[data-chart-tag="ChartPressure"]')).toContainText('BAD DATA');
     await expect(radar.locator('.radar-dot')).toHaveCount(2);
+    await expect(pie).toContainText('Pie unavailable');
+    await expect(accepted).toContainText('BAD DATA');
+    await expect(pie.locator('.pie-share')).toHaveCount(0);
+    await expect(plot).toHaveCount(0);
+    values = { ...values, ChartPressure: 1, ChartParts: -1 };
+    await expect(pie).toContainText('Negative slice value');
+    await expect(plot).toHaveCount(0);
+    values = { ...values, ChartPressure: 0, ChartParts: 0 };
+    await expect(pie).toContainText('All slice values are zero');
+    await expect(plot).toHaveCount(0);
+    values = { ...values, ChartParts: 150 };
+    await expect(plot.locator('circle')).toHaveCount(1);
+    await expect(accepted.locator('.pie-share')).toHaveText('0.0%');
   } finally {
     await save(original.active);
     await save(original.draft, false);

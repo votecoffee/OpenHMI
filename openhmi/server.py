@@ -294,9 +294,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if control['refresh_tag'] and kinds.get(control['refresh_tag']) not in ('boolean', 'integer'):
                     raise HTTPException(422, 'Web Browser refresh requires a BOOL or integer tag')
                 continue
-            if control['kind'] in ('bar', 'radar'):
-                if any(kinds.get(series['tag']) not in ('number', 'integer') for series in control['series']):
-                    raise HTTPException(422, 'Bar and radar charts require numeric tags')
+            if control['kind'] in ('bar', 'radar', 'pie'):
+                tags = [series['tag'] for series in control['series']]
+                if any(kinds.get(tag) not in ('number', 'integer') for tag in tags):
+                    raise HTTPException(422, 'Live charts require numeric tags')
+                if control['kind'] == 'pie' and len(set(tags)) != len(tags):
+                    raise HTTPException(422, 'Pie slices require distinct tags')
                 continue
             if control['kind'] == 'trend':
                 if any(kinds.get(tag) not in ('number', 'integer', 'boolean') for tag in control['tags']):

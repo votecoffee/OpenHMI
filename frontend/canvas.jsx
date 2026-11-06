@@ -20,7 +20,7 @@ function size(type) {
   if (type === 'ScreenSymbol') return { width: 48, height: 48 };
   if (type === 'Trend') return { width: 480, height: 320 };
   if (type === 'WebBrowser') return { width: 400, height: 280 };
-  if (['TankLevel', 'BarGraph', 'RadarChart', 'Faceplate'].includes(type)) return { width: 240, height: 240 };
+  if (['TankLevel', 'BarGraph', 'RadarChart', 'PieChart', 'Faceplate'].includes(type)) return { width: 240, height: 240 };
   return { width: 176, height: 80 };
 }
 

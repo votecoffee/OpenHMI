@@ -1071,6 +1071,7 @@ class LogixHistoryTests(unittest.TestCase):
             {'id': 'bar', 'kind': 'bar', 'label': 'Comparison', 'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}]},
             {'id': 'radar', 'kind': 'radar', 'label': 'Profile',
              'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}, {'tag': 'TankLevel'}]},
+            {'id': 'pie', 'kind': 'pie', 'label': 'Shares', 'series': [{'tag': '$.Speed'}, {'tag': 'RecipeRevision'}]},
         ]}]
         project['screens'].append({'id': 'charts', 'title': 'Charts', 'update_ms': 200, 'controls': [
             {'id': 'chartpanel', 'kind': 'faceplate', 'label': 'Charts', 'template': 'charts', 'root_tag': 'MotorA'},
@@ -1079,8 +1080,8 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(Project.model_validate(project).model_dump())
         driver.lease('charts-station', ['charts'], 1)
-        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'LevelA', 'TankLevel')},
-                         {'MotorA.Speed': 200, 'LevelA': 200, 'TankLevel': 200})
+        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'LevelA', 'TankLevel', 'RecipeRevision')},
+                         {'MotorA.Speed': 200, 'LevelA': 200, 'TankLevel': 200, 'RecipeRevision': 200})
         driver.poll(1)
         self.assertEqual(driver.connections['plc'].client.reads, [('Motor', 'Level')])
         # Apply changes to the template and scan rate while the same viewer is active.
@@ -1092,7 +1093,7 @@ class LogixHistoryTests(unittest.TestCase):
         project['screens'][-1]['update_ms'] = 350
         driver.configure(Project.model_validate(project).model_dump())
         self.assertEqual(driver.demands(2),
-                         {'MotorA.Speed': 350, 'LevelB': 350, 'TankLevel': 350, 'ProcessAlarm': 250})
+                         {'MotorA.Speed': 350, 'LevelB': 350, 'TankLevel': 350, 'RecipeRevision': 350, 'ProcessAlarm': 250})
         driver.poll(2)
         self.assertEqual(driver.sample_snapshot(2)['LevelB']['value'], 65.0)
         self.assertNotIn('LevelB', driver.demands(16))
