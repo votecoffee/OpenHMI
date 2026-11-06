@@ -143,24 +143,44 @@ class LogixConnection:
     @staticmethod
     def _metadata(name, info):
         datatype = info.get('data_type', '')
+        metadata = {
+            'address': name, 'udt_type': '', 'members': {},
+            'dimensions': info.get('dimensions', []),
+            'external_access': info.get('external_access', 'Unknown'),
+        }
         if isinstance(datatype, dict):
-            if datatype.get('string'):
-                return {'address': name, 'type': 'string', 'udt_type': '', 'members': {}, 'external_access': info.get('external_access', 'Unknown')}
-            members = {}
+            capacity = datatype.get('string')
+            metadata['plc_type'] = datatype.get('name') or ('STRING' if capacity else '')
+            if capacity:
+                return {**metadata, 'type': 'string', 'string_capacity_bytes': capacity}
+
+            members = metadata['members']
+
             def visit(data, prefix=''):
                 for key in data.get('attributes', []):
                     detail = data.get('internal_tags', {}).get(key, {})
+                    if detail.get('array'):
+                        continue
                     field = detail.get('data_type', '')
                     path = prefix + key
-                    if isinstance(field, dict):
+                    if isinstance(field, dict) and field.get('string'):
+                        members[path] = 'string'
+                    elif isinstance(field, dict):
                         visit(field, path + '.')
-                    elif detail.get('array', 0) == 0:
+                    else:
                         members[path] = LogixConnection.kind(field)
+
             visit(datatype)
-            return {'address': name, 'type': 'struct', 'udt_type': datatype.get('name', ''), 'members': members,
-                    'external_access': info.get('external_access', 'Unknown')}
-        return {'address': name, 'type': LogixConnection.kind(datatype), 'udt_type': '', 'members': {},
-                'dimensions': info.get('dimensions', []), 'external_access': info.get('external_access', 'Unknown')}
+            return {**metadata, 'type': 'struct', 'udt_type': metadata['plc_type']}
+
+        metadata.update(type=LogixConnection.kind(datatype), plc_type=datatype)
+        limits = PLC_INTEGER_LIMITS.get(datatype) if isinstance(datatype, str) else None
+        if datatype == 'REAL':
+            limits = (-REAL_MAX, REAL_MAX)
+        if limits:
+            # Decimal text preserves native 64-bit limits in JSON and the browser.
+            metadata['numeric_range'] = [str(limit) for limit in limits]
+        return metadata
 
     @staticmethod
     def kind(datatype):

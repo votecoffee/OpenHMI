@@ -120,6 +120,10 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await page.getByRole('combobox', { name: 'Browse connection', exact: true }).selectOption('testplc');
     await page.getByRole('button', { name: 'Browse PLC tags', exact: true }).click();
     await page.getByRole('listbox', { name: 'PLC tag', exact: true }).selectOption('Level');
+    const metadata = page.getByRole('group', { name: 'PLC tag metadata' });
+    await expect(metadata).toContainText('PLC type REAL');
+    await expect(metadata).toContainText('External access Read/Write');
+    await expect(metadata).toContainText('PLC numeric range');
     await page.getByLabel('Logical tag name', { exact: true }).fill('PLCLevel');
     await page.getByRole('button', { name: 'Add tag', exact: true }).click();
     await page.getByLabel('PLCLevel scale', { exact: true }).fill('2');
@@ -238,5 +242,52 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
   } finally {
     await saveProject(original.active);
     await saveProject(original.draft, false);
+  }
+});
+
+test('PLC browse keeps a delayed response from replacing the selected connection', async ({ page }) => {
+  await page.route('**/api/project', async route => {
+    const response = await route.fetch();
+    const project = await response.json();
+    project.draft.connections = ['first', 'second'].map(id => ({ id, name: id, path: 'offline-only/0', enabled: false }));
+    await route.fulfill({ response, json: project });
+  });
+  let release;
+  const delayed = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/connections/first/browse', async route => {
+    await delayed;
+    await route.fulfill({ json: { tags: [{ address: 'Previous', type: 'number', plc_type: 'REAL' }] } });
+  });
+  await page.route('**/api/connections/second/browse', route => route.fulfill({ json: { tags: [{
+    address: 'Current', type: 'string', plc_type: 'ShortString', external_access: 'Read Only',
+    dimensions: [3, 0, 0], string_capacity_bytes: 24,
+  }] } }));
+
+  try {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Tags', exact: true }).click();
+    const connection = page.getByRole('combobox', { name: 'Browse connection', exact: true });
+    const browse = page.getByRole('button', { name: 'Browse PLC tags', exact: true });
+    await connection.selectOption('first');
+    const pending = page.waitForRequest('**/api/connections/first/browse');
+    await browse.click();
+    await pending;
+    await connection.selectOption('second');
+    await expect(page.getByLabel('PLC address', { exact: true })).toHaveValue('');
+    await browse.click();
+    const tags = page.getByRole('listbox', { name: 'PLC tag', exact: true });
+    await tags.selectOption('Current');
+
+    const response = page.waitForResponse('**/api/connections/first/browse');
+    release();
+    await (await response).finished();
+    const metadata = page.getByRole('group', { name: 'PLC tag metadata' });
+    await expect(metadata).toContainText('External access Read Only');
+    await expect(metadata).toContainText('Array dimensions 3');
+    await expect(metadata).toContainText('PLC STRING capacity 24 bytes');
+    await expect(tags).toHaveValue('Current');
+    await expect(tags.getByRole('option', { name: /Previous/ })).toHaveCount(0);
+  } finally {
+    release();
   }
 });

@@ -32,6 +32,16 @@ class BenchBuilderTests(unittest.TestCase):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
                 self.values['TestArray[1]'] = 15
+                short_string = {'name': 'ShortString', 'string': 24,
+                                'attributes': ['LEN'], 'internal_tags': {'LEN': {'data_type': 'DINT'}}}
+                self.tags.update({
+                    'Counter': {'data_type': 'ULINT', 'external_access': 'Read Only'},
+                    'Names': {'data_type': short_string, 'dimensions': [3, 0, 0], 'external_access': 'Read/Write'},
+                })
+                motor = self.tags['Motor']['data_type']
+                motor['attributes'].extend(['Label', 'Names'])
+                motor['internal_tags'].update(
+                    Label={'data_type': short_string}, Names={'data_type': short_string, 'array': 3})
 
         with ExitStack() as stack:
             root = stack.enter_context(TemporaryDirectory())
@@ -82,6 +92,16 @@ class BenchBuilderTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'read-only'):
                 driver.write('BenchRun', [False])
             self.assertEqual(plc.writes, [])
+            reads = list(plc.reads)
+            response = client.get('/api/connections/bench/browse')
+            self.assertEqual(response.status_code, 200)
+            tags = {tag['address']: tag for tag in response.json()['tags']}
+            self.assertEqual(tags['Counter']['numeric_range'], ['0', '18446744073709551615'])
+            self.assertEqual(tags['Counter']['plc_type'], 'ULINT')
+            self.assertEqual(tags['Names']['string_capacity_bytes'], 24)
+            self.assertEqual(tags['Names']['dimensions'], [3, 0, 0])
+            self.assertEqual(tags['Motor']['members'], {'Running': 'boolean', 'Speed': 'number', 'Label': 'string'})
+            self.assertEqual(plc.reads, reads)
             before = client.get('/api/diagnostics.json').json()
             connection = before['connections'][0]
             self.assertEqual(connection['timings']['scan']['count'], 2)

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { api } from './api.mjs';
 
 function structureInitial(members, values) {
@@ -187,6 +187,7 @@ export function EngineeringSettings({ tab, settings, onChange, editScope, catalo
   const [memberInitial, setMemberInitial] = useState({});
   const [udt, setUdt] = useState('');
   const [browse, setBrowse] = useState([]);
+  const browseRequest = useRef(0);
   const [filter, setFilter] = useState('');
   const [popup, setPopup] = useState(false);
   const [historyTag, setHistoryTag] = useState('');
@@ -254,11 +255,44 @@ export function EngineeringSettings({ tab, settings, onChange, editScope, catalo
     <button onClick={() => { if (historyTag && !settings.historian.tags.some(item => item.tag === historyTag)) onChange({ ...settings, historian: { ...settings.historian, tags: [...settings.historian.tags, { tag: historyTag, sample_ms: sample, deadband }] } }); }}>Add history tag</button>
     <HistoryExport tags={settings.historian.tags} projectInstance={projectInstance} />
   </section>;
+  const visibleTags = browse.filter(item => item.address.toLowerCase().includes(filter.toLowerCase())).slice(0, 500);
+  const selectedTag = browse.find(item => item.address === path);
+  const dimensions = selectedTag?.dimensions?.filter(size => size > 0) || [];
   return <section className="engineering" aria-label="Tag manager"><h2>Tag manager</h2><p>Logical names keep screens independent of PLC addresses. Built-in simulation tags remain available.</p>
-    <label>Browse connection<select value={connection} onChange={event => setConnection(event.target.value)}><option value="">Local HMI tags</option>{settings.connections.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    <button disabled={!connection} onClick={async () => { try { const state = await api(`/api/connections/${connection}/browse`); setBrowse(state.tags); setMessage(state.error || `${state.tags.length} PLC tags available`); } catch (error) { setMessage(error.message); } }}>Browse PLC tags</button>
+    <label>Browse connection<select value={connection} onChange={event => {
+      browseRequest.current++;
+      setConnection(event.target.value);
+      setBrowse([]);
+      setPath('');
+      setMessage('');
+    }}><option value="">Local HMI tags</option>{settings.connections.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+    <button disabled={!connection} onClick={async () => {
+      const request = ++browseRequest.current;
+      try {
+        const state = await api(`/api/connections/${connection}/browse`);
+        if (request !== browseRequest.current) return;
+        setBrowse(state.tags);
+        setMessage(state.error || `${state.tags.length} PLC tags available`);
+      } catch (error) {
+        if (request === browseRequest.current) setMessage(error.message);
+      }
+    }}>Browse PLC tags</button>
     <label>Filter PLC tags<input value={filter} onChange={event => setFilter(event.target.value)} /></label>
-    {browse.length > 0 && <select aria-label="PLC tag" size="6" onChange={event => { const tag = browse.find(item => item.address === event.target.value); if (tag) { setPath(tag.address); setDatatype(tag.type); setMembers(tag.members || {}); setUdt(tag.udt_type || ''); } }}>{browse.filter(item => item.address.toLowerCase().includes(filter.toLowerCase())).slice(0, 500).map(item => <option key={item.address} value={item.address}>{item.address} · {item.udt_type || item.type}</option>)}</select>}
+    {browse.length > 0 && <select aria-label="PLC tag" size="6" value={visibleTags.some(item => item.address === path) ? path : ''} onChange={event => {
+      const tag = browse.find(item => item.address === event.target.value);
+      if (tag) {
+        setPath(tag.address);
+        setDatatype(tag.type);
+        setMembers(tag.members || {});
+        setUdt(tag.udt_type || '');
+      }
+    }}>{visibleTags.map(item => <option key={item.address} value={item.address}>{item.address} · {item.plc_type || item.udt_type || item.type}</option>)}</select>}
+    {selectedTag && <div role="group" aria-label="PLC tag metadata">
+      <p>PLC type {selectedTag.plc_type || selectedTag.udt_type || selectedTag.type} · External access {selectedTag.external_access || 'Unknown'}</p>
+      {dimensions.length > 0 && <p>Array dimensions {dimensions.join(' × ')}. Enter an indexed address to bind one element.</p>}
+      {selectedTag.numeric_range && <p>PLC numeric range {selectedTag.numeric_range.join(' to ')}</p>}
+      {selectedTag.string_capacity_bytes != null && <p>PLC STRING capacity {selectedTag.string_capacity_bytes} bytes</p>}
+    </div>}
     <label>Logical tag name<input value={name} onChange={event => setName(event.target.value)} /></label><label>PLC address<input disabled={!connection} value={path} onChange={event => setPath(event.target.value)} /></label>
     <label>Tag type<select value={datatype} onChange={event => { setDatatype(event.target.value); setInitial(event.target.value === 'boolean' ? 'false' : event.target.value === 'struct' ? '{}' : '0'); }}>{['boolean', 'number', 'integer', 'string', 'struct'].map(type => <option key={type}>{type}</option>)}</select></label>
     {!connection && datatype !== 'struct' && <label>Initial value<input type={datatype === 'boolean' ? 'checkbox' : datatype === 'string' ? 'text' : 'number'} value={initial} checked={datatype === 'boolean' ? initial === 'true' : undefined} onChange={event => setInitial(datatype === 'boolean' ? String(event.target.checked) : event.target.value)} /></label>}

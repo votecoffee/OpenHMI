@@ -200,7 +200,9 @@ keeps its running copy; test recipes carry production status false. See the
 1. In **Connections**, add a ControlLogix/CompactLogix pycomm3 route, enable it and
    apply. Tags remain read-only until explicitly configured for writing.
 2. In **Tags**, browse the connection and add logical HMI names for PLC addresses,
-   or create local tags. Set numeric scaling and write permission as needed.
+   or create local tags. A selected PLC tag shows its native type, access, array
+   dimensions and known numeric range or STRING capacity. Set numeric scaling
+   and write permission as needed.
 3. In **Screens**, add screens/popups and set each tag update interval. The server
    merges requests across viewers, reads shared tags at the fastest needed rate
    and batches due addresses through pycomm3.

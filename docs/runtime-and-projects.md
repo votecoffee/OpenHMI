@@ -26,6 +26,11 @@ width and the maximum finite REAL magnitude. For PLC STRINGs recognized by
 pycomm3 it checks the declared DATA byte capacity and ISO-8859-1 encoding.
 These checks apply after scaling and support indexed scalar and nested member
 targets. Other address forms and types depend on adapter validation.
+The **Tags** browser shows cached PLC metadata for the selected route. Select
+a tag to see its native type, external access, array dimensions and known
+numeric range or STRING byte capacity. Native 64-bit bounds are displayed as
+exact decimal text. To bind an array element, enter its indexed address. Scalar
+STRING members of a browsed UDT are offered as strings.
 Built-in simulation/recipe tags cannot be replaced by PLC aliases.
 
 Local tags have typed initial values. UDT tags expose a configured member/type
