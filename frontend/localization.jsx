@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useId, useLayoutEffect, us
 
 export const uiText = {
   viewCommandTransaction: 'View command transaction #{id}',
+  commandStatusWaiting: 'Waiting for command status', commandStatusUnavailable: 'Command status unavailable',
   languageSelector: 'Language: {name}', configuredLanguages: 'Configured languages',
   canvasDisplay: 'Canvas display', canvasActualSize: 'Actual size', canvasFitWidth: 'Fit width', canvasDisplayScale: '{percent}% scale',
   clearTrendCursor: 'Clear trend cursor',

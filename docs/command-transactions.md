@@ -61,6 +61,9 @@ are rejected. Trusted Python and other PLC clients remain outside this boundary.
    Inspect the **Commands** page for the durable sequence/state/event timeline.
    Select a transaction number to open its live details directly.
    The command button also links to the latest transaction for its contract.
+   It waits for valid status before accepting a request. During a status outage,
+   it keeps the last received transaction visible and blocks new requests until
+   status recovers. An unresolved transaction continues to block new requests.
    Filter history by exact command ID and transaction state. **All unresolved**
    includes prepared, staging, requested, accepted and uncertain transactions.
    The list updates as transactions change state. If status is unavailable or
