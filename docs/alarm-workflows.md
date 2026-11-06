@@ -58,7 +58,11 @@ prior successful response. The console disables Acknowledge all while the
 status is stale or unavailable.
 
 **Alarm details** shows the captured cause and recovery steps, related-screen navigation,
-first acknowledgement and append-only operator notes. Trigger quality/time comes
+first acknowledgement and append-only operator notes. Details and notes
+refresh independently, so a notes outage leaves the recovery instructions
+and current trigger quality readable. During a detail outage, retained
+trigger quality is labeled as last received. Note entry waits for both reads
+to recover. Trigger quality/time comes
 from the cached driver sample. Open the quality badge to inspect the trigger
 tag, reason, sample age and source time when available. Opening details
 creates no additional PLC scan lease. Notes record the authenticated

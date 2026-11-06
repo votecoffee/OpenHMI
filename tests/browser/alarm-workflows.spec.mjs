@@ -32,10 +32,17 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await page.request.post('/api/controls/alarm_fixture/activate', { data: {} });
     raised = true;
     await page.reload();
+    const notesEndpoint = '**/api/alarms/occurrences/*/notes';
+    await page.route(notesEndpoint, route => route.fulfill({ status: 503, json: { detail: 'Synthetic notes outage' } }));
     await page.getByLabel('Screen alarm status').getByRole('link', { name: 'Alarm details: P1 Supply fault' }).press('Enter');
     const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
     await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
     await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
+    const notesWarning = detail.getByRole('alert').filter({ hasText: 'Operator notes unavailable' });
+    await expect(notesWarning).toContainText('Synthetic notes outage');
+    await expect(detail.getByLabel('Operator note', { exact: true })).toBeDisabled();
+    await page.unroute(notesEndpoint);
+    await expect(detail.getByLabel('Operator note', { exact: true })).toBeEnabled();
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
     const alarmStatus = await (await page.request.get('/api/alarms')).json();
     let status = { ...alarmStatus, evaluation_stale: true };
@@ -103,6 +110,25 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await detail.getByRole('button', { name: 'Save operator note', exact: true }).click();
     await expect(detail.getByRole('cell', { name: 'Regulator inspected; awaiting supply', exact: true })).toBeVisible();
     await expect(detail.getByRole('cell').filter({ hasText: 'admin (local)' })).toBeVisible();
+    await page.route(notesEndpoint, route => route.fulfill({ json: { items: [null] } }));
+    await expect(notesWarning).toContainText('Showing the last page received');
+    await expect(detail.getByText('Regulator inspected; awaiting supply', { exact: true })).toBeVisible();
+    await expect(detail.getByText(/Current trigger quality: Good data/)).toBeVisible();
+    await expect(detail.getByLabel('Operator note', { exact: true })).toBeDisabled();
+    await page.unroute(notesEndpoint);
+    await expect(notesWarning).toBeHidden();
+
+    const detailPath = `/api/alarms/occurrences/${primary.occurrence_id}`;
+    const captured = await (await page.request.get(detailPath)).json();
+    await page.route(`**${detailPath}`, route => route.fulfill({ json: { ...captured,
+      occurrence: { ...captured.occurrence, occurrence_id: primary.occurrence_id + 1, response: 'Wrong alarm' } } }));
+    const detailWarning = detail.getByRole('alert').filter({ hasText: 'Alarm details unavailable' });
+    await expect(detailWarning).toContainText('Showing the last page received');
+    await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
+    await expect(detail.getByText('Wrong alarm')).toHaveCount(0);
+    await expect(detail.getByText(/Last received trigger quality: Good data/)).toBeVisible();
+    await page.unroute(`**${detailPath}`);
+    await expect(detailWarning).toBeHidden();
     await page.getByLabel('Event filter', { exact: true }).selectOption('operator_note');
     const download = page.waitForEvent('download');
     await page.getByRole('link', { name: 'Export alarm events CSV', exact: true }).click();

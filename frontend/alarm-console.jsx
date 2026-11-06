@@ -43,27 +43,50 @@ function isAlarmEvent(item) {
     && [item.comment, item.actor, item.provider].every(optionalText);
 }
 
-function useAlarmPage(endpoint, isItem, generation) {
+function isAlarmNote(item) {
+  return positiveId(item?.id) && ['timestamp', 'actor', 'provider', 'comment'].every(key => typeof item[key] === 'string');
+}
+
+function isAlarmDetail(detail, identifier) {
+  const { occurrence, trigger, related_screen: screen } = detail ?? {};
+  return isOccurrence(occurrence) && occurrence.occurrence_id === identifier && typeof occurrence.tag === 'string'
+    && ['cause', 'response', 'related_screen', 'acknowledged_provider', 'acknowledgement_comment']
+      .every(key => optionalText(occurrence[key]))
+    && ['causes', 'responses'].every(key => occurrence[key] == null || (typeof occurrence[key] === 'object'
+      && !Array.isArray(occurrence[key]) && Object.values(occurrence[key]).every(value => typeof value === 'string')))
+    && typeof trigger?.quality === 'string' && optionalText(trigger.quality_reason)
+    && optionalText(trigger.timestamp) && optionalText(trigger.error)
+    && (screen === null || (typeof screen?.id === 'string' && typeof screen.title === 'string'));
+}
+
+function isAlarmPage(page, isItem) {
+  return Array.isArray(page?.items) && page.items.every(isItem) && typeof page.has_more === 'boolean'
+    && (page.has_more ? positiveId(page.next_before_id) : page.next_before_id === null);
+}
+
+const isOccurrencePage = page => isAlarmPage(page, isOccurrence);
+const isEventPage = page => isAlarmPage(page, isAlarmEvent);
+const isNotePage = page => isAlarmPage(page, isAlarmNote);
+
+function useAlarmRead(endpoint, validate, generation, identifier) {
   const [response, setResponse] = useState(null);
   useEffect(() => {
+    if (!endpoint) return;
     let stopped = false, timer;
     async function refresh() {
       try {
-        const page = await api(endpoint);
-        if (!Array.isArray(page?.items) || !page.items.every(isItem) || typeof page.has_more !== 'boolean'
-          || (page.has_more ? !positiveId(page.next_before_id) : page.next_before_id !== null)) {
-          throw new Error('Invalid alarm page response');
-        }
-        if (!stopped) setResponse({ endpoint, page, receivedAt: new Date() });
+        const data = await api(endpoint);
+        if (!validate(data, identifier)) throw new Error('Invalid alarm response');
+        if (!stopped) setResponse({ endpoint, data, receivedAt: new Date() });
       } catch (problem) {
-        const denied = [401, 403].includes(problem.status);
-        if (!stopped) setResponse(previous => ({ ...(!denied && previous?.endpoint === endpoint ? previous : { endpoint }),
+        const discard = [401, 403, 404].includes(problem.status);
+        if (!stopped) setResponse(previous => ({ ...(!discard && previous?.endpoint === endpoint ? previous : { endpoint }),
           error: problem.message }));
       }
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [endpoint, isItem, generation]);
+  }, [endpoint, validate, generation, identifier]);
   return response?.endpoint === endpoint ? response : {};
 }
 
@@ -79,35 +102,31 @@ export function AlarmConsole() {
   const [filters, setFilters] = useState(blankFilters), [applied, setApplied] = useState(blankFilters);
   const [before, setBefore] = useState(null), [eventBefore, setEventBefore] = useState(null), [eventFilter, setEventFilter] = useState('');
   const [selected, setSelected] = useState([]), [comment, setComment] = useState('');
-  const [identifier, setIdentifier] = useState(linkedOccurrence), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState('');
+  const [identifier, setIdentifier] = useState(linkedOccurrence);
   const detailHeading = useRef(null);
-  const detailReady = Boolean(detail || detailError);
-  const triggerProblem = detail && sampleQualityProblem(detail.trigger);
-  const [note, setNote] = useState(''), [notesBefore, setNotesBefore] = useState(null), [notes, setNotes] = useState(null);
+  const [note, setNote] = useState(''), [notesBefore, setNotesBefore] = useState(null);
   const [generation, setGeneration] = useState(0);
   const alarms = live.alarms || {};
   const monitorProblem = alarmMonitorProblem(live);
   const monitorAvailable = !monitorProblem;
   const unavailable = monitorAvailable ? unavailableAlarmTriggers(live) : [];
   const waiting = monitorAvailable && alarmEvaluationPending(live);
-  const { page: rows, error, receivedAt: rowsReceivedAt } = useAlarmPage(
-    `/api/alarms/occurrences?${parameters(applied, before)}`, isOccurrence, generation);
-  const { page: history, error: historyError, receivedAt: historyReceivedAt } = useAlarmPage(
-    `/api/alarms/events?${parameters(applied, eventBefore, true, eventFilter)}`, isAlarmEvent, generation);
+  const { data: rows, error, receivedAt: rowsReceivedAt } = useAlarmRead(
+    `/api/alarms/occurrences?${parameters(applied, before)}`, isOccurrencePage, generation);
+  const { data: history, error: historyError, receivedAt: historyReceivedAt } = useAlarmRead(
+    `/api/alarms/events?${parameters(applied, eventBefore, true, eventFilter)}`, isEventPage, generation);
+  const detailUrl = identifier ? `/api/alarms/occurrences/${identifier}` : null;
+  const { data: detail, error: detailError, receivedAt: detailReceivedAt } = useAlarmRead(
+    detailUrl, isAlarmDetail, generation, identifier);
+  const { data: notes, error: notesError, receivedAt: notesReceivedAt } = useAlarmRead(
+    detailUrl && `${detailUrl}/notes${notesBefore ? `?before_id=${notesBefore}` : ''}`, isNotePage, generation);
+  const detailReady = Boolean(detail || detailError);
+  const triggerProblem = detail && sampleQualityProblem(detail.trigger);
+  const noteBlocked = !canComment || busy || !!detailError || !!notesError || !notes;
   useEffect(() => {
     setSelected(previous => previous.length
       ? previous.filter(id => rows?.items.some(item => item.occurrence_id === id && !item.acknowledged_at)) : previous);
   }, [rows]);
-  useEffect(() => {
-    if (!identifier) return;
-    let stopped = false, timer;
-    async function refresh() {
-      try { const [next, page] = await Promise.all([api(`/api/alarms/occurrences/${identifier}`), api(`/api/alarms/occurrences/${identifier}/notes${notesBefore ? `?before_id=${notesBefore}` : ''}`)]); if (!stopped) { setDetail(next); setNotes(page); setDetailError(''); } }
-      catch (problem) { if (!stopped) setDetailError(problem.message); }
-      if (!stopped) timer = setTimeout(refresh, 1000);
-    }
-    refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [identifier, notesBefore, generation]);
   useEffect(() => {
     if (detailReady) detailHeading.current?.focus();
   }, [identifier, detailReady]);
@@ -142,7 +161,10 @@ export function AlarmConsole() {
     finally { setBusy(false); }
   }
   function guidance(alarm, field) { return alarm[field + 's']?.[language.code] || alarm[field] || ui('noGuidance'); }
-  function inspect(id) { setIdentifier(id); setDetail(null); setNotes(null); setNotesBefore(null); setDetailError(''); setNote(''); }
+  function inspect(id) {
+    setIdentifier(id); setNotesBefore(null); setNote('');
+    if (id === identifier) detailHeading.current?.focus();
+  }
   return <section className="alarm-console" aria-label="Alarm console">
     <div className="alarm-console-heading"><h1>{ui('alarmStatus')}</h1><LanguageSelector /></div>
     {monitorProblem && <p role="alert">{ui(monitorProblem)}</p>}
@@ -183,17 +205,20 @@ export function AlarmConsole() {
       : alarms.shelved_occurrence_count ? 'noUnshelvedAlarms' : 'noOutstanding') : ui('alarmFilteredEmpty')}</p>}
     <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!!error || !rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
     <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />
-    {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2 ref={detailHeading} tabIndex={-1}>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
-      {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {triggerProblem
+    {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2 ref={detailHeading} tabIndex={-1}>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmDetailUnavailable')} {detailError}
+      {detail && <> {ui('alarmLastPage', { time: timestamp(detailReceivedAt) })}</>}</p>}
+      {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui(detailError ? 'alarmLastTriggerQuality' : 'triggerQuality')}: {triggerProblem
         ? <Quality tag={detail.occurrence.tag} problem={triggerProblem} sample={detail.trigger} />
         : <>{ui('tagGood')} · {timestamp(detail.trigger.timestamp)}</>}</p>
         <p>{detail.occurrence.shelf ? `${ui('shelved')} · ${timestamp(detail.occurrence.shelf.expires_at)}` : ui('unshelved')}</p><button disabled={!canShelve || busy || !!detailError || !!detail.occurrence.shelf || !!detail.occurrence.retired_at || (!detail.occurrence.active && !!detail.occurrence.acknowledged_at) || !shelfReason.trim()} onClick={() => changeShelf()}>{ui('shelveAlarm')}</button>
         <h3>{ui('possibleCause')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'cause')}</p><h3>{ui('operatorResponse')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'response')}</p>
         {detail.related_screen && <a href={`/runtime?screen=${encodeURIComponent(detail.related_screen.id)}`}>{ui('openRelatedScreen')}: {detail.related_screen.title}</a>}{!detail.related_screen && detail.occurrence.related_screen && <p>{ui('relatedScreenUnavailable')}</p>}
         <p>{ui('acknowledgedBy')}: {detail.occurrence.acknowledged_by || (detail.occurrence.acknowledged_at ? ui('legacyIdentity') : ui('unacknowledged'))} {detail.occurrence.acknowledged_provider} · {timestamp(detail.occurrence.acknowledged_at)}</p><p>{detail.occurrence.acknowledgement_comment}</p>
-        <h3>{ui('operatorNotes')}</h3><form onSubmit={saveNote}><label>{ui('operatorNote')}<textarea aria-label={ui('operatorNote')} maxLength={1000} value={note} onChange={event => setNote(event.target.value)} disabled={!canComment || busy || !!detailError} /></label><button disabled={!canComment || busy || !!detailError || !note.trim()}>{ui('saveOperatorNote')}</button></form>
+        <h3>{ui('operatorNotes')}</h3><form onSubmit={saveNote}><label>{ui('operatorNote')}<textarea aria-label={ui('operatorNote')} maxLength={1000} value={note} onChange={event => setNote(event.target.value)} disabled={noteBlocked} /></label><button disabled={noteBlocked || !note.trim()}>{ui('saveOperatorNote')}</button></form>
+        {notesError && <p role="alert">{ui('alarmNotesUnavailable')} {notesError}
+          {notes && <> {ui('alarmLastPage', { time: timestamp(notesReceivedAt) })}</>}</p>}
         <table><tbody>{notes?.items.map(item => <tr key={item.id}><td>{timestamp(item.timestamp)}<br />{item.actor} ({item.provider})</td><td className="alarm-guidance">{item.comment}</td></tr>)}</tbody></table>
-        <button onClick={() => setNotesBefore(null)}>{ui('newestNotes')}</button><button disabled={!notes?.has_more} onClick={() => setNotesBefore(notes.next_before_id)}>{ui('olderNotes')}</button>
+        <button onClick={() => setNotesBefore(null)}>{ui('newestNotes')}</button><button disabled={!!notesError || !notes?.has_more} onClick={() => setNotesBefore(notes.next_before_id)}>{ui('olderNotes')}</button>
       </>}
     </section>}
     <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{['active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note', 'shelved', 'shelf_restored', 'shelf_expired', 'shelf_invalidated'].map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={`/api/alarms/events.csv?${parameters(applied, null, true, eventFilter)}`}>{ui('exportAlarmCsv')}</a></div>
