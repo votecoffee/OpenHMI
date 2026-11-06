@@ -332,6 +332,7 @@ class RuntimeDriver(SimulatorDriver):
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
         self._refresh_after = {}
+        self._demanded_aliases = set()
         self._lease_sequences = {}
         self.local_names = set()
         self.plc_hold = False
@@ -459,7 +460,9 @@ class RuntimeDriver(SimulatorDriver):
                         logging.exception('PLC scan failed for route %s', identifier)
 
             grouped = {}
-            for alias, rate in self.demands(now).items():
+            demands = self.demands(now)
+            self._demanded_aliases = set(demands)
+            for alias, rate in demands.items():
                 root, _ = self.sources.get(alias, (None, ''))
                 tag = self.definitions.get(root)
                 if tag and tag['connection']:
@@ -556,6 +559,7 @@ class RuntimeDriver(SimulatorDriver):
             with self.lock:
                 if self._closing or self.project is not project:
                     return
+                awaiting_usable = not connection.has_usable_sample or connection.outage_started is not None
                 for address, (result, acquired, timestamp) in zip(due, results):
                     key = (identifier, address)
                     rate = self.last_rates.get(key)
@@ -587,17 +591,20 @@ class RuntimeDriver(SimulatorDriver):
                                 if not math.isfinite(value):
                                     raise ValueError('Scaled PLC value is not finite')
                             sample = {'value': value, 'quality': 'good', 'error': None}
-                            if scan_finished - acquired <= freshness_seconds(rate):
-                                connection.has_usable_sample = True
-                                if connection.outage_started is not None:
-                                    connection.timings.record('recovery', scan_finished - connection.outage_started)
-                                    connection.outage_started = None
                         except (ValueError, KeyError, TypeError, IndexError) as failure:
                             sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
                         self.samples[alias] = {
                             **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
                             'failure_generation': connection.failure_generation,
                         }
+                        # One physical UDT read can populate aliases no consumer requested.
+                        if (awaiting_usable and alias in self._demanded_aliases and sample['quality'] == 'good'
+                                and scan_finished - acquired <= freshness_seconds(rate)):
+                            connection.has_usable_sample = True
+                            awaiting_usable = False
+                            if connection.outage_started is not None:
+                                connection.timings.record('recovery', scan_finished - connection.outage_started)
+                                connection.outage_started = None
 
     def sample_snapshot(self, now=None):
         now = time.monotonic() if now is None else now

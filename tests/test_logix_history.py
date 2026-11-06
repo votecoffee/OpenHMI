@@ -267,6 +267,46 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertFalse(driver.status()[0]['awaiting_data'])
         self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'good')
 
+    def test_only_demanded_udt_members_can_complete_route_startup_and_recovery(self):
+        class MotorPLC(FakePLC):
+            speed = 'invalid speed'
+
+            def read(self, *addresses):
+                self.values['Motor']['Speed'] = self.speed
+                return super().read(*addresses)
+
+        driver = RuntimeDriver(MotorPLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('viewer', ['fast'], 1)
+        driver.poll(1)
+        samples = driver.sample_snapshot(1)
+        self.assertEqual(samples['MotorA.Speed']['quality'], 'bad')
+        self.assertEqual(samples['MotorA.Running']['quality'], 'good')
+        self.assertEqual(driver.connections['plc'].client.reads, [('Motor',)])
+        self.assertTrue(driver.status()[0]['awaiting_data'])
+
+        MotorPLC.speed = 42.0
+        driver.poll(1.2)
+        self.assertFalse(driver.status()[0]['awaiting_data'])
+        self.assertEqual(driver.sample_snapshot(1.2)['MotorA.Speed']['value'], 42.0)
+
+        driver.connections['plc'].client.fail = True
+        driver.poll(2)
+        MotorPLC.speed = 'invalid speed'
+        driver.poll(3)
+        status = driver.status(include_timing=True)[0]
+        self.assertTrue(status['connected'])
+        self.assertTrue(status['recovering'])
+        self.assertNotIn('recovery', status['timings'])
+
+        MotorPLC.speed = 50.0
+        driver.poll(3.2)
+        status = driver.status(include_timing=True)[0]
+        self.assertFalse(status['recovering'])
+        self.assertEqual(status['timings']['recovery']['last_ms'], 1200)
+        self.assertEqual(driver.sample_snapshot(3.2)['MotorA.Speed']['value'], 50.0)
+
     def test_route_recovery_waits_for_usable_data_after_reconnect(self):
         reject = False
 
