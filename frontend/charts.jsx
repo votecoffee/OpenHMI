@@ -51,6 +51,27 @@ export function TankGraphic({ label, position, valid, minimum, maximum, normalLo
   </div>;
 }
 
+export function GaugeGraphic({ label, position, valid, normalLow, normalHigh }) {
+  const point = (percent, radius) => {
+    const angle = (150 + 2.4 * percent) * Math.PI / 180;
+    return [80 + radius * Math.cos(angle), 78 + radius * Math.sin(angle)];
+  };
+  const arc = (from, to) => `M${point(from, 60)} A60,60 0 ${to - from > 75 ? 1 : 0} 1 ${point(to, 60)}`;
+  const [needleX, needleY] = point(position, 48);
+  return <svg className="radial-gauge" role="img" aria-label={label} viewBox="0 0 160 114">
+    <path className="gauge-track" d={arc(0, 100)} />
+    <path className="gauge-band" d={arc(normalLow, normalHigh)} />
+    {[0, 25, 50, 75, 100].map(tick => {
+      const [x1, y1] = point(tick, 53), [x2, y2] = point(tick, 57);
+      return <line key={tick} className="gauge-tick" x1={x1} y1={y1} x2={x2} y2={y2} />;
+    })}
+    {valid && <g className="gauge-needle" data-gauge-needle="">
+      <line x1="80" y1="78" x2={needleX} y2={needleY} />
+      <circle cx="80" cy="78" r="3" />
+    </g>}
+  </svg>;
+}
+
 function readout(value, decimals, language) {
   const options = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false };
   try { return new Intl.NumberFormat(language, options).format(value); }

@@ -1,6 +1,6 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
-  analog: 'AnalogRange', tank: 'TankLevel', bar: 'BarGraph', radar: 'RadarChart', alarm: 'AlarmIndicator',
+  analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', progress: 'ProgressBar',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
@@ -56,7 +56,7 @@ export function toProject(data, settings = {}) {
       if (type === 'Sparkline') return { ...numeric, seconds: Number(props.seconds ?? 60) };
       if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
       if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
-      if (type === 'AnalogRange' || type === 'TankLevel') {
+      if (['AnalogRange', 'TankLevel', 'RadialGauge'].includes(type)) {
         return { ...numeric, ...Object.fromEntries(['minimum', 'maximum', 'normal_low', 'normal_high'].map(key => [key, Number(props[key])])) };
       }
       return numeric;

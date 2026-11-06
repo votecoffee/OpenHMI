@@ -13,7 +13,7 @@ import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Sparkline, Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
-import { ChartFields, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
+import { ChartFields, GaugeGraphic, ProcessChart, TankGraphic, chartSeries } from './charts.jsx';
 
 export const ScreenControls = createContext([]);
 
@@ -116,7 +116,7 @@ function Indicator({ id, label, tag, on_text = 'ON', off_text = 'OFF', puck }) {
   </article>;
 }
 
-function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_low, normal_high, puck, tank = false }) {
+function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_low, normal_high, puck, kind = 'analog' }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, ui, language } = useLocalization();
   label = text(`control.${id}.label`, label);
@@ -129,17 +129,18 @@ function AnalogRange({ id, label, tag, unit, decimals, minimum, maximum, normal_
   const position = number => Math.max(0, Math.min(100, (number - minimum) / (maximum - minimum) * 100));
   const outside = valid && (value < minimum || value > maximum);
   const graphicLabel = valid ? `${label}: ${value} ${unit}, scale ${minimum} to ${maximum}, normal ${normal_low} to ${normal_high}${outside ? ', out of scale' : ''}` : `${label}: ${ui(problem)}`;
-  return <article className="hmi-control hmi-analog" data-control={tank ? 'tank' : 'analog'}>
+  const Graphic = kind === 'gauge' ? GaugeGraphic : kind === 'tank' ? TankGraphic : null;
+  return <article className="hmi-control hmi-analog" data-control={kind}>
     <div className="analog-heading"><span className="hmi-label">{label}</span>
       {valid ? <strong className="hmi-value">{formatted} <small>{unit}</small></strong> : <Quality problem={problem} tag={tag} />}</div>
     {!configured ? <Quality problem="badRange" /> : <>
-      {tank ? <TankGraphic label={graphicLabel} position={valid ? position(value) : 0} valid={valid} minimum={minimum} maximum={maximum}
+      {Graphic ? <Graphic label={graphicLabel} position={valid ? position(value) : 0} valid={valid} minimum={minimum} maximum={maximum}
         normalLow={position(normal_low)} normalHigh={position(normal_high)} />
         : <div className={`analog-track ${!valid ? 'invalid' : ''}`} role="img" aria-label={graphicLabel}>
         <span className="normal-band" style={{ left: `${position(normal_low)}%`, width: `${position(normal_high) - position(normal_low)}%` }} />
         {valid && <span className="analog-pointer" style={{ left: `${position(value)}%` }} aria-hidden="true">▼</span>}
       </div>}
-      <div className="analog-scale">{!tank && <span>{minimum}</span>}<span>{ui('normal')} {normal_low}–{normal_high} {unit}</span>{!tank && <span>{maximum}</span>}</div>
+      <div className="analog-scale">{kind !== 'tank' && <span>{minimum}</span>}<span>{ui('normal')} {normal_low}–{normal_high} {unit}</span>{kind !== 'tank' && <span>{maximum}</span>}</div>
       {valid && (outside || value < normal_low || value > normal_high) && <strong className="range-deviation">{outside ? ui('outOfScale') : ui('outsideBand')}</strong>}
     </>}
     <TagReference tag={tag} puck={puck} />
@@ -380,7 +381,7 @@ export function createConfig(catalog) {
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline'];
-  const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
+  const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
@@ -482,7 +483,9 @@ export function createConfig(catalog) {
       AnalogRange: { label: 'Analog range', fields: analogFields,
         defaultProps: { ...analogDefaults, label: 'Tank operating range' }, render: AnalogRange },
       TankLevel: { label: 'Tank level indicator', fields: analogFields,
-        defaultProps: analogDefaults, render: props => <AnalogRange {...props} tank /> },
+        defaultProps: analogDefaults, render: props => <AnalogRange {...props} kind="tank" /> },
+      RadialGauge: { label: 'Radial gauge', fields: analogFields,
+        defaultProps: { ...analogDefaults, label: 'Tank level gauge' }, render: props => <AnalogRange {...props} kind="gauge" /> },
       BarGraph: { label: 'Bar graph', fields: { label: labelField, ...scaleFields, unit: numericFields.unit, series: chartField(false) },
         defaultProps: { label: 'Process comparison', minimum: 0, maximum: 100, unit: '', series: [chartSeries('TankLevel', false)] },
         render: LiveChart },

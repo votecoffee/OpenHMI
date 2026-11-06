@@ -15,6 +15,12 @@
 .radar-grid { fill: none; stroke: #888; }
 .radar-profile { fill: var(--hmi-live); fill-opacity: .13; stroke: var(--hmi-live); stroke-width: 2; }
 .radar-dot { fill: var(--hmi-live); }
+.radial-gauge { display: block; align-self: center; width: min(100%, 136px); height: auto; }
+.radial-gauge path { fill: none; }
+.gauge-track { stroke: #777; stroke-width: 2; }
+.gauge-band { stroke: #555; stroke-width: 6; }
+.gauge-tick { stroke: #555; }
+.gauge-needle { fill: var(--hmi-live); stroke: var(--hmi-live); stroke-width: 2; }
 .tank-graphic { display: flex; gap: 8px; align-items: stretch; align-self: center; }
 .tank-vessel { position: relative; width: 82px; height: 138px; overflow: hidden; border: 2px solid #666; border-radius: 12px; background: #eee; }
 .tank-vessel.tank-invalid { border-style: dashed; }

@@ -145,6 +145,10 @@ class TankControl(AnalogControl):
     kind: Literal['tank']
 
 
+class GaugeControl(AnalogControl):
+    kind: Literal['gauge']
+
+
 class ChartSeries(StrictModel):
     tag: str = Field(min_length=1, max_length=200)
     label: str = Field(default='', max_length=100)
@@ -377,7 +381,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.use({ actionTimeout: 8000 });
 
-test('drag live tank, bar and radar controls onto a screen and handle bad data', async ({ page, context }) => {
+test('drag live tank, gauge, bar and radar controls onto a screen and handle bad data', async ({ page, context }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   async function save(project, apply = true) {
@@ -33,11 +33,16 @@ test('drag live tank, bar and radar controls onto a screen and handle bad data',
       { name: 'ChartPressure', type: 'number', initial: 50 },
     ] });
     await page.goto('/');
-    for (const [name, kind] of [['Tank level indicator', 'tank'], ['Bar graph', 'bar'], ['Radar chart', 'radar']]) {
+    for (const [name, kind] of [['Tank level indicator', 'tank'], ['Radial gauge', 'gauge'], ['Bar graph', 'bar'], ['Radar chart', 'radar']]) {
       await drop(name);
       await expect(page.locator(`[data-control="${kind}"]`)).toHaveCount(1);
       await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     }
+    await page.locator('[data-control="gauge"] .hmi-label').click();
+    await page.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'ChartPressure' });
+    await page.getByRole('spinbutton', { name: 'Scale minimum', exact: true }).fill('-50');
+    await page.getByRole('spinbutton', { name: 'Scale maximum', exact: true }).fill('150');
+    await page.getByRole('textbox', { name: 'Units', exact: true }).fill('psi');
     await page.locator('[data-control="bar"] .hmi-label').click();
     await page.getByRole('spinbutton', { name: 'Scale minimum', exact: true }).fill('-100');
     const bars = page.getByRole('group', { name: 'Bar series', exact: true });
@@ -61,6 +66,11 @@ test('drag live tank, bar and radar controls onto a screen and handle bad data',
     await viewer.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
     await viewer.goto('/runtime');
     const tank = viewer.locator('[data-control="tank"]');
+    const gauge = viewer.locator('[data-control="gauge"]');
+    const needle = gauge.locator('[data-gauge-needle] line');
+    await expect(gauge).toContainText('50.0 psi');
+    await expect(gauge).toContainText('Normal 20–80 psi');
+    await expect(needle).toHaveAttribute('y2', '30');
     const bar = viewer.locator('[data-control="bar"] [data-chart-tag="ChartFlow"]');
     const radar = viewer.locator('[data-control="radar"]');
     await expect(tank.locator('[data-tank-fill]')).toHaveAttribute('style', 'height: 42%;');
@@ -71,7 +81,15 @@ test('drag live tank, bar and radar controls onto a screen and handle bad data',
     await expect(radar.locator('[data-chart-tag="ChartPressure"]')).toContainText('50.0 psi');
     if (process.env.OPENHMI_CHARTS_SCREENSHOT) await viewer.screenshot({ path: process.env.OPENHMI_CHARTS_SCREENSHOT, fullPage: true });
 
+    values = { ...values, ChartPressure: 90 };
+    await expect(gauge).toContainText('OUTSIDE NORMAL BAND');
+    values = { ...values, ChartPressure: 180 };
+    await expect(gauge).toContainText('180.0 psi');
+    await expect(gauge).toContainText('OUT OF SCALE');
+    expect(Number(await needle.getAttribute('y2'))).toBeCloseTo(102);
     values = { ...values, TankLevel: 120, ChartFlow: null, ChartPressure: null };
+    await expect(gauge).toContainText('BAD DATA');
+    await expect(needle).toHaveCount(0);
     await expect(tank).toContainText('120.0');
     await expect(tank).toContainText('OUT OF SCALE');
     await expect(tank.locator('[data-tank-fill]')).toHaveAttribute('style', 'height: 100%;');

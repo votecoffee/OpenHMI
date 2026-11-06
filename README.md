@@ -232,7 +232,8 @@ keeps its running copy; test recipes carry production status false. See the
    rolling sample retention, saved capture review and full capture CSV export.
    Configure trend labels and capture controls in **Languages**.
 7. In the **Live charts** palette section, drop in a **Tank level indicator**
-   for a live fill and normal band, a **Bar graph** to compare numeric tags on
+   for a live fill and normal band, a **Radial gauge** for a dial with a normal
+   band, a **Bar graph** to compare numeric tags on
    one scale, or a **Radar chart** with independently scaled axes. Set tags,
    labels, units and precision in the designer. See the [control catalog](docs/hmi-style-guide.md#initial-catalog).
 
