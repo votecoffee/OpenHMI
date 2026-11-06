@@ -6,7 +6,6 @@ from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 import logging
 import math
-import json
 import re
 from threading import Lock, RLock
 import time
@@ -18,23 +17,34 @@ from .screens import screen_map, expanded_controls, referenced_tags
 from .alarms import utc_now
 
 
+MAX_SAFE_INTEGER = 2 ** 53 - 1
+
+
 def member_value(value, path):
     for part in re.findall(r'[^.\[\]]+', path):
         value = value[int(part)] if isinstance(value, list) else value[part]
     return value
 
 
+def browser_value_ok(value):
+    if isinstance(value, int):
+        return abs(value) <= MAX_SAFE_INTEGER
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, dict):
+        return all(isinstance(key, str) and browser_value_ok(item) for key, item in value.items())
+    if isinstance(value, (list, tuple)):
+        return all(browser_value_ok(item) for item in value)
+    return value is None or isinstance(value, str)
+
+
 def type_ok(value, kind):
     if type(value) not in {'boolean': (bool,), 'number': (int, float), 'integer': (int,), 'string': (str,), 'struct': (dict,)}[kind]:
         return False
-    if type(value) is float and not math.isfinite(value) or type(value) is int and abs(value) > 9007199254740991:
+    try:
+        return browser_value_ok(value)
+    except RecursionError:
         return False
-    if kind == 'struct':
-        try:
-            json.dumps(value, allow_nan=False)
-        except (ValueError, TypeError, OverflowError):
-            return False
-    return True
 
 
 def overlapping_addresses(first, second):
@@ -432,7 +442,7 @@ class RuntimeDriver(SimulatorDriver):
                             value = member_value(result.value, member) if member else result.value
                             kind = tag['members'][member] if member else tag['type']
                             if not type_ok(value, kind):
-                                raise ValueError('PLC value does not match configured type')
+                                raise ValueError('PLC value does not match configured type or browser numeric limits')
                             if not member and kind in ('number', 'integer'):
                                 if tag['scale'] != 1 or tag['offset'] != 0:
                                     value = value * tag['scale'] + tag['offset']
@@ -568,7 +578,11 @@ class RuntimeDriver(SimulatorDriver):
                     if metadata.get('external_access') != 'Read/Write':
                         raise ValueError('PLC metadata does not permit writes')
                     raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
+                    if kind in ('number', 'integer') and not math.isfinite(raw):
+                        raise ValueError('Inverse PLC scaling must produce a finite value')
                     if kind == 'integer':
+                        if abs(raw) > MAX_SAFE_INTEGER:
+                            raise ValueError('Inverse PLC scaling exceeds the browser-safe integer range')
                         if int(raw) != raw:
                             raise ValueError('Scaled integer writes must resolve to an integer')
                         raw = int(raw)

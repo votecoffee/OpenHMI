@@ -15,7 +15,12 @@ connection recovery never replays it. FLOAT readback uses a small numeric tolera
 This confirms a tag value, not a PLC application's command-complete acknowledgement.
 The adapter supports Boolean, integer, floating-point, string and declared UDT
 members. Add indexed scalar addresses for arrays; array root editors are not
-implemented. Browser numeric integers are limited to the exact JavaScript range.
+implemented. PLC integers must be within ±9,007,199,254,740,991, the
+[JavaScript safe integer range](https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-number.issafeinteger).
+A wider value is marked bad. A UDT containing one is unavailable as a whole,
+while individually declared members with valid values stay available. Inverse
+scaling for writes must yield a finite value and, for integer tags, a whole
+number in that same range before the driver calls the adapter.
 Built-in simulation/recipe tags cannot be replaced by PLC aliases.
 
 Local tags have typed initial values. UDT tags expose a configured member/type

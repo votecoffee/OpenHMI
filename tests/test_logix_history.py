@@ -78,7 +78,44 @@ class LogixHistoryTests(unittest.TestCase):
         driver.write('LevelA', [3.5])
         self.assertEqual(plc.writes[-1], ('Level', 35))
         self.assertIs(type(plc.writes[-1][1]), int)
+        with self.assertRaisesRegex(ValueError, 'browser-safe integer range'):
+            driver.write('LevelA', [900719925474099.2])
+        project['tags'][1].update(type='number', scale=1e-308, offset=0.0)
+        driver.configure(project)
+        with self.assertRaisesRegex(ValueError, 'finite value'):
+            driver.write('LevelA', [1e308])
+        self.assertEqual(plc.writes, [('Level', 35)])
+        self.assertIs(driver.connections['plc'].client, plc)
         driver.close()
+    def test_browser_safe_integer_range_applies_to_nested_plc_data(self):
+        project = logix_project()
+        project['tags'][0]['members']['Counters.Totals[0]'] = 'integer'
+        project['tags'][1].update(type='integer', scale=1.0, offset=0.0)
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.lease('viewer', ['fast', 'slow'], 1)
+        driver.poll(1)
+        plc = driver.connections['plc'].client
+        plc.values['Motor']['Counters'] = {'Totals': [9007199254740993]}
+        plc.values['Level'] = -9007199254740993
+        driver.poll(2)
+        samples = driver.sample_snapshot(2)
+        for alias in ('MotorA', 'MotorA.Counters.Totals[0]', 'LevelA'):
+            self.assertEqual(samples[alias]['quality'], 'bad')
+            self.assertIsNone(samples[alias]['value'])
+            self.assertIn('browser numeric limits', samples[alias]['error'])
+        self.assertEqual(samples['MotorA.Speed']['value'], 42.0)
+        self.assertEqual(driver.connections['plc'].failure_generation, 0)
+
+        plc.values['Motor']['Counters']['Totals'][0] = 9007199254740991
+        plc.values['Level'] = -9007199254740991
+        driver.poll(3)
+        samples = driver.sample_snapshot(3)
+        self.assertEqual(samples['MotorA']['value']['Counters']['Totals'][0], 9007199254740991)
+        self.assertEqual(samples['MotorA.Counters.Totals[0]']['value'], 9007199254740991)
+        self.assertEqual(samples['LevelA']['value'], -9007199254740991)
+
     def test_reconnect_backoff_is_not_extended_by_skipped_polls(self):
         driver = RuntimeDriver(FakePLC)
         driver.configure(logix_project())
