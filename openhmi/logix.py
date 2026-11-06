@@ -437,6 +437,10 @@ class RuntimeDriver(SimulatorDriver):
             demand(command['root_tag'], command['update_ms'])
         return rates
 
+    def _due_addresses(self, identifier, now):
+        return [address for route, address in self.last_rates
+                if route == identifier and now >= self.deadlines.get((route, address), 0)]
+
     def poll(self, now=None, *, wait=True):
         """Schedule at most one scan per route. Explicit callers can wait for completion."""
         real_clock = now is None
@@ -494,16 +498,12 @@ class RuntimeDriver(SimulatorDriver):
                     for key in list(self.deadlines):
                         if key[0] == identifier:
                             del self.deadlines[key]
-                due = [address for conn, address in grouped
-                       if conn == identifier and now >= self.deadlines.get((conn, address), 0)]
-                if not due and not reconnect:
+                if not reconnect and not self._due_addresses(identifier, now):
                     continue
                 if self._scan_pool is None:
                     self._scan_pool = ThreadPoolExecutor(max_workers=MAX_PLC_CONNECTIONS, thread_name_prefix='openhmi-plc')
-                deadline = min((self.deadlines[(identifier, address)] for address in due
-                                if (identifier, address) in self.deadlines), default=None)
                 self._scans[identifier] = self._scan_pool.submit(
-                    self._scan, identifier, connection, self.project, due, deadline,
+                    self._scan, identifier, connection, self.project,
                     None if real_clock else now, time.monotonic()
                 )
                 self._scan_started[identifier] = now
@@ -511,7 +511,7 @@ class RuntimeDriver(SimulatorDriver):
         for future in scheduled:
             future.result()
 
-    def _scan(self, identifier, connection, project, due, deadline, now, submitted_at):
+    def _scan(self, identifier, connection, project, now, submitted_at):
         # Serialize reads, writes and publication for this route. Never hold the
         # runtime state lock across socket operations.
         worker_started = time.monotonic()
@@ -520,11 +520,17 @@ class RuntimeDriver(SimulatorDriver):
             with self.lock:
                 if self._closing or self.project is not project:
                     return
-            started = time.monotonic()
-            scan_start = started if now is None else now
-            if scan_start < connection.retry_at and not connection.connected:
-                return
+                started = time.monotonic()
+                scan_start = started if now is None else now
+                if scan_start < connection.retry_at and not connection.connected:
+                    return
+                # Demand can change while this scan waits for a writer or a worker slot.
+                due = self._due_addresses(identifier, scan_start)
+                deadline = min((self.deadlines[(identifier, address)] for address in due
+                                if (identifier, address) in self.deadlines), default=None)
             if not due:
+                if connection.connected:
+                    return
                 # Metadata browsing is available even before a screen leases tags.
                 try:
                     connection.connect(scan_start)

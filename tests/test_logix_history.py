@@ -679,6 +679,40 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(2.4)['LevelA']['quality'], 'good')
         self.assertNotIn('quality_reason', driver.sample_snapshot(2.4)['LevelA'])
 
+    def test_route_lock_wait_replans_due_addresses_before_reading(self):
+        project = logix_project()
+        project['screens'][1]['controls'] = [project['screens'][1]['controls'][1]]
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        clock = SimpleNamespace(now=0)
+        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)):
+            driver.poll()
+            connection = driver.connections['plc']
+            with driver.write_scope(['LevelA']):
+                clock.now = 1
+                driver.lease('viewer', ['fast'])
+                driver.poll(wait=False)
+                queued = driver._scans['plc']
+                self.assertFalse(queued.done())
+                clock.now = 1.02
+                driver.lease('viewer', ['slow'])
+                driver.poll(wait=False)
+                self.assertIs(driver._scans['plc'], queued)
+            queued.result(timeout=5)
+            self.assertEqual(connection.client.reads, [('Level',)])
+            self.assertEqual(driver.sample_snapshot()['LevelA']['value'], 65.0)
+
+            with driver.write_scope(['LevelA']):
+                clock.now = 2.1
+                driver.poll(wait=False)
+                queued = driver._scans['plc']
+                self.assertFalse(queued.done())
+                driver.lease('viewer', [])
+                driver.poll(wait=False)
+            queued.result(timeout=5)
+            self.assertEqual(connection.client.reads, [('Level',)])
+
     def test_background_scans_keep_healthy_routes_fresh_while_another_read_waits(self):
         blocked, release = Event(), Event()
 

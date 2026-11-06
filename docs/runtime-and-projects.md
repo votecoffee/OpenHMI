@@ -70,6 +70,8 @@ defer a future read to the slower cadence, capped by the cached sample's
 freshness limit. Already-due reads keep their deadlines. If faster demand
 arrives during a scan, a sample received before that demand leaves the address
 due for the next scan.
+A scan waiting for the route rechecks the scheduler's due addresses before
+sending a PLC read. A connected route skips the read if no addresses remain due.
 
 Due addresses share a single pycomm3 connection per configured PLC and are read
 in batches. pycomm3 splits requests to fit EtherNet/IP Multiple Service Packets
