@@ -243,6 +243,7 @@ function App({ initial, catalog }) {
   const [popups, setPopups] = useState([]);
   const screenNavigation = useRef(null);
   const clientId = useRef(crypto.randomUUID());
+  const subscriptionSequence = useRef(0);
   const screens = useMemo(() => projectScreens(active.project), [active.project]);
   const invalidScreen = location.pathname === '/runtime' && !screens.some(screen => screen.id === screenId && !screen.popup);
   const currentScreen = scopedScreen(active.project, invalidScreen ? 'overview' : screenId);
@@ -295,9 +296,18 @@ function App({ initial, catalog }) {
   const leasedScreens = runtime ? location.pathname === '/runtime' ? [currentScreen.id, ...visiblePopups.map(({ id }) => id)].join(',') : '' : editorSubscription.screen;
   useEffect(() => {
     let stopped = false, timer;
-    async function heartbeat() { try { await api('/api/subscriptions', json('POST', { client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [], preview_root: runtime ? '' : editorSubscription.root })); } catch {} if (!stopped) timer = setTimeout(heartbeat, 5000); }
+    async function heartbeat() {
+      try {
+        await api('/api/subscriptions', json('POST', {
+          client: clientId.current, screens: leasedScreens ? leasedScreens.split(',') : [],
+          preview_root: runtime ? '' : editorSubscription.root,
+          sequence: ++subscriptionSequence.current,
+        }));
+      } catch {}
+      if (!stopped) timer = setTimeout(heartbeat, 5000);
+    }
     heartbeat(); return () => { stopped = true; clearTimeout(timer); };
-  }, [leasedScreens, editorSubscription.root]);
+  }, [leasedScreens, editorSubscription.root, runtime]);
   useEffect(() => {
     let stopped = false;
     let timer;

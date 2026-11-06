@@ -18,6 +18,8 @@ from .alarms import utc_now
 
 
 MAX_SAFE_INTEGER = 2 ** 53 - 1
+MAX_VIEWER_LEASES = 1000
+MAX_SUBSCRIPTION_SEQUENCES = 2 * MAX_VIEWER_LEASES
 REAL_MAX = float.fromhex('0x1.fffffep+127')
 PLC_INTEGER_LIMITS = {
     'SINT': (-2 ** 7, 2 ** 7 - 1), 'USINT': (0, 2 ** 8 - 1),
@@ -319,6 +321,7 @@ class RuntimeDriver(SimulatorDriver):
         self._screen_demands = {}
         self.trend_demands = {}
         self.leases, self.deadlines, self.last_rates = {}, {}, {}
+        self._lease_sequences = {}
         self.local_names = set()
         self.plc_hold = False
 
@@ -373,10 +376,12 @@ class RuntimeDriver(SimulatorDriver):
             for connection in retired:
                 connection.close()
 
-    def lease(self, client, screens, now=None, preview_root=''):
+    def lease(self, client, screens, now=None, preview_root='', *, sequence=None):
         now = time.monotonic() if now is None else now
         screens = set(screens)
         with self.lock:
+            if sequence is not None and sequence <= self._lease_sequences.get(client, 0):
+                return
             if any(screen not in self._screen_demands for screen in screens):
                 raise ValueError('Unknown subscription screen')
             if preview_root and (preview_root not in self.definitions or self.definitions[preview_root]['type'] != 'struct'):
@@ -385,8 +390,14 @@ class RuntimeDriver(SimulatorDriver):
             self.leases = {key: value for key, value in self.leases.items() if value[1] > now}
             if screens or preview_root:
                 self.leases[client] = (screens, now + 15, preview_root)
-            if len(self.leases) > 1000:
+            if len(self.leases) > MAX_VIEWER_LEASES:
                 self.leases.pop(next(iter(self.leases)))
+            if sequence is not None:
+                # Retain the latest sequence even after a viewer releases its lease.
+                self._lease_sequences.pop(client, None)
+                self._lease_sequences[client] = sequence
+                if len(self._lease_sequences) > MAX_SUBSCRIPTION_SEQUENCES:
+                    self._lease_sequences.pop(next(iter(self._lease_sequences)))
 
     def demands(self, now):
         rates = {}

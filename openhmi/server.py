@@ -17,7 +17,7 @@ from .activity import ActivityJournal
 from .commands import CommandService, add_command_routes, validate_commands
 from .recipe_transfers import validate_transfers
 from .operations_routes import add_operations_routes
-from .logix import RuntimeDriver
+from .logix import MAX_SAFE_INTEGER, RuntimeDriver
 from .runtime_workers import RuntimeWorkers
 from .historian import Historian
 from .history_export import CSV_COLUMNS, complete_history_csv, csv_row
@@ -49,6 +49,7 @@ class SubscriptionRequest(BaseModel):
     client: str
     screens: list[str]
     preview_root: str = ''
+    sequence: int | None = Field(default=None, ge=1, le=MAX_SAFE_INTEGER)
 
 
 class ValueRequest(BaseModel):
@@ -531,7 +532,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
         try:
             if body.preview_root:
                 security.require(request, 'project.edit')
-            application.driver.lease(body.client, body.screens, preview_root=body.preview_root)
+            application.driver.lease(body.client, body.screens, preview_root=body.preview_root,
+                                     sequence=body.sequence)
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         return {'expires_in_seconds': 15}

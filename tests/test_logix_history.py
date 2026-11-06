@@ -270,6 +270,37 @@ class LogixHistoryTests(unittest.TestCase):
         driver.close()
         self.assertTrue(plc.closed)
 
+    def test_out_of_order_subscriptions_cannot_restore_released_demand(self):
+        app = create_app()
+        driver = app.state.driver
+        self.addCleanup(app.state.store.close)
+        self.addCleanup(driver.close)
+        driver.factory = FakePLC
+        driver.configure(logix_project())
+        client = TestClient(app)
+
+        def subscribe(screens, sequence):
+            return client.post('/api/subscriptions', json={
+                'client': 'viewer', 'screens': screens, 'sequence': sequence,
+            })
+
+        self.assertEqual(subscribe(['fast'], 2).status_code, 200)
+        self.assertEqual(subscribe(['slow'], 1).status_code, 200)
+        driver.poll()
+        self.assertEqual(driver.status()[0]['groups'], [{'rate_ms': 100, 'addresses': ['Motor']}])
+
+        self.assertEqual(subscribe([], 4).status_code, 200)
+        self.assertEqual(subscribe(['slow'], 3).status_code, 200)
+        self.assertEqual(subscribe(['fast'], 4).status_code, 200)
+        self.assertEqual(subscribe(['slow'], 0).status_code, 422)
+        driver.poll()
+        self.assertEqual(driver.status()[0]['groups'], [])
+        self.assertNotIn('viewer', driver.leases)
+
+        self.assertEqual(subscribe(['slow'], 5).status_code, 200)
+        driver.poll()
+        self.assertEqual(driver.status()[0]['groups'], [{'rate_ms': 1000, 'addresses': ['Level', 'Motor']}])
+
     def test_reopening_an_idle_screen_refreshes_before_its_old_deadline(self):
         project = logix_project()
         project['screens'][1]['update_ms'] = 60000

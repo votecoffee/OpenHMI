@@ -182,7 +182,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     const more = details.getByRole('button', { name: 'More details', exact: true });
     const subscribed = screens => viewer.waitForRequest(request => request.url().endsWith('/api/subscriptions')
       && request.method() === 'POST' && request.postDataJSON().screens.join(',') === screens);
-    await Promise.all([subscribed('equipment,details,more'), more.press('Enter')]);
+    const [nestedSubscription] = await Promise.all([subscribed('equipment,details,more'), more.press('Enter')]);
     const nested = viewer.getByRole('dialog', { name: 'More', exact: true });
     await expect(nested.getByRole('button', { name: 'Close popup', exact: true })).toBeFocused();
     for (let index = 0; index < 5; index++) {
@@ -190,8 +190,12 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
       expect(await viewer.evaluate(() => document.activeElement === document.body
         || document.activeElement.closest('dialog')?.getAttribute('aria-label') === 'More')).toBe(true);
     }
-    await Promise.all([subscribed('equipment,details'),
+    const [parentSubscription] = await Promise.all([subscribed('equipment,details'),
       nested.getByRole('button', { name: 'Return to details', exact: true }).press('Enter')]);
+    const nestedLease = nestedSubscription.postDataJSON();
+    const parentLease = parentSubscription.postDataJSON();
+    expect(parentLease.client).toBe(nestedLease.client);
+    expect(parentLease.sequence).toBeGreaterThan(nestedLease.sequence);
     await expect(nested).toHaveCount(0);
     await expect(more).toBeFocused();
     await Promise.all([subscribed('equipment'), viewer.keyboard.press('Escape')]);
