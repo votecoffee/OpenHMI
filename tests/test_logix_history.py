@@ -34,9 +34,13 @@ class FakePLC:
         result = []
         for address in addresses:
             value = self.values
-            for part in address.split('.'):
-                value = value[part]
-            result.append(SimpleNamespace(value=value, error=None))
+            try:
+                for part in address.split('.'):
+                    value = value[part]
+            except KeyError:
+                result.append(Tag(address, None, None, 'Tag does not exist'))
+            else:
+                result.append(SimpleNamespace(value=value, error=None))
         return result[0] if len(result) == 1 else result
     def write(self, pair):
         self.writes.append(pair)

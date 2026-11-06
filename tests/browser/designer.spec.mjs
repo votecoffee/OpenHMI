@@ -253,6 +253,67 @@ test('a stalled recipe status request does not delay alarms, layout or identity'
   }
 });
 
+test('one missing PLC tag is marked on its control while the same route keeps updating', async ({ page }) => {
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply = true) {
+    const { draft_revision } = await (await page.request.get('/api/project')).json();
+    const saved = await page.request.put('/api/project/draft', { data: { project, expected_revision: draft_revision } });
+    expect(saved.ok(), await saved.text()).toBe(true);
+    if (apply) {
+      const applied = await page.request.post('/api/project/apply', {
+        data: { expected_revision: (await saved.json()).draft_revision },
+      });
+      expect(applied.ok(), await applied.text()).toBe(true);
+    }
+  }
+
+  const project = {
+    title: 'Single PLC binding fault',
+    connections: [{ id: 'line', name: 'Synthetic PLC', path: 'offline-only/0', enabled: true }],
+    tags: [
+      { name: 'LineLevel', connection: 'line', address: 'LevelTypo', type: 'number' },
+      { name: 'LineRunning', connection: 'line', address: 'Motor.Running', type: 'boolean' },
+    ],
+    controls: [
+      { id: 'level', kind: 'numeric', label: 'Line level', tag: 'LineLevel', decimals: 1 },
+      { id: 'running', kind: 'indicator', label: 'Line running', tag: 'LineRunning' },
+    ],
+  };
+
+  try {
+    await save(project);
+    await page.goto('/runtime');
+    const header = page.locator('.app-header .connection');
+    const numeric = page.locator('[data-control="numeric"]');
+    const indicator = page.locator('[data-control="indicator"]');
+    const badge = numeric.getByRole('button', { name: 'Inspect LineLevel quality (BAD DATA)', exact: true });
+    await expect(indicator).toContainText('ON');
+    await expect(header).toContainText('PLC routes connected (1/1)');
+    await badge.click();
+    const details = page.getByRole('dialog', { name: 'Tag quality details' });
+    await expect(details).toContainText('LineLevel');
+    await expect(details).toContainText('Tag does not exist');
+    await page.keyboard.press('Escape');
+    await expect(badge).toBeFocused();
+
+    const snapshot = async () => (await (await page.request.get('/api/tags')).json()).samples;
+    const first = await snapshot();
+    expect(first.LineLevel).toMatchObject({ quality: 'bad', value: null });
+    expect(first.LineRunning).toMatchObject({ quality: 'good', value: true });
+    await expect.poll(async () => (await snapshot()).LineRunning.timestamp > first.LineRunning.timestamp).toBe(true);
+
+    project.tags[0].address = 'Level';
+    await save(project);
+    await expect(numeric).toContainText('30.0');
+    await expect(badge).toHaveCount(0);
+    await expect(indicator).toContainText('ON');
+    await expect(header).toContainText('PLC routes connected (1/1)');
+  } finally {
+    await save(original.active);
+    if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
+  }
+});
+
 test('PLC route status and binding quality distinguish loss, stale data and recovery', async ({ page }) => {
   const configs = [
     { id: 'line', name: 'Line PLC', enabled: true },

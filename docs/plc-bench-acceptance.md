@@ -105,6 +105,7 @@ the approved subset at its configured interval.
 | Check | Evidence to retain |
 | --- | --- |
 | Binding and quality | Logical tag, controller address, expected/observed type and value, quality and source time. Record unsupported types or address shapes explicitly. |
+| One bad binding on a connected route | With a bench-owner-approved absent address, record the affected control's **BAD DATA** badge and its details. Verify a healthy control on that same route continues to receive fresh samples, then correct the HMI binding and record the recovered control. |
 | Stable scan and grouping | Capture Diagnostics before and after a stable interval. Record the requested screen rates, actual effective groups, pycomm3 call/requested-address deltas, recent scan duration/lateness and representative tag timestamp changes. Repeat with the approved overlapping screen demand to check shared-tag grouping. |
 | Controller load | Record independent controller-side load and communication measurements before OpenHMI, then during the agreed demand. Compare with the owner's limits. Stop acquisition if a limit is exceeded. |
 | Communication loss and recovery | With the approved disconnect method, retain before/loss/recovery Diagnostics. Record quality transitions, elapsed recovery time, resumed scan groups and whether readings matched the engineering reference after recovery. |
