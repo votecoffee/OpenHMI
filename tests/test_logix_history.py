@@ -305,6 +305,46 @@ class LogixHistoryTests(unittest.TestCase):
         driver.poll(1.04)
         self.assertEqual(len(connection.client.reads), 2)
 
+    def test_faster_screen_tightens_cached_quality_until_another_sample_arrives(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        driver.configure(logix_project())
+        driver.lease('slow-viewer', ['slow'], 1)
+        driver.poll(1)
+        original = driver.sample_snapshot(1)['MotorA.Speed']
+        connection = driver.connections['plc']
+        read = connection.read
+        entered, release = Event(), Event()
+        self.addCleanup(release.set)
+
+        def delay_read(*args, **kwargs):
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError('Test did not release the scan')
+            return read(*args, **kwargs)
+
+        with patch.object(connection, 'read', side_effect=delay_read):
+            driver.poll(2.5, wait=False)
+            self.assertTrue(entered.wait(5))
+            scan = driver._scans['plc']
+            self.assertEqual(driver.sample_snapshot(2.5)['MotorA.Speed']['quality'], 'good')
+            driver.lease('fast-viewer', ['fast'], 2.51)
+            driver.poll(2.51, wait=False)
+            samples = driver.sample_snapshot(2.51)
+            self.assertEqual(samples['MotorA.Speed']['quality'], 'stale')
+            self.assertEqual(samples['MotorA.Running']['quality'], 'stale')
+            self.assertEqual(samples['MotorA.Speed']['timestamp'], original['timestamp'])
+            self.assertEqual(samples['LevelA']['quality'], 'good')
+
+            driver.lease('fast-viewer', [], 2.52)
+            driver.poll(2.52, wait=False)
+            self.assertEqual(driver.sample_snapshot(2.52)['MotorA.Speed']['quality'], 'stale')
+            release.set()
+            scan.result(timeout=5)
+
+        self.assertEqual(driver.sample_snapshot(2.53)['MotorA.Speed']['quality'], 'good')
+        self.assertEqual(driver.sample_snapshot(4)['MotorA.Speed']['quality'], 'good')
+
     def test_out_of_order_subscriptions_cannot_restore_released_demand(self):
         app = create_app()
         driver = app.state.driver

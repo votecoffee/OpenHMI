@@ -463,6 +463,11 @@ class RuntimeDriver(SimulatorDriver):
                     self._refresh_after.pop(key, None)
                 elif rate < previous_rate:
                     self.deadlines[key] = now
+                    # Tighten the existing samples without letting slower demand revive them.
+                    for alias, _, _ in self.address_aliases[key]:
+                        sample = self.samples.get(alias)
+                        if sample is not None:
+                            sample['rate_ms'] = min(sample['rate_ms'], rate)
             for key in grouped.keys() - self.last_rates.keys():
                 self._refresh_after[key] = now
             self.last_rates = grouped
