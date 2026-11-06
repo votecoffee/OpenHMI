@@ -109,8 +109,10 @@ uses the additive `annunciated_*` fields.
 
 The shelf registry is independent of alarm list filters and shows the initiating
 user/provider, reason and absolute expiry. Enter a restoration reason and choose
-**Restore alarm** to return it early. Repeated shelving cannot extend an existing
-interval. Restoration requires the current shelf operation ID so an old browser
+**Restore alarm** to return it early. If the shelving registry cannot refresh,
+it shows the last received page and its receipt time. Restore and paging to
+more shelves wait for a valid response. Access denial clears the retained page.
+Repeated shelving cannot extend an existing interval. Restoration requires the current shelf operation ID so an old browser
 cannot restore a replacement interval accidentally. These operations use the
 durable activity journal; events/CSV record shelving, restoration, expiry and
 configuration invalidation. Registry reads share the alarm monitor's public

@@ -6,6 +6,7 @@ import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import './alarm-workflows.css';
 import { AlarmShelving } from './alarm-shelving.jsx';
+import { hasAlarmMessage, useAlarmRead } from './alarm-read.mjs';
 
 const blankFilters = { priority: '0', search: '', state: 'outstanding', start: '', end: '', shelving: new URLSearchParams(location.search).get('shelving') === 'shelved' ? 'shelved' : 'unshelved' };
 function linkedOccurrence() {
@@ -24,11 +25,6 @@ function parameters(filters, before, history = false, event = '') {
 
 const positiveId = value => Number.isSafeInteger(value) && value > 0;
 const optionalText = value => value == null || typeof value === 'string';
-
-function hasAlarmMessage(item) {
-  return typeof item?.message === 'string' && (item.messages == null || (typeof item.messages === 'object'
-    && !Array.isArray(item.messages) && Object.values(item.messages).every(message => typeof message === 'string')));
-}
 
 function isOccurrence(item) {
   return hasAlarmMessage(item) && positiveId(item.occurrence_id) && [1, 2, 3, 4].includes(item.priority)
@@ -67,28 +63,6 @@ function isAlarmPage(page, isItem) {
 const isOccurrencePage = page => isAlarmPage(page, isOccurrence);
 const isEventPage = page => isAlarmPage(page, isAlarmEvent);
 const isNotePage = page => isAlarmPage(page, isAlarmNote);
-
-function useAlarmRead(endpoint, validate, generation, identifier) {
-  const [response, setResponse] = useState(null);
-  useEffect(() => {
-    if (!endpoint) return;
-    let stopped = false, timer;
-    async function refresh() {
-      try {
-        const data = await api(endpoint);
-        if (!validate(data, identifier)) throw new Error('Invalid alarm response');
-        if (!stopped) setResponse({ endpoint, data, receivedAt: new Date() });
-      } catch (problem) {
-        const discard = [401, 403, 404].includes(problem.status);
-        if (!stopped) setResponse(previous => ({ ...(!discard && previous?.endpoint === endpoint ? previous : { endpoint }),
-          error: problem.message }));
-      }
-      if (!stopped) timer = setTimeout(refresh, 1000);
-    }
-    refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [endpoint, validate, generation, identifier]);
-  return response?.endpoint === endpoint ? response : {};
-}
 
 export function AlarmConsole() {
   const live = useContext(Live);
