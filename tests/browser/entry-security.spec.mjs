@@ -180,7 +180,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
   }
 });
 
-test('machine state, mode selection, stack lights and permissives use independent tag quality', async ({ page }) => {
+test('machine state, bitfields, mode selection, stack lights and permissives use independent tag quality', async ({ page }) => {
   const login = await page.request.post('/api/security/login', {
     data: { name: 'admin', password: 'SecurityTestOnly-2026!' },
   });
@@ -206,6 +206,7 @@ test('machine state, mode selection, stack lights and permissives use independen
       { name: 'ModeFeedback', type: 'integer', initial: 0 },
       { name: 'PilotMotorRunning', type: 'boolean', initial: true },
       { name: 'PilotFaulted', type: 'boolean', initial: false },
+      { name: 'StatusWord', type: 'integer', initial: -2147483647 },
     ],
     controls: [
       { id: 'state', kind: 'multi_state', label: 'Actual machine state', tag: 'ModeFeedback', states },
@@ -220,6 +221,9 @@ test('machine state, mode selection, stack lights and permissives use independen
         { tag: 'PilotFaulted', label: 'Faulted', color: '#b3272a' },
         { tag: 'PilotFaulted', label: 'Healthy', active_when: false, color: '#36744b' },
       ] },
+      { id: 'bits', kind: 'bitfield', label: 'Status word', tag: 'StatusWord', bits: [
+        { bit: 0, label: 'Motor enabled' }, { bit: 1, label: 'Fault latched' }, { bit: 31, label: 'Highest bit' },
+      ] },
     ],
   };
   try {
@@ -228,6 +232,8 @@ test('machine state, mode selection, stack lights and permissives use independen
     await page.locator('[data-control="mode_selector"] .hmi-label').click();
     await expect(page.getByRole('combobox', { name: 'Mode request tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeRequest' }));
     await expect(page.getByRole('combobox', { name: 'PLC confirmed mode tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeFeedback' }));
+    await page.locator('[data-control="bitfield"] .hmi-label').click();
+    await page.getByRole('group', { name: 'Bit 31', exact: true }).getByRole('textbox', { name: 'Bit label', exact: true }).fill('Controller flag');
     await page.locator('[data-control="stack_light"] .hmi-label').click();
     await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption({ label: 'Horizontal' });
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
@@ -241,6 +247,12 @@ test('machine state, mode selection, stack lights and permissives use independen
     const running = lamps.getByRole('listitem').filter({ hasText: 'Running' });
     const faulted = lamps.getByRole('listitem').filter({ hasText: 'Faulted' });
     const healthy = lamps.getByRole('listitem').filter({ hasText: 'Healthy' });
+    const bitfield = page.locator('[data-control="bitfield"]');
+    const highestBit = bitfield.locator('[data-bit="31"]');
+    await expect(bitfield.locator('code')).toHaveText('0x80000001');
+    await expect(highestBit).toContainText('Controller flag');
+    await expect(highestBit.locator('strong')).toHaveText('ON');
+    await expect(bitfield.locator('[data-bit="1"] strong')).toHaveText('OFF');
     await expect(lamps.getByRole('list')).toHaveCSS('flex-direction', 'row');
     await expect(running).toHaveAttribute('data-lamp-state', 'on');
     await expect(running.locator('.stack-lamp')).toHaveCSS('background-color', 'rgb(54, 116, 75)');
@@ -254,22 +266,28 @@ test('machine state, mode selection, stack lights and permissives use independen
     expect((await (await page.request.get('/api/tags')).json()).values.ModeRequest).toBe(0);
     await mode.getByRole('button', { name: 'Request mode', exact: true }).click();
     await expect(mode).toContainText('Waiting for PLC confirmation');
-    const values = (await (await page.request.get('/api/tags')).json()).values;
-    expect([values.ModeRequest, values.ModeFeedback]).toEqual([1, 0]);
+    const data = await (await page.request.get('/api/tags')).json();
+    expect([data.values.ModeRequest, data.values.ModeFeedback]).toEqual([1, 0]);
     await expect(state).toContainText('Manual');
 
-    await page.route('**/api/tags', async route => {
-      const response = await route.fetch();
-      const data = await response.json();
-      data.samples.ModeFeedback = { quality: 'stale', age_seconds: 4, error: 'Test feedback aged out' };
-      data.samples.PilotMotorRunning = { quality: 'bad', error: 'Test permissive unavailable' };
-      await route.fulfill({ response, json: data });
-    });
+    data.samples.ModeFeedback = { quality: 'stale', age_seconds: 4, error: 'Test feedback aged out' };
+    data.samples.PilotMotorRunning = { quality: 'bad', error: 'Test permissive unavailable' };
+    data.samples.StatusWord = { quality: 'stale', age_seconds: 4 };
+    await page.route('**/api/tags', route => route.fulfill({ json: data }));
     await expect(state).toContainText('STALE DATA');
     await expect(mode.getByRole('button', { name: 'Manual', exact: true })).toBeDisabled();
     await expect(permissives.getByRole('listitem').filter({ hasText: 'Motor must be stopped' })).toContainText('BAD DATA');
     await expect(running).toHaveAttribute('data-lamp-state', 'unavailable');
     await expect(running).toContainText('BAD DATA');
+    await expect(bitfield).toContainText('STALE DATA');
+    await expect(highestBit.getByRole('img', { name: 'Unavailable' })).toBeVisible();
+    await expect(bitfield.locator('code')).toHaveCount(0);
+    data.samples.StatusWord = { quality: 'good' };
+    data.values.StatusWord = 2 ** 32;
+    await expect(bitfield).toContainText('Outside 32-bit range');
+    data.values.StatusWord = 2 ** 31 + 1;
+    await expect(bitfield.locator('code')).toHaveText('0x80000001');
+    await expect(highestBit.locator('strong')).toHaveText('ON');
     await expect(faulted).toHaveAttribute('data-lamp-state', 'off');
     await expect(healthy).toHaveAttribute('data-lamp-state', 'on');
   } finally {

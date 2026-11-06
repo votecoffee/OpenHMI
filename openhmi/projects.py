@@ -91,6 +91,23 @@ class StackLightControl(ControlBase):
     orientation: Literal['vertical', 'horizontal'] = 'vertical'
 
 
+class BitfieldBit(StrictModel):
+    bit: int = Field(ge=0, le=31)
+    label: str = Field(min_length=1, max_length=100)
+
+
+class BitfieldControl(ControlBase):
+    kind: Literal['bitfield']
+    tag: str = Field(min_length=1, max_length=200)
+    bits: list[BitfieldBit] = Field(min_length=1, max_length=32)
+
+    @model_validator(mode='after')
+    def unique_bits(self):
+        if len({item.bit for item in self.bits}) != len(self.bits):
+            raise ValueError('Bitfield positions must be unique')
+        return self
+
+
 class NumericControl(ControlBase):
     kind: Literal["numeric"]
     tag: str = Field(min_length=1, max_length=200)
@@ -483,7 +500,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

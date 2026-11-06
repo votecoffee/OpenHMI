@@ -21,6 +21,7 @@ function size(type) {
   if (type === 'TagQuality') return { width: 176, height: 64 };
   if (type === 'LedDisplay') return { width: 176, height: 64 };
   if (type === 'DurationDisplay') return { width: 144, height: 56 };
+  if (type === 'Bitfield') return { width: 176, height: 128 };
   if (type === 'StackLight') return { width: 160, height: 128 };
   if (type === 'Sparkline') return { width: 176, height: 104 };
   if (type === 'ScreenSymbol') return { width: 48, height: 48 };

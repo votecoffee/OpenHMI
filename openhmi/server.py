@@ -277,6 +277,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 if control['tag'] not in kinds:
                     raise HTTPException(422, 'Tag quality requires an existing tag')
                 continue
+            if control['kind'] == 'bitfield':
+                if kinds.get(control['tag']) != 'integer':
+                    raise HTTPException(422, 'Bitfield display requires an unscaled integer tag')
+                continue
             if control['kind'] == 'date_time_display':
                 if kinds.get(control['tag']) != 'integer':
                     raise HTTPException(422, 'Date/time display requires an unscaled integer tag')

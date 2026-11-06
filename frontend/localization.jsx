@@ -97,6 +97,7 @@ export const uiText = {
   cameraMixedContent: 'HTTP camera embedding is blocked on an HTTPS station. Use the new tab.',
   cameraIsolationUnavailable: 'This browser cannot isolate the embedded camera. Use the new tab.',
   tagInspectQuality: 'Inspect {tag} quality ({label})', tagQualityDetails: 'Tag quality details',
+  bitfieldRange: 'Outside 32-bit range', bitfieldPosition: 'Bit {bit}',
   tagQualityBinding: 'Tag', tagQualityReason: 'Reason', tagSourceTime: 'Source time', tagAge: 'Sample age',
   tagPlcConnection: 'PLC connection', tagPlcAddress: 'PLC address', tagPlcRoute: 'PLC route',
   tagOpenDiagnostics: 'Open tag in Diagnostics (new tab)',

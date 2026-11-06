@@ -294,6 +294,9 @@ A **PLC connection status** control shows the selected controller's state on
 any screen. It distinguishes a healthy connection from acquisition hold,
 recovery, overdue scans and unusable data. Authorized operators can open the
 selected controller's affected tags in Diagnostics.
+A **Bitfield display** shows the hexadecimal word and selected, named bits
+0 to 31 from an unscaled integer tag. It accepts signed DINT and unsigned
+32-bit values and marks the bits unavailable when the word cannot be read.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

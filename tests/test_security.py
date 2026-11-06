@@ -65,8 +65,11 @@ class SecurityTests(unittest.TestCase):
                     'tag': 'ModeRequest', 'confirmed_tag': 'ModeFeedback', 'states': modes,
                     'enabled_tag': 'ModePermit', 'security_groups': ['Administrators']}
         lamp = {'tag': 'ModeFeedback', 'label': 'Mode permitted'}
+        bits = {'id': 'bits', 'kind': 'bitfield', 'label': 'Word', 'tag': 'ModeFeedback',
+                'bits': [{'bit': 31, 'label': 'High bit'}]}
         draft['controls'] += [
             {'id': 'lamps', 'kind': 'stack_light', 'label': 'Status', 'lamps': [lamp]},
+            bits,
             selector, {'id': 'state', 'kind': 'multi_state', 'label': 'State', 'tag': 'ModeFeedback', 'states': modes},
             {'id': 'permissives', 'kind': 'permissives', 'label': 'Permissives',
              'checks': [{'tag': 'ModePermit', 'label': 'Mode change allowed'}]},
@@ -75,6 +78,11 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 422)
         self.assertIn('Stack lights require Boolean tags', rejected.text)
         lamp['tag'] = 'ModePermit'
+        bits['tag'] = 'ModePermit'
+        rejected = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': draft})
+        self.assertEqual(rejected.status_code, 422)
+        self.assertIn('Bitfield display requires an unscaled integer tag', rejected.text)
+        bits['tag'] = 'ModeFeedback'
         selector['confirmed_tag'] = 'ModeRequest'
         rejected = self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': draft})
         self.assertEqual(rejected.status_code, 422)

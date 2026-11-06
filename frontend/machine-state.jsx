@@ -35,6 +35,52 @@ function BooleanTagField({ label, tag, tags, onChange }) {
   </select></label>;
 }
 
+const bitPositions = Array.from({ length: 32 }, (_, bit) => bit);
+
+export function BitfieldFields({ value = [], onChange }) {
+  const used = new Set(value.map(item => item.bit));
+  const next = bitPositions.find(bit => !used.has(bit));
+  const edit = (index, fields) => onChange(value.map((item, i) => i === index ? { ...item, ...fields } : item));
+  return <fieldset className="chart-fields"><legend>Displayed bits</legend>
+    {value.map((item, index) => <fieldset key={index}><legend>Bit {item.bit}</legend>
+      <label>Bit position<select value={item.bit} onChange={event => edit(index, { bit: Number(event.target.value) })}>
+        {bitPositions.filter(bit => bit === item.bit || !used.has(bit)).map(bit => <option key={bit}>{bit}</option>)}
+      </select></label>
+      <label>Bit label<input maxLength={100} value={item.label}
+        onChange={event => edit(index, { label: event.target.value })} /></label>
+      <button type="button" disabled={value.length <= 1}
+        onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove bit</button>
+    </fieldset>)}
+    <button type="button" disabled={next === undefined}
+      onClick={() => onChange([...value, { bit: next, label: 'Bit ' + next }])}>Add bit</button>
+  </fieldset>;
+}
+
+export function Bitfield({ id, label, tag, bits = [] }) {
+  const live = useContext(Live);
+  const { text, ui } = useLocalization();
+  const sample = tagValue(live, tag, 'number');
+  const inRange = sample.valid && Number.isInteger(sample.value) && sample.value >= -(2 ** 31) && sample.value < 2 ** 32;
+  const word = inRange ? sample.value >>> 0 : null;
+  return <article className="hmi-control" data-control="bitfield">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {!sample.valid ? <Quality problem={sample.problem} tag={tag} /> : word === null
+      ? <strong className="range-deviation">{ui('bitfieldRange')}</strong>
+      : <code dir="ltr">0x{word.toString(16).toUpperCase().padStart(8, '0')}</code>}
+    <ul className="hmi-bitfield">
+      {bits.map(({ bit, label }) => {
+        const on = word !== null && ((word >>> bit) & 1) === 1;
+        return <li key={bit} data-bit={bit}>
+          <span className="bitfield-position">{ui('bitfieldPosition', { bit })}</span>
+          <span>{text(`control.${id}.bit.${bit}`, label)}</span>
+          {word === null ? <span role="img" aria-label={ui('machineUnavailable')}>—</span>
+            : <strong>{ui(on ? 'on' : 'off')}</strong>}
+        </li>;
+      })}
+    </ul>
+  </article>;
+}
+
 export function StackLightFields({ value = [], onChange, catalog }) {
   const tags = catalog.tags.filter(tag => tag.type === 'boolean');
   const nextTag = tags.find(tag => !value.some(lamp => lamp.tag === tag.name)) || tags[0];
