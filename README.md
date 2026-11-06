@@ -313,6 +313,9 @@ A **Position image** moves an uploaded image or a default marker along a
 horizontal or vertical path. Bind a numeric position tag and set its travel
 range, direction and marker size. On freeform screens, place the control over
 an image of the machine. Out-of-range or unavailable readings hide the marker.
+A **Rotation image** uses a numeric tag to turn an uploaded image or a default
+pointer around its center. Set the input range and the starting and ending
+angles in degrees. Reverse the angles for counterclockwise motion.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

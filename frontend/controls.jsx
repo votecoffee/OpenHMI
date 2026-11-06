@@ -164,33 +164,36 @@ function ScreenSymbol({ id, label, symbol, size, rotation }) {
   </div>;
 }
 
-function PositionImage({ id, label, tag, unit, decimals, minimum, maximum, image, direction, size_percent, show_label, puck }) {
+function MotionImage({ id, label, tag, unit, decimals, minimum, maximum, image, direction,
+  angle_start, angle_end, size_percent, show_label, puck, rotation = false }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, ui, language } = useLocalization();
   const title = text(`control.${id}.label`, label);
   const units = text(`control.${id}.unit`, unit);
   const reading = valid ? `${formatNumeric(value, decimals, language.code)} ${units}`.trim() : '';
   const span = maximum - minimum;
-  const configured = Number.isFinite(span) && span > 0;
+  const configured = Number.isFinite(span) && span > 0
+    && (!rotation || [angle_start, angle_end].every(angle => Number.isFinite(angle) && Math.abs(angle) <= 360));
   const outside = valid && configured && (value < minimum || value > maximum);
   const caption = show_label || puck?.isEditing;
   const vertical = direction === 'top_to_bottom' || direction === 'bottom_to_top';
   const reverse = direction === 'right_to_left' || direction === 'bottom_to_top';
   const fraction = (value - minimum) / span;
   const graphicLabel = caption ? '' : `${title}: ${reading}`;
-  return <article className="hmi-control hmi-image-control" data-control="position_image">
+  const style = rotation
+    ? { '--angle': `${angle_start + fraction * (angle_end - angle_start)}deg`, '--marker-scale': size_percent / 100 }
+    : { '--position': `${(reverse ? 1 - fraction : fraction) * 100}%`, '--marker-size': `${size_percent}%` };
+  return <article className="hmi-control hmi-image-control" data-control={rotation ? 'rotation_image' : 'position_image'}>
     {caption && <span className="hmi-label">{title}</span>}
     {!valid ? <Quality problem={problem} tag={tag} /> : <>
       {(caption || outside) && <strong>{reading}</strong>}
       {!configured ? <Quality problem="badRange" /> : outside
         ? <strong className="range-deviation">{ui('outOfScale')}</strong>
-        : <div className={`position-travel ${vertical ? 'vertical' : 'horizontal'}`}>
-          <div className="position-marker" style={{
-            '--position': `${(reverse ? 1 - fraction : fraction) * 100}%`, '--marker-size': `${size_percent}%`,
-          }}>
+        : <div className={`motion-travel ${rotation ? 'rotation' : vertical ? 'vertical' : 'horizontal'}`} dir="ltr">
+          <div className="motion-marker" style={style}>
             {image ? <ProjectPicture key={image} identifier={image} alt={graphicLabel} />
-              : <span className="position-default" role={graphicLabel ? 'img' : undefined}
-                aria-label={graphicLabel || undefined} aria-hidden={!graphicLabel}>◆</span>}
+              : <span className="motion-default" role={graphicLabel ? 'img' : undefined}
+                aria-label={graphicLabel || undefined} aria-hidden={!graphicLabel}>{rotation ? '▲' : '◆'}</span>}
           </div>
         </div>}
     </>}
@@ -522,6 +525,8 @@ export function createConfig(catalog) {
   const sliderTag = tag => tag.type === 'number' && tag.writable && (!tag.integer || tag.unscaled !== false);
   const numericDefaults = { label: 'Tank level', tag: 'TankLevel', unit: '%', decimals: 1 };
   const scaleFields = { minimum: { type: 'number', label: 'Scale minimum' }, maximum: { type: 'number', label: 'Scale maximum' } };
+  const motionImageFields = { ...numericFields, ...scaleFields, show_label: showImageLabel,
+    image: { type: 'custom', render: props => <ImageField key={props.id} {...props} label="Motion image" /> } };
   const analogFields = { ...numericFields, ...scaleFields,
     normal_low: { type: 'number', label: 'Normal low' }, normal_high: { type: 'number', label: 'Normal high' } };
   const analogDefaults = { ...numericDefaults, minimum: 0, maximum: 100, normal_low: 20, normal_high: 80 };
@@ -529,7 +534,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage', 'MultiStateImage', 'PositionImage'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage', 'MultiStateImage', 'PositionImage', 'RotationImage'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -615,15 +620,21 @@ export function createConfig(catalog) {
       }, defaultProps: { label: 'Machine image', tag: 'MotorRunning', on_image: '', off_image: '',
         on_text: 'ON', off_text: 'OFF', show_label: true }, render: props => <StateImage {...props} /> },
       PositionImage: { label: 'Position image', fields: {
-        ...numericFields, ...scaleFields, show_label: showImageLabel,
+        ...motionImageFields,
         direction: { type: 'select', label: 'Travel direction', options: [
           { label: 'Left to right', value: 'left_to_right' }, { label: 'Right to left', value: 'right_to_left' },
           { label: 'Bottom to top', value: 'bottom_to_top' }, { label: 'Top to bottom', value: 'top_to_bottom' },
         ] },
         size_percent: { type: 'number', label: 'Marker size (%)', min: 10, max: 60 },
-        image: { type: 'custom', render: props => <ImageField key={props.id} {...props} label="Position image" /> },
       }, defaultProps: { ...numericDefaults, label: 'Axis position', minimum: 0, maximum: 100, direction: 'left_to_right',
-        size_percent: 25, image: '', show_label: true }, render: PositionImage },
+        size_percent: 25, image: '', show_label: true }, render: MotionImage },
+      RotationImage: { label: 'Rotation image', fields: {
+        ...motionImageFields,
+        angle_start: { type: 'number', label: 'Start angle (degrees)', min: -360, max: 360 },
+        angle_end: { type: 'number', label: 'End angle (degrees)', min: -360, max: 360 },
+        size_percent: { type: 'number', label: 'Marker size (%)', min: 10, max: 70 },
+      }, defaultProps: { ...numericDefaults, label: 'Rotation', minimum: 0, maximum: 100, angle_start: 0, angle_end: 360,
+        size_percent: 50, image: '', show_label: true }, render: props => <MotionImage {...props} rotation /> },
       MultiStateImage: { label: 'Multi-state image', fields: {
         label: labelField, tag: browserTag('Tag', 'Choose an unscaled integer tag', integerTag),
         states: { type: 'custom', render: props => <ImageStatesFields key={props.id} {...props} /> },

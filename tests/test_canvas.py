@@ -35,7 +35,8 @@ class CanvasBackupTests(unittest.TestCase):
                      'states': [{'value': 0, 'label': 'Closed', 'image': off_id},
                                 {'value': 1, 'label': 'Open', 'image': 'e' * 64}]}
         travel = {'id': 'travel', 'kind': 'position_image', 'label': 'Travel', 'tag': 'TankLevel', 'image': 'd' * 64}
-        project['controls'] += [state_image, positions, travel]
+        rotation = {'id': 'rotation', 'kind': 'rotation_image', 'label': 'Rotation', 'tag': 'TankLevel', 'image': 'c' * 64}
+        project['controls'] += [state_image, positions, travel, rotation]
         project['layout'] = {'background': '0' * 64, 'boxes': {
             control['id']: {'x': index * 100, 'y': 0, 'width': 80, 'height': 48}
             for index, control in enumerate(project['controls'])
@@ -53,6 +54,8 @@ class CanvasBackupTests(unittest.TestCase):
         positions['states'][1]['image'] = identifier
         self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
         travel['image'] = off_id
+        self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
+        rotation['image'] = identifier
         saved = client.put('/api/project/draft', json=request)
         self.assertEqual(saved.status_code, 200, saved.text)
         applied = client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -73,6 +76,8 @@ class CanvasBackupTests(unittest.TestCase):
             self.assertEqual(restored_positions['states'], positions['states'])
             restored_travel = next(control for control in current['controls'] if control['id'] == 'travel')
             self.assertEqual(restored_travel['image'], off_id)
+            restored_rotation = next(control for control in current['controls'] if control['id'] == 'rotation')
+            self.assertEqual(restored_rotation['image'], identifier)
             off_asset = '/api/canvas-images/' + off_id
             self.assertEqual(restored_client.get(off_asset).content, client.get(off_asset).content)
         finally:

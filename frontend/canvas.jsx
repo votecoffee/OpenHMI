@@ -18,6 +18,7 @@ function size(type) {
   if (type === 'RadialGauge') return { width: 176, height: 160 };
   if (type === 'DateTimeDisplay') return { width: 208, height: 56 };
   if (type === 'PlcConnectionStatus') return { width: 192, height: 88 };
+  if (type === 'RotationImage') return { width: 160, height: 160 };
   if (type === 'PositionImage') return { width: 192, height: 120 };
   if (type === 'StateImage' || type === 'MultiStateImage') return { width: 160, height: 120 };
   if (type === 'SetpointComparison') return { width: 208, height: 148 };

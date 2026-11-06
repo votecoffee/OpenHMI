@@ -114,14 +114,14 @@ test('compact annotations, LED and setpoint displays survive canvas save and liv
   }
 });
 
-test('Boolean, multi-state and position images follow tags and quality', async ({ page }) => {
+test('state, position and rotation images follow tags and quality', async ({ page }) => {
   test.setTimeout(60000);
   const other = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAE0lEQVR4nGM0Di1ngAEmOAsvBwAyjgEHv03a3gAAAABJRU5ErkJggg==', 'base64');
   const original = await (await page.request.get('/api/project')).json();
   try {
     await save(page, { ...original.active, controls: [], screens: [], layout: null,
       tags: [{ name: 'ValveOpen', type: 'boolean', initial: true }, { name: 'FixtureState', type: 'integer', initial: 1 },
-        { name: 'AxisTravel', type: 'number', initial: 25 }] });
+        { name: 'AxisTravel', type: 'number', initial: 25 }, { name: 'ValveAngle', type: 'number', initial: 25 }] });
     await page.goto('/');
     await page.getByRole('button', { name: 'Enable freeform layout' }).click();
     const canvas = page.getByLabel('Freeform canvas', { exact: true });
@@ -160,8 +160,16 @@ test('Boolean, multi-state and position images follow tags and quality', async (
     await fields.getByRole('textbox', { name: 'Units', exact: true }).fill('mm');
     await fields.getByRole('combobox', { name: 'Travel direction', exact: true }).selectOption({ label: 'Right to left' });
     await fields.getByRole('combobox', { name: 'Show label and state text', exact: true }).selectOption({ label: 'No' });
-    const travelImage = fields.getByRole('group', { name: 'Position image', exact: true });
-    await travelImage.getByLabel('Upload Position image', { exact: true }).setInputFiles({ name: 'Carriage.png', mimeType: 'image/png', buffer: other });
+    const travelImage = fields.getByRole('group', { name: 'Motion image', exact: true });
+    await travelImage.getByLabel('Upload Motion image', { exact: true }).setInputFiles({ name: 'Carriage.png', mimeType: 'image/png', buffer: other });
+    await travelImage.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
+    await palette.getByRole('combobox', { name: 'Control type' }).selectOption('RotationImage');
+    await palette.getByRole('button', { name: 'Add or drag control' }).dragTo(canvas, { targetPosition: { x: 640, y: 40 } });
+    await fields.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'ValveAngle' });
+    await fields.getByRole('spinbutton', { name: 'Start angle (degrees)', exact: true }).fill('90');
+    await fields.getByRole('spinbutton', { name: 'End angle (degrees)', exact: true }).fill('-90');
+    await fields.getByRole('combobox', { name: 'Show label and state text', exact: true }).selectOption({ label: 'No' });
+    await travelImage.getByLabel('Upload Motion image', { exact: true }).setInputFiles({ name: 'Valve.png', mimeType: 'image/png', buffer: other });
     await travelImage.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
@@ -179,14 +187,27 @@ test('Boolean, multi-state and position images follow tags and quality', async (
     const multi = page.locator('[data-control="multi_state_image"]');
     await expect(multi.getByRole('img', { name: 'Fixture: Clamping', exact: true })).toHaveJSProperty('naturalWidth', 1);
     const position = page.locator('[data-control="position_image"]');
-    const marker = position.locator('.position-marker');
-    const track = position.locator('.position-travel');
+    const marker = position.locator('.motion-marker');
+    const track = position.locator('.motion-travel');
     await expect(position.getByRole('img', { name: 'Axis position: 25.0 mm', exact: true })).toHaveJSProperty('naturalWidth', 4);
     const offset = async () => {
       const path = await track.boundingBox(), point = await marker.boundingBox();
       return (point.x - path.x) / (path.width - point.width);
     };
     await expect.poll(offset).toBeCloseTo(0.75);
+    const rotation = page.locator('[data-control="rotation_image"]');
+    const rotor = rotation.locator('.motion-marker');
+    const turn = () => rotor.evaluate(element => {
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+      return Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+    });
+    await expect(rotation.getByRole('img', { name: 'Rotation: 25.0 %', exact: true })).toHaveJSProperty('naturalWidth', 4);
+    await expect.poll(turn).toBeCloseTo(45);
+    const rotorBox = await rotor.boundingBox(), rotationBox = await rotation.locator('.motion-travel').boundingBox();
+    expect(rotorBox.x + rotorBox.width / 2).toBeCloseTo(rotationBox.x + rotationBox.width / 2, 0);
+    expect(rotorBox.y + rotorBox.height / 2).toBeCloseTo(rotationBox.y + rotationBox.height / 2, 0);
+    expect(rotorBox.width).toBeLessThan(rotationBox.width);
+    expect(rotorBox.height).toBeLessThan(rotationBox.height);
     const live = await (await page.request.get('/api/tags')).json();
     live.values.ValveOpen = false;
     live.values.FixtureState = 2;
@@ -205,14 +226,21 @@ test('Boolean, multi-state and position images follow tags and quality', async (
     await expect(control).toContainText('STALE DATA');
     await expect(control.locator('img')).toHaveCount(0);
     live.values.AxisTravel = 0;
+    live.values.ValveAngle = 0;
     await expect.poll(offset).toBeCloseTo(1);
+    await expect.poll(turn).toBeCloseTo(90);
     live.values.AxisTravel = 100;
+    live.values.ValveAngle = 100;
     await expect.poll(offset).toBeCloseTo(0);
+    await expect.poll(turn).toBeCloseTo(-90);
     live.values.AxisTravel = 120;
     await expect(position).toContainText('120.0 mm');
     await expect(position).toContainText('OUT OF SCALE');
     await expect(marker).toHaveCount(0);
     live.samples.AxisTravel = { quality: 'stale', age_seconds: 4 };
+    live.samples.ValveAngle = { quality: 'stale', age_seconds: 4 };
+    await expect(rotation).toContainText('STALE DATA');
+    await expect(rotor).toHaveCount(0);
     await expect(position).toContainText('STALE DATA');
     await expect(marker).toHaveCount(0);
   } finally {

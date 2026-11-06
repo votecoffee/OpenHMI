@@ -115,7 +115,7 @@ class CanvasImages:
             for control in controls:
                 if control.kind == 'state_image':
                     identifiers.update(identifier for identifier in (control.on_image, control.off_image) if identifier)
-                if control.kind == 'position_image' and control.image:
+                if control.kind in ('position_image', 'rotation_image') and control.image:
                     identifiers.add(control.image)
                 if control.kind == 'multi_state_image':
                     identifiers.update(state.image for state in control.states if state.image)

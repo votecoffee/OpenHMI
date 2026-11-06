@@ -1,7 +1,7 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', connection_status: 'PlcConnectionStatus', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
-  recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', state_image: 'StateImage', multi_state_image: 'MultiStateImage', position_image: 'PositionImage', sparkline: 'Sparkline',
+  recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', state_image: 'StateImage', multi_state_image: 'MultiStateImage', position_image: 'PositionImage', rotation_image: 'RotationImage', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar', setpoint_comparison: 'SetpointComparison',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
@@ -72,8 +72,12 @@ export function toProject(data, settings = {}) {
       if (type === 'Sparkline') return { ...numeric, seconds: Number(props.seconds ?? 60) };
       if (type === 'SetpointComparison') return { ...numeric, setpoint_tag: props.setpoint_tag || '',
         tolerance: Number(props.tolerance), tolerance_tag: props.tolerance_tag || '' };
-      if (type === 'PositionImage') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum),
-        image: props.image || '', direction: props.direction, size_percent: Number(props.size_percent), show_label: props.show_label ?? true };
+      if (type === 'PositionImage' || type === 'RotationImage') {
+        const motion = type === 'PositionImage' ? { direction: props.direction }
+          : { angle_start: Number(props.angle_start), angle_end: Number(props.angle_end) };
+        return { ...numeric, ...motion, minimum: Number(props.minimum), maximum: Number(props.maximum),
+          image: props.image || '', size_percent: Number(props.size_percent), show_label: props.show_label ?? true };
+      }
       if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
       if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
       if (['AnalogRange', 'TankLevel', 'RadialGauge'].includes(type)) {
