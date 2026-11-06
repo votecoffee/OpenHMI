@@ -6,7 +6,7 @@ import { TouchEntry } from './touch-entry.jsx';
 import { api, json } from './api.mjs';
 
 export function EditControl(props) {
-  const { id, tag, security_groups = [], puck, enabled_tag = '', text = false } = props;
+  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false } = props;
   const live = useContext(Live), { session } = useContext(SecurityContext) || {}, { text: translate, ui } = useLocalization();
   const label = translate(`control.${id}.label`, props.label);
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [touch, setTouch] = useState(null);
@@ -16,6 +16,7 @@ export function EditControl(props) {
   const { value, valid, problem } = tagValue(live, tag, text ? 'string' : 'number');
   const enabled = enabled_tag ? tagValue(live, enabled_tag, 'boolean') : null;
   const bindingEnabled = !enabled || enabled.valid && enabled.value === true;
+  const instanceEnabled = instance_enabled_tag ? tagValue(live, instance_enabled_tag, 'boolean') : null;
   const fields = text ? [['min_length', 'editMinLength'], ['max_length', 'editMaxLength']]
     : [['minimum', 'editMinimum'], ['maximum', 'editMaximum']];
   const limitBindings = fields.map(([field, labelKey]) => {
@@ -30,12 +31,31 @@ export function EditControl(props) {
     : !validRange ? 'editLimitsInvalid' : null;
   const limits = { low, high, valid: !limitProblem, problem: limitProblem };
   const bindingProblem = (labelKey, problem) => ui('editBindingProblem', { binding: ui(labelKey), quality: ui(problem) });
-  const disabled = puck?.isEditing || !valid || !authorized || !limits.valid || !bindingEnabled || busy;
+  const namedProblem = (labelKey, tag, problem) => ui('editNamedBindingProblem', {
+    binding: ui(labelKey), tag, quality: ui(problem),
+  });
+
+  function writeBlock(expectedRevision) {
+    if (expectedRevision !== revision) return ui('editRevisionChanged');
+    if (!authorized) return ui('editNotAuthorized');
+    if (!valid) return namedProblem('editValueBinding', tag, problem);
+    for (const [state, source, labelKey] of [
+      [instanceEnabled, instance_enabled_tag, 'editInstanceEnableBinding'],
+      [enabled, enabled_tag, 'editEnableBinding'],
+    ]) {
+      if (state && !state.valid) return namedProblem(labelKey, source, state.problem);
+      if (state?.value === false) return ui('editEnableOff', { tag: source });
+    }
+    const badLimit = limitBindings.find(state => !state.valid);
+    if (badLimit) return namedProblem(badLimit.labelKey, badLimit.source, badLimit.problem);
+    return limitProblem ? ui(limitProblem) : '';
+  }
+
+  const disabled = puck?.isEditing || !!writeBlock(revision) || busy;
   async function save(value, expectedRevision) {
-    if (expectedRevision !== revision) throw new Error(ui('editRevisionChanged'));
-    if (!valid || !bindingEnabled) throw new Error(ui('editDataUnavailable'));
+    const blockedReason = writeBlock(expectedRevision);
+    if (blockedReason) throw new Error(blockedReason);
     const measured = text ? Array.from(value).length : value;
-    if (limitProblem) throw new Error(ui(limitProblem));
     if (!text && !Number.isFinite(value) || measured < low || measured > high) throw new Error(ui('editOutsideLimits'));
     setBusy(true);
     try { const result = await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value, expected_revision: expectedRevision })); setDraft(null); setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten')); }
@@ -56,6 +76,6 @@ export function EditControl(props) {
     }} disabled={disabled} /><button disabled={disabled}>{ui('writeValue')}</button></form>
     <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>
     <span className="command-feedback">{message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
-    {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} initial={touch.initial} limits={limits} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
+    {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
   </article>;
 }

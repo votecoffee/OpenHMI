@@ -17,7 +17,7 @@ export function Popup({ title, close, closeLabel, opener, children }) {
   return createPortal(<dialog ref={dialog} aria-label={title} className="hmi-popup" onCancel={event => { event.preventDefault(); close(); }}><header><h2>{title}</h2><button type="button" onClick={close} aria-label={closeLabel || ui('closeDialog', { title })}>{closeLabel || '×'}</button></header>{children}</dialog>, document.body);
 }
 
-export function TouchEntry({ title, initial = '', numeric = false, secret = false, limits, close, accept }) {
+export function TouchEntry({ title, initial = '', numeric = false, secret = false, limits, blockedReason = '', close, accept }) {
   const ui = useUi();
   const [entry, setEntry] = useState(initial), [shift, setShift] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const input = useRef(null);
@@ -51,7 +51,9 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
   }
 
   async function submit(event) {
-    event.preventDefault(); setError(''); setBusy(true);
+    event.preventDefault();
+    if (blockedReason) return;
+    setError(''); setBusy(true);
     try {
       if (numeric && (!entry.trim() || !Number.isFinite(Number(entry)))) throw new Error(ui('invalidNumericEntry'));
       const value = numeric ? Number(entry) : entry;
@@ -68,12 +70,13 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
   return <Popup title={title} close={close}><form onSubmit={submit}>
     <label>{entryLabel}<input ref={input} autoFocus type={secret ? 'password' : 'text'} inputMode={numeric ? 'decimal' : 'text'} autoComplete="off" value={entry} onChange={event => setEntry(event.target.value)} /></label>
     {limits && <p>{limits.valid ? ui(numeric ? 'numericRange' : 'textLength', limits) : ui(limits.problem || 'editLimitsUnavailable')}</p>}
+    {blockedReason && <p role="status">{blockedReason}</p>}
     <fieldset disabled={busy} className={`touch-keys ${numeric ? 'numeric-keys' : ''}`} onPointerDown={event => {
       if (event.button === 0 && event.target.closest('button')) event.preventDefault();
     }}><legend>{ui(numeric ? 'numericKeypad' : 'textKeyboard')}</legend>
       {rows.map((row, index) => <div className="key-row" key={index}>{Array.from(row).map(key => <button type="button" key={key} onClick={() => editKey(key)}>{key}</button>)}</div>)}
       <div className="key-row">{!numeric && <><button type="button" aria-pressed={shift} onClick={() => setShift(!shift)}>{ui('shiftKey')}</button><button type="button" onClick={() => editKey(' ')}>{ui('spaceKey')}</button></>}
         <button type="button" onClick={() => editKey('', 'backspace')}>{ui('backspaceKey')}</button><button type="button" onClick={() => editKey('', 'clear')}>{ui('clearEntry')}</button></div>
-    </fieldset><p role="alert">{error}</p><footer><button type="button" disabled={busy} onClick={close}>{ui('cancelEntry')}</button><button disabled={busy}>{ui('acceptEntry')}</button></footer>
+    </fieldset><p role="alert">{error}</p><footer><button type="button" disabled={busy} onClick={close}>{ui('cancelEntry')}</button><button disabled={busy || !!blockedReason}>{ui('acceptEntry')}</button></footer>
   </form></Popup>;
 }

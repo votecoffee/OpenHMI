@@ -350,13 +350,13 @@ export function createConfig(catalog) {
   return config;
 }
 
-function FaceplateInstance({ id, label, template, root_tag, puck, config }) {
+function FaceplateInstance({ id, label, template, root_tag, puck, config, enabled_tag }) {
   const live = useContext(Live);
   const { text } = useLocalization();
   const definition = live.project?.faceplates?.find(item => item.id === template);
   if (!definition) return <article className="hmi-control" data-control="faceplate"><strong>{label}</strong><p>Faceplate definition unavailable</p></article>;
   return <article className="hmi-faceplate" data-control="faceplate"><strong>{text(`control.${id}.label`, label)}</strong><div className="faceplate-grid">{definition.controls.map(control => {
-    const resolved = { ...control, id: `${id}__${control.id}`, puck };
+    const resolved = { ...control, id: `${id}__${control.id}`, puck, instance_enabled_tag: enabled_tag };
     for (const field of ['tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag',
       'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag']) {
       if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);

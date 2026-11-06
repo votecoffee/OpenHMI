@@ -205,7 +205,21 @@ test('touch entry, colored lock legend, login popup and explicit PLC identity st
     await expect(numeric.getByRole('alert')).toContainText('Allowed range');
     await numeric.getByRole('button', { name: 'Clear', exact: true }).click();
     await numeric.getByRole('button', { name: '2', exact: true }).click(); await numeric.getByRole('button', { name: '5', exact: true }).click();
-    await numeric.getByRole('button', { name: 'Accept entry', exact: true }).click();
+    await page.route('**/api/tags', async route => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.samples.TouchHigh = { quality: 'stale', error: 'Synthetic maximum loss during entry' };
+      await route.fulfill({ response, json: state });
+    });
+    const accept = numeric.getByRole('button', { name: 'Accept entry', exact: true });
+    const entry = numeric.getByLabel('Entry', { exact: true });
+    await expect(numeric.getByRole('status')).toHaveText('Maximum TouchHigh · STALE DATA');
+    await expect(accept).toBeDisabled();
+    await expect(entry).toHaveValue('25');
+    await page.unroute('**/api/tags');
+    await expect(accept).toBeEnabled();
+    await expect(entry).toHaveValue('25');
+    await accept.click();
     await expect(numeric).not.toBeVisible();
     await expect(page.locator('[data-control="input"]').filter({ hasText: 'Touch number' })).toContainText('25.0');
     await page.getByRole('button', { name: 'Open keyboard for Touch text', exact: true }).click();

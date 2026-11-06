@@ -218,6 +218,19 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     const caption = viewer.locator('[data-control="text_input"]').filter({ hasText: 'Unit caption' });
     await expect(setpoint).toContainText('Range: 10 – 20');
     await expect(caption).toContainText('Length: 2 – 4');
+    await setpoint.getByRole('button', { name: 'Open numeric keypad for Unit setpoint', exact: true }).click();
+    const keypad = viewer.getByRole('dialog', { name: 'Numeric entry: Unit setpoint', exact: true });
+    await viewer.route('**/api/tags', async route => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.samples.FaceplatePermit = { quality: 'stale', error: 'Synthetic permit loss during entry' };
+      await route.fulfill({ response, json: state });
+    });
+    await expect(keypad.getByRole('status')).toHaveText('Faceplate enable tag FaceplatePermit · STALE DATA');
+    await expect(keypad.getByRole('button', { name: 'Accept entry', exact: true })).toBeDisabled();
+    await viewer.unroute('**/api/tags');
+    await expect(keypad.getByRole('button', { name: 'Accept entry', exact: true })).toBeEnabled();
+    await keypad.getByRole('button', { name: 'Cancel', exact: true }).click();
     const rejected = await viewer.request.put(`/api/controls/equipment__${instance.id}__setpoint/value`, { data: { value: 25 } });
     expect(rejected.status()).toBe(422);
     await setpoint.getByLabel('Unit setpoint new value', { exact: true }).fill('15');

@@ -36,6 +36,8 @@ export const uiText = {
   editLimitsInvalid: 'Edit limits are invalid', editMinimum: 'Minimum', editMaximum: 'Maximum',
   editMinLength: 'Minimum length', editMaxLength: 'Maximum length', editEnableBinding: 'Enable tag',
   editBindingProblem: '{binding} · {quality}', editEnableOff: 'Enable tag {tag} is off',
+  editNamedBindingProblem: '{binding} {tag} · {quality}', editValueBinding: 'Value tag',
+  editInstanceEnableBinding: 'Faceplate enable tag', editNotAuthorized: 'Your current HMI permissions do not allow this edit',
   actionPermitBinding: 'PLC permit', actionPermitOff: 'PLC permit {tag} is off',
   actionCommandBinding: 'Command channel', actionTargetBinding: 'Target tag',
   editOutsideLimits: 'Entry is outside the current edit limits', enterValue: 'Enter a value',

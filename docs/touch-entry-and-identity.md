@@ -29,7 +29,11 @@ and the acceptance buttons.
 Physical typing and native Unicode/IME entry remain available. The text keyboard provides
 a US Latin layout with Shift, punctuation and Space. Password keyboard fields
 are masked. Acceptance validates the latest limits and keeps the dialog open on
-failure; cancel performs no write. Manual typed entry remains available too.
+failure. If a required value, limit, or enable tag becomes unavailable while
+the keypad is open, the keypad names the binding and blocks acceptance.
+The draft stays in the keypad and can be submitted after recovery if it
+meets the current limits. Cancel performs no write. Manual typed entry
+remains available too.
 
 If the applied project changes while an entry is in progress, OpenHMI requires
 a fresh entry against the new revision. Reopen the keypad or clear and re-enter
