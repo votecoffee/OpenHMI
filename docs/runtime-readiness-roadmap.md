@@ -29,8 +29,10 @@ and reads back writes. [pycomm3 LogixDriver documentation](https://github.com/ot
    continues scheduling healthy routes during a slow read or reconnect. Route
    loss invalidates all its aliases, and each alias needs a fresh read before
    its value becomes available again. A simulated two-route regression verifies
-   isolation and rejects results from a superseded configuration. Verify this
-   behavior on the bench and keep tag-level errors distinct from route failures.
+   isolation and rejects results from a superseded configuration. A tag write
+   rejection or unverified readback invalidates overlapping samples and makes
+   them due for reacquisition while the route stays connected. The write is
+   never replayed. Verify this behavior on the bench.
 2. **Measure before tuning.** The current schedule includes scan duration and
    the polling loop delay. Diagnostics now reports rolling p50/p95/p99 for
    scan duration and start lateness, successful opens and loss to first good

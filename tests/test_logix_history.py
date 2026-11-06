@@ -187,6 +187,45 @@ class LogixHistoryTests(unittest.TestCase):
         self.assertEqual(driver.sample_snapshot(2)['LevelA']['quality'], 'bad')
         driver.close()
 
+    def test_tag_write_failure_keeps_route_connected_and_refreshes_affected_aliases(self):
+        for rejection in (True, False):
+            with self.subTest(rejection=rejection):
+                project = logix_project()
+                project['tags'].append({'name': 'SpeedAlias', 'connection': 'plc',
+                                        'address': 'Motor.Speed', 'type': 'number'})
+                project['screens'][1]['controls'].append(
+                    {'id': 'speed-alias', 'kind': 'numeric', 'label': 'Speed alias', 'tag': 'SpeedAlias'})
+                driver = RuntimeDriver(FakePLC)
+                self.addCleanup(driver.close)
+                driver.configure(Project.model_validate(project).model_dump())
+                driver.lease('viewer', ['slow', 'fast'], 1)
+                driver.poll(1)
+                connection = driver.connections['plc']
+                plc = connection.client
+                error = 'Controller denied the request' if rejection else None
+                message = 'PLC rejected write' if rejection else 'PLC write readback did not match'
+                # The successful response in the second case leaves the observed value unchanged.
+                with patch.object(plc, 'write', return_value=SimpleNamespace(error=error)) as write:
+                    with self.assertRaisesRegex(ValueError, message):
+                        driver.write('MotorA.Speed', [50.0])
+                    write.assert_called_once_with(('Motor.Speed', 50.0))
+                self.assertIs(connection.client, plc)
+                self.assertFalse(plc.closed)
+                self.assertEqual(connection.failure_generation, 0)
+                samples = driver.sample_snapshot(1)
+                for name in ('MotorA', 'MotorA.Speed', 'SpeedAlias'):
+                    self.assertEqual(samples[name]['quality'], 'bad')
+                    self.assertIsNone(samples[name]['value'])
+                for name in ('MotorA.Running', 'LevelA'):
+                    self.assertEqual(samples[name]['quality'], 'good')
+
+                driver.poll(1.01)
+                self.assertCountEqual(plc.reads[-1], ('Motor', 'Motor.Speed'))
+                samples = driver.sample_snapshot(1.01)
+                self.assertEqual(samples['SpeedAlias']['value'], 42.0)
+                self.assertEqual(samples['MotorA.Speed']['quality'], 'good')
+                self.assertEqual(plc.writes, [])
+
     def test_route_loss_invalidates_cached_aliases_until_fresh_reads(self):
         project = logix_project()
         project['connections'].append({**project['connections'][0], 'id': 'other', 'path': 'other-offline/0'})

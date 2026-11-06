@@ -37,6 +37,16 @@ def type_ok(value, kind):
     return True
 
 
+def overlapping_addresses(first, second):
+    first, second = first.casefold(), second.casefold()
+    return (first == second or first.startswith((second + '.', second + '['))
+            or second.startswith((first + '.', first + '[')))
+
+
+class TagWriteError(ValueError):
+    """A PLC tag response could not confirm the requested write."""
+
+
 class ScanTimings:
     """Bounded, in-memory timing samples for one configured route."""
 
@@ -191,12 +201,14 @@ class LogixConnection:
             try:
                 result = self.client.write((address, value))
                 if result.error:
-                    raise ValueError(f'PLC rejected write: {result.error}')
+                    raise TagWriteError(f'PLC rejected write: {result.error}')
                 actual = self.client.read(address)
                 matches = math.isclose(actual.value, value, rel_tol=1e-6, abs_tol=1e-7) if type(actual.value) is float and type(value) in (int, float) else actual.value == value
                 if actual.error or not matches:
-                    raise ValueError('PLC write readback did not match; command was not retried')
+                    raise TagWriteError('PLC write readback did not match; command was not retried')
                 return actual.value
+            except TagWriteError:
+                raise
             except Exception as error:
                 # Never replay a write during reconnection.
                 self.failed(error, time.monotonic())
@@ -542,7 +554,21 @@ class RuntimeDriver(SimulatorDriver):
                         if int(raw) != raw:
                             raise ValueError('Scaled integer writes must resolve to an integer')
                         raw = int(raw)
-                    connection.write(tag['address'] + ('.' + member if member else ''), raw)
+                    physical_address = tag['address'] + ('.' + member if member else '')
+                    try:
+                        connection.write(physical_address, raw)
+                    except TagWriteError as error:
+                        with self.lock:
+                            for key, aliases in self.address_aliases.items():
+                                route, scan_address = key
+                                if route != tag['connection'] or not overlapping_addresses(physical_address, scan_address):
+                                    continue
+                                self.deadlines.pop(key, None)
+                                for alias, _, scan_member in aliases:
+                                    alias_address = scan_address + ('.' + scan_member if scan_member else '')
+                                    if alias in self.samples and overlapping_addresses(physical_address, alias_address):
+                                        self.samples[alias].update(value=None, quality='bad', error=str(error))
+                        raise
                     # A write readback verifies the transaction; normal polling owns displayed samples.
                     with self.lock:
                         self.deadlines.pop((tag['connection'], tag['address']), None)
