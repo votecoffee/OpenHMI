@@ -47,6 +47,7 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Binary indicator | Stable label, grayscale filled/empty square and configurable ON/OFF text |
 | Analog range | Value and units, scale endpoints, normal band and pointer; out-of-scale indication without falsifying the numeric value |
 | Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
+| Image | Place a static project image with fit, optional caption and alternative text in a screen or faceplate |
 | Rotation image | Turn a project image or pointer around its center over a configured input and angular range |
 | Position image | Move a marker or project image along a configured axis, with no marker when the position is unavailable or out of range |
 | Multi-state image | Map integer codes to named project images and indicate unknown states or bad quality |

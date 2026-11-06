@@ -26,7 +26,8 @@
 .canvas-object-body > .binding-frame > .binding-contents:has(> .hmi-image-control),
 .canvas-object-body > .binding-frame > .binding-contents > .hmi-image-control { height: 100%; }
 .canvas-object-body .hmi-image-control > .state-image-graphic,
-.canvas-object-body .hmi-image-control > .motion-travel { flex: 1 1 auto; max-height: none; }
+.canvas-object-body .hmi-image-control > .motion-travel,
+.canvas-object-body .hmi-image-control > .static-image-frame { flex: 1 1 auto; max-height: none; }
 .canvas-object .hmi-control { min-height: 0; padding: 4px; gap: 3px; border-bottom: 0; }
 .canvas-object .hmi-value { font-size: 19px; }
 .canvas-object .hmi-action { min-height: 32px; padding: 5px 8px; }

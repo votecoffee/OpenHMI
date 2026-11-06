@@ -36,6 +36,8 @@ class CanvasBackupTests(unittest.TestCase):
                                 {'value': 1, 'label': 'Open', 'image': 'e' * 64}]}
         travel = {'id': 'travel', 'kind': 'position_image', 'label': 'Travel', 'tag': 'TankLevel', 'image': 'd' * 64}
         rotation = {'id': 'rotation', 'kind': 'rotation_image', 'label': 'Rotation', 'tag': 'TankLevel', 'image': 'c' * 64}
+        static_image = {'id': 'drawing', 'kind': 'image', 'label': 'Drawing', 'image': 'b' * 64}
+        project['faceplates'] = [{'id': 'equipment', 'name': 'Equipment', 'members': {}, 'controls': [static_image]}]
         project['controls'] += [state_image, positions, travel, rotation]
         project['layout'] = {'background': '0' * 64, 'boxes': {
             control['id']: {'x': index * 100, 'y': 0, 'width': 80, 'height': 48}
@@ -56,6 +58,8 @@ class CanvasBackupTests(unittest.TestCase):
         travel['image'] = off_id
         self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
         rotation['image'] = identifier
+        self.assertEqual(client.put('/api/project/draft', json=request).status_code, 422)
+        static_image['image'] = off_id
         saved = client.put('/api/project/draft', json=request)
         self.assertEqual(saved.status_code, 200, saved.text)
         applied = client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
@@ -78,6 +82,7 @@ class CanvasBackupTests(unittest.TestCase):
             self.assertEqual(restored_travel['image'], off_id)
             restored_rotation = next(control for control in current['controls'] if control['id'] == 'rotation')
             self.assertEqual(restored_rotation['image'], identifier)
+            self.assertEqual(current['faceplates'][0]['controls'][0]['image'], off_id)
             off_asset = '/api/canvas-images/' + off_id
             self.assertEqual(restored_client.get(off_asset).content, client.get(off_asset).content)
         finally:

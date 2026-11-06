@@ -249,6 +249,57 @@ test('state, position and rotation images follow tags and quality', async ({ pag
   }
 });
 
+test('static images work in grid screens and faceplates without tag bindings', async ({ page }) => {
+  test.setTimeout(60000);
+  const original = await (await page.request.get('/api/project')).json();
+  try {
+    const uploaded = await page.request.post('/api/canvas-images', { data: pixel });
+    expect(uploaded.ok(), await uploaded.text()).toBe(true);
+    const { id } = await uploaded.json();
+    await save(page, { ...original.active, layout: null, screens: [],
+      tags: [{ name: 'Equipment', type: 'struct', initial: { Running: false }, members: { Running: 'boolean' } }],
+      faceplates: [{ id: 'equipment', name: 'Equipment', members: { Running: 'boolean' }, controls: [
+        { id: 'drawing', kind: 'image', label: 'Equipment drawing', image: id, alt_text: 'Equipment outline', show_label: false },
+      ] }],
+      controls: [{ id: 'equipment_panel', kind: 'faceplate', label: 'Equipment panel', template: 'equipment', root_tag: 'Equipment' }],
+    });
+    await page.goto('/');
+    const block = page.getByRole('button', { name: 'Image', exact: true });
+    await block.scrollIntoViewIfNeeded();
+    const source = await block.boundingBox();
+    const target = await page.locator('.hmi-grid').boundingBox();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 100, target.y + 30, { steps: 10 });
+    await page.mouse.move(target.x + 110, target.y + 17, { steps: 2 });
+    await page.mouse.up();
+    const dropped = page.locator('[data-control="image"] .hmi-label').getByText('Image', { exact: true });
+    await dropped.click();
+    await page.getByRole('textbox', { name: 'Alternative text', exact: true }).fill('Machine schematic');
+    await page.getByRole('combobox', { name: 'Image fit', exact: true }).selectOption({ label: 'Cover' });
+    await page.getByRole('combobox', { name: 'Show caption', exact: true }).selectOption({ label: 'No' });
+    const upload = page.getByRole('group', { name: 'Project image', exact: true });
+    await upload.getByLabel('Upload Project image', { exact: true }).setInputFiles({ name: 'Drawing.png', mimeType: 'image/png', buffer: pixel });
+    await upload.getByRole('button', { name: 'Use uploaded image', exact: true }).click();
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+
+    await page.goto('/runtime');
+    const image = page.getByRole('img', { name: 'Machine schematic', exact: true });
+    await expect(image).toHaveAttribute('src', '/api/canvas-images/' + id);
+    await expect(image).toHaveCSS('object-fit', 'cover');
+    await expect(image).toHaveJSProperty('naturalWidth', 1);
+    await expect(page.locator('[data-control="faceplate"]').getByRole('img', { name: 'Equipment outline', exact: true })).toBeVisible();
+    const { active } = await (await page.request.get('/api/project')).json();
+    const configured = active.controls.find(control => control.kind === 'image');
+    expect(configured).toMatchObject({ image: id, fit: 'cover', show_label: false });
+    expect(Object.hasOwn(configured, 'tag')).toBe(false);
+  } finally {
+    await save(page, original.active);
+    await save(page, original.draft, false);
+  }
+});
+
 test('runtime fit width preserves canvas alignment, controls and trend cursor', async ({ page }) => {
   await page.setViewportSize({ width: 620, height: 780 });
   const original = await (await page.request.get('/api/project')).json();

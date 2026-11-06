@@ -1,7 +1,7 @@
 export const controlTypes = {
   numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', connection_status: 'PlcConnectionStatus', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
-  recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', state_image: 'StateImage', multi_state_image: 'MultiStateImage', position_image: 'PositionImage', rotation_image: 'RotationImage', sparkline: 'Sparkline',
+  recipe: 'SelectedRecipe', label: 'StaticLabel', image: 'StaticImage', symbol: 'ScreenSymbol', state_image: 'StateImage', multi_state_image: 'MultiStateImage', position_image: 'PositionImage', rotation_image: 'RotationImage', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar', setpoint_comparison: 'SetpointComparison',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
@@ -50,6 +50,8 @@ export function toProject(data, settings = {}) {
       if (type === 'StackLight') return { ...base, lamps: props.lamps, orientation: props.orientation };
       if (type === 'PermissiveList') return { ...base, checks: props.checks };
       if (type === 'MultiStateImage') return { ...base, tag: props.tag, states: props.states, show_label: props.show_label ?? true };
+      if (type === 'StaticImage') return { ...base, image: props.image || '', alt_text: props.alt_text || '',
+        fit: props.fit || 'contain', show_label: props.show_label ?? true };
       if (type === 'StateImage') return { ...base, tag: props.tag, on_image: props.on_image || '', off_image: props.off_image || '',
         on_text: props.on_text, off_text: props.off_text, show_label: props.show_label ?? true };
       if (type === 'StaticLabel') return { ...base, font_size: Number(props.font_size), alignment: props.alignment, weight: props.weight };

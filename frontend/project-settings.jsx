@@ -30,7 +30,7 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
     const key = `control.${id}`;
     return [
       [key + '.label', control.label],
-      ...['unit', 'x_unit', 'y_unit'].filter(field => field in control).map(field => [key + '.' + field, control[field]]),
+      ...['unit', 'x_unit', 'y_unit', 'alt_text'].filter(field => field in control).map(field => [key + '.' + field, control[field]]),
       ...(['indicator', 'state_image'].includes(control.kind) ? [[key + '.on_text', control.on_text || 'ON'], [key + '.off_text', control.off_text || 'OFF']] : []),
       ...(control.states || []).map(state => [`${key}.state.${state.value}`, state.label]),
       ...(control.options || []).map((option, index) => [`${key}.choice.${index}`, option.label]),

@@ -63,12 +63,25 @@ export function ImageStatesFields({ id, value = [], onChange, readOnly }) {
   </fieldset>;
 }
 
-export function ProjectPicture({ identifier, alt }) {
+export function ProjectPicture({ identifier, alt, fit }) {
   const { ui } = useLocalization();
   const [failed, setFailed] = useState(false);
   return failed ? <strong className="range-deviation">{ui('stateImageUnavailable')}</strong>
-    : <img className="state-image-graphic" src={imagePath(identifier)} alt={alt} draggable={false}
+    : <img className="state-image-graphic" src={imagePath(identifier)} alt={alt} style={{ objectFit: fit }} draggable={false}
       onError={() => setFailed(true)} />;
+}
+
+export function StaticImage({ id, label, image, alt_text, fit, show_label, puck }) {
+  const { text, ui } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const caption = show_label || puck?.isEditing;
+  const alt = text(`control.${id}.alt_text`, alt_text) || (caption ? '' : title);
+  return <article className="hmi-control hmi-image-control" data-control="image">
+    {caption && <span className="hmi-label">{title}</span>}
+    {image ? <div className="static-image-frame">
+      <ProjectPicture key={image} identifier={image} alt={alt} fit={fit} />
+    </div> : <small>{ui('imageUnassigned')}</small>}
+  </article>;
 }
 
 function ImageReadout({ kind, title, tag, problem, stateText, image, caption, unknown = false }) {

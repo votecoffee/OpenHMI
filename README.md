@@ -301,6 +301,9 @@ A **Setpoint comparison** shows a process value, setpoint and signed deviation
 in the same units. Set a tolerance in the designer or bind it to a numeric tag.
 The control reports whether the deviation is within tolerance when the
 required readings are available.
+Use **Image** for a static project image in a grid, freeform screen, or
+faceplate. Set its fit, optional caption and alternative text. It needs no
+PLC tag.
 A **State image** switches between project-owned images when a Boolean tag
 changes. In the designer, upload a PNG, JPEG or WebP for each state and choose
 **Use uploaded image**. A state can be left blank for a transparent overlay
