@@ -65,9 +65,11 @@ independent of viewers. Idle screen tags are not kept on a scan solely because
 their screen exists.
 Faster demand immediately tightens the freshness limit for cached samples of
 that address to the greater of one second or three times the requested interval.
-A later slowdown changes the limit only for newly received samples. If faster
-demand arrives during a scan, a sample received before that demand leaves the
-address due for the next scan.
+A later slowdown changes the limit only for newly received samples. It can
+defer a future read to the slower cadence, capped by the cached sample's
+freshness limit. Already-due reads keep their deadlines. If faster demand
+arrives during a scan, a sample received before that demand leaves the address
+due for the next scan.
 
 Due addresses share a single pycomm3 connection per configured PLC and are read
 in batches. pycomm3 splits requests to fit EtherNet/IP Multiple Service Packets

@@ -29,6 +29,10 @@ PLC_INTEGER_LIMITS = {
 }
 
 
+def freshness_seconds(rate_ms):
+    return max(1.0, 3 * rate_ms / 1000)
+
+
 def member_value(value, path):
     for part in re.findall(r'[^.\[\]]+', path):
         value = value[int(part)] if isinstance(value, list) else value[part]
@@ -468,6 +472,13 @@ class RuntimeDriver(SimulatorDriver):
                         sample = self.samples.get(alias)
                         if sample is not None:
                             sample['rate_ms'] = min(sample['rate_ms'], rate)
+                elif rate > previous_rate and self.deadlines.get(key, now) > now:
+                    # Only defer a scheduled read. Leave already-due refreshes intact.
+                    alias = self.address_aliases[key][0][0]
+                    sample = self.samples.get(alias)
+                    if sample is not None:
+                        interval = min(rate / 1000, freshness_seconds(sample['rate_ms']))
+                        self.deadlines[key] = max(self.deadlines[key], sample['monotonic'] + interval)
             for key in grouped.keys() - self.last_rates.keys():
                 self._refresh_after[key] = now
             self.last_rates = grouped
@@ -608,7 +619,7 @@ class RuntimeDriver(SimulatorDriver):
                                   error='Waiting for a fresh PLC sample after connection loss')
                 elif (tag['connection'], tag['address']) in self._refresh_after:
                     sample.update(value=None, quality='pending', error='Waiting for a PLC sample for renewed demand')
-                elif sample['quality'] == 'good' and now - sample['monotonic'] > max(1.0, 3 * sample['rate_ms'] / 1000):
+                elif sample['quality'] == 'good' and now - sample['monotonic'] > freshness_seconds(sample['rate_ms']):
                     sample.update(quality='stale', error='PLC sample is stale')
                 sample.pop('monotonic', None)
                 if alias in self.samples:

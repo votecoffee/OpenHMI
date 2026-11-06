@@ -270,6 +270,33 @@ class LogixHistoryTests(unittest.TestCase):
         driver.close()
         self.assertTrue(plc.closed)
 
+    def test_slower_screen_demand_defers_only_the_promoted_address_until_freshness_limit(self):
+        driver = RuntimeDriver(FakePLC)
+        self.addCleanup(driver.close)
+        project = logix_project()
+        project['screens'][1]['update_ms'] = 10000
+        driver.configure(project)
+        driver.trend_demands = {'LevelA': 500}
+        driver.lease('slow-viewer', ['slow'], 1)
+        driver.lease('fast-viewer', ['fast'], 1)
+        driver.poll(1)
+        plc = driver.connections['plc'].client
+        self.assertEqual(plc.reads, [('Motor', 'Level')])
+
+        driver.lease('fast-viewer', [], 1.05)
+        driver.poll(1.05)
+        driver.poll(1.11)
+        self.assertEqual(len(plc.reads), 1)
+        driver.poll(1.5)
+        self.assertEqual(plc.reads[-1], ('Level',))
+        self.assertEqual(driver.sample_snapshot(1.99)['MotorA.Speed']['quality'], 'good')
+
+        driver.poll(2)
+        self.assertEqual(plc.reads, [('Motor', 'Level'), ('Level',), ('Motor', 'Level')])
+        driver.poll(3)
+        self.assertEqual(plc.reads[-1], ('Level',))
+        self.assertEqual(driver.sample_snapshot(3.1)['MotorA.Speed']['quality'], 'good')
+
     def test_faster_screen_demand_survives_an_in_flight_older_sample(self):
         driver = RuntimeDriver(FakePLC)
         self.addCleanup(driver.close)
