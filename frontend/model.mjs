@@ -6,7 +6,7 @@ export const controlTypes = {
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', date_time_display: 'DateTimeDisplay', duration: 'DurationDisplay', web_browser: 'WebBrowser',
-  multi_state: 'MultiState', mode_selector: 'ModeSelector', permissives: 'PermissiveList',
+  multi_state: 'MultiState', mode_selector: 'ModeSelector', permissives: 'PermissiveList', stack_light: 'StackLight',
 };
 const kinds = Object.fromEntries(Object.entries(controlTypes).map(([kind, type]) => [type, kind]));
 
@@ -46,6 +46,7 @@ export function toProject(data, settings = {}) {
       if (type === 'MultiState') return { ...base, tag: props.tag, states: props.states };
       if (type === 'ModeSelector') return { ...base, tag: props.tag, confirmed_tag: props.confirmed_tag,
         states: props.states, presentation: props.presentation || 'dropdown', security_groups: props.security_groups || [] };
+      if (type === 'StackLight') return { ...base, lamps: props.lamps, orientation: props.orientation };
       if (type === 'PermissiveList') return { ...base, checks: props.checks };
       if (type === 'StaticLabel') return { ...base, font_size: Number(props.font_size), alignment: props.alignment, weight: props.weight };
       if (type === 'ScreenSymbol') return { ...base, symbol: props.symbol, size: Number(props.size), rotation: Number(props.rotation) };

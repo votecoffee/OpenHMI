@@ -290,6 +290,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     if control['tag'] == control['confirmed_tag'] or same_address:
                         raise HTTPException(422, 'Mode request and confirmation must use separate tags')
                 continue
+            if control['kind'] == 'stack_light':
+                if any(kinds.get(lamp['tag']) != 'boolean' for lamp in control['lamps']):
+                    raise HTTPException(422, 'Stack lights require Boolean tags')
+                continue
             if control['kind'] == 'permissives':
                 if any(kinds.get(check['tag']) != 'boolean' for check in control['checks']):
                     raise HTTPException(422, 'Permissive checks require Boolean tags')

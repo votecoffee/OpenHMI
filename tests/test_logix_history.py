@@ -1063,10 +1063,11 @@ class LogixHistoryTests(unittest.TestCase):
         protected_scan.result(timeout=5)
         self.assertEqual(len(driver.connections['plc'].client.reads), 3)
 
-    def test_chart_faceplate_tags_join_screen_subscription(self):
+    def test_faceplate_display_tags_join_screen_subscription(self):
         project = logix_project()
         project['faceplates'] = [{'id': 'charts', 'name': 'Equipment charts', 'udt_type': 'MotorUDT',
-                                  'members': {'Speed': 'number'}, 'controls': [
+                                  'members': {'Speed': 'number', 'Running': 'boolean'}, 'controls': [
+            {'id': 'lamps', 'kind': 'stack_light', 'label': 'State', 'lamps': [{'tag': '$.Running', 'label': 'Running'}]},
             {'id': 'tank', 'kind': 'tank', 'label': 'Level', 'tag': '$.Speed'},
             {'id': 'bar', 'kind': 'bar', 'label': 'Comparison', 'series': [{'tag': '$.Speed'}, {'tag': 'LevelA'}]},
             {'id': 'radar', 'kind': 'radar', 'label': 'Profile',
@@ -1081,8 +1082,8 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(Project.model_validate(project).model_dump())
         driver.lease('charts-station', ['charts'], 1)
-        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'LevelA', 'TankLevel', 'RecipeRevision', 'AlarmWord')},
-                         {'MotorA.Speed': 200, 'LevelA': 200, 'TankLevel': 200, 'RecipeRevision': 200, 'AlarmWord': 200})
+        self.assertEqual({tag: driver.demands(1)[tag] for tag in ('MotorA.Speed', 'MotorA.Running', 'LevelA', 'TankLevel', 'RecipeRevision', 'AlarmWord')},
+                         {'MotorA.Speed': 200, 'MotorA.Running': 200, 'LevelA': 200, 'TankLevel': 200, 'RecipeRevision': 200, 'AlarmWord': 200})
         driver.poll(1)
         self.assertEqual(driver.connections['plc'].client.reads, [('Motor', 'Level')])
         # Apply changes to the template and scan rate while the same viewer is active.
@@ -1094,7 +1095,7 @@ class LogixHistoryTests(unittest.TestCase):
         project['screens'][-1]['update_ms'] = 350
         driver.configure(Project.model_validate(project).model_dump())
         self.assertEqual(driver.demands(2),
-                         {'MotorA.Speed': 350, 'LevelB': 350, 'TankLevel': 350, 'RecipeRevision': 350, 'AlarmWord': 350, 'ProcessAlarm': 250})
+                         {'MotorA.Speed': 350, 'MotorA.Running': 350, 'LevelB': 350, 'TankLevel': 350, 'RecipeRevision': 350, 'AlarmWord': 350, 'ProcessAlarm': 250})
         driver.poll(2)
         self.assertEqual(driver.sample_snapshot(2)['LevelB']['value'], 65.0)
         self.assertNotIn('LevelB', driver.demands(16))

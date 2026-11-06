@@ -280,6 +280,9 @@ The read-only **Date/time display** uses the same UTC epoch-seconds format.
 A **Duration display** formats a numeric timer in seconds or milliseconds as
 hours, minutes and seconds, with optional fractional seconds. Hours continue
 past 24 for long-running counters.
+A **Stack light** groups up to six Boolean signals in a vertical or horizontal
+row. Set a label, active color, and active polarity for each lamp. The lamp
+shows on, off, or its own unavailable-data status.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

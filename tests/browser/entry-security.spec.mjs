@@ -180,7 +180,7 @@ test('input palette drag and drop and secured live entry', async ({ page }) => {
   }
 });
 
-test('machine state, mode selection and permissives use live quality and separate feedback', async ({ page }) => {
+test('machine state, mode selection, stack lights and permissives use independent tag quality', async ({ page }) => {
   const login = await page.request.post('/api/security/login', {
     data: { name: 'admin', password: 'SecurityTestOnly-2026!' },
   });
@@ -215,6 +215,11 @@ test('machine state, mode selection and permissives use live quality and separat
         { tag: 'PilotMotorRunning', label: 'Motor must be stopped', expected: false },
         { tag: 'PilotFaulted', label: 'No process alarm', expected: false },
       ] },
+      { id: 'lamps', kind: 'stack_light', label: 'Machine lamps', lamps: [
+        { tag: 'PilotMotorRunning', label: 'Running', color: '#36744b' },
+        { tag: 'PilotFaulted', label: 'Faulted', color: '#b3272a' },
+        { tag: 'PilotFaulted', label: 'Healthy', active_when: false, color: '#36744b' },
+      ] },
     ],
   };
   try {
@@ -223,11 +228,24 @@ test('machine state, mode selection and permissives use live quality and separat
     await page.locator('[data-control="mode_selector"] .hmi-label').click();
     await expect(page.getByRole('combobox', { name: 'Mode request tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeRequest' }));
     await expect(page.getByRole('combobox', { name: 'PLC confirmed mode tag', exact: true })).toHaveValue(JSON.stringify({ value: 'ModeFeedback' }));
+    await page.locator('[data-control="stack_light"] .hmi-label').click();
+    await page.getByRole('combobox', { name: 'Orientation', exact: true }).selectOption({ label: 'Horizontal' });
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
 
     await page.goto('/runtime');
     const state = page.locator('[data-control="multi_state"]');
     const mode = page.locator('[data-control="mode_selector"]');
     const permissives = page.locator('[data-control="permissives"]');
+    const lamps = page.locator('[data-control="stack_light"]');
+    const running = lamps.getByRole('listitem').filter({ hasText: 'Running' });
+    const faulted = lamps.getByRole('listitem').filter({ hasText: 'Faulted' });
+    const healthy = lamps.getByRole('listitem').filter({ hasText: 'Healthy' });
+    await expect(lamps.getByRole('list')).toHaveCSS('flex-direction', 'row');
+    await expect(running).toHaveAttribute('data-lamp-state', 'on');
+    await expect(running.locator('.stack-lamp')).toHaveCSS('background-color', 'rgb(54, 116, 75)');
+    await expect(faulted).toHaveAttribute('data-lamp-state', 'off');
+    await expect(healthy).toHaveAttribute('data-lamp-state', 'on');
     await expect(state).toContainText('Manual');
     await expect(permissives.getByRole('listitem').filter({ hasText: 'Motor must be stopped' })).toContainText('Blocked');
     await expect(permissives.getByRole('listitem').filter({ hasText: 'No process alarm' })).toContainText('Ready');
@@ -250,6 +268,10 @@ test('machine state, mode selection and permissives use live quality and separat
     await expect(state).toContainText('STALE DATA');
     await expect(mode.getByRole('button', { name: 'Manual', exact: true })).toBeDisabled();
     await expect(permissives.getByRole('listitem').filter({ hasText: 'Motor must be stopped' })).toContainText('BAD DATA');
+    await expect(running).toHaveAttribute('data-lamp-state', 'unavailable');
+    await expect(running).toContainText('BAD DATA');
+    await expect(faulted).toHaveAttribute('data-lamp-state', 'off');
+    await expect(healthy).toHaveAttribute('data-lamp-state', 'on');
   } finally {
     await save(original.active);
     if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);

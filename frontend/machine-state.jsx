@@ -28,15 +28,61 @@ export function StateFields({ value = [], onChange }) {
   </fieldset>;
 }
 
+function BooleanTagField({ label, tag, tags, onChange }) {
+  return <label>{label}<select value={tag} onChange={event => onChange(event.target.value)}>
+    {!tags.some(item => item.name === tag) && <option value={tag}>{tag}</option>}
+    {tags.map(item => <option key={item.name}>{item.name}</option>)}
+  </select></label>;
+}
+
+export function StackLightFields({ value = [], onChange, catalog }) {
+  const tags = catalog.tags.filter(tag => tag.type === 'boolean');
+  const nextTag = tags.find(tag => !value.some(lamp => lamp.tag === tag.name)) || tags[0];
+  const edit = (index, key, next) => onChange(value.map((lamp, i) => i === index ? { ...lamp, [key]: next } : lamp));
+  return <fieldset className="chart-fields"><legend>Stack light lamps</legend>
+    {value.map((lamp, index) => <fieldset key={index}><legend>Lamp {index + 1}</legend>
+      <BooleanTagField label="Lamp tag" tag={lamp.tag} tags={tags} onChange={tag => edit(index, 'tag', tag)} />
+      <label>Lamp label<input maxLength={100} value={lamp.label}
+        onChange={event => edit(index, 'label', event.target.value)} /></label>
+      <label>Active when<select value={String(lamp.active_when)}
+        onChange={event => edit(index, 'active_when', event.target.value === 'true')}>
+        <option value="true">Tag is true</option><option value="false">Tag is false</option>
+      </select></label>
+      <label>Active color<input type="color" value={lamp.color}
+        onChange={event => edit(index, 'color', event.target.value)} /></label>
+      <button type="button" disabled={value.length <= 1} onClick={() => onChange(value.filter((_, i) => i !== index))}>Remove lamp</button>
+    </fieldset>)}
+    <button type="button" disabled={value.length >= 6 || !nextTag} onClick={() => onChange([
+      ...value, { tag: nextTag.name, label: nextTag.name, active_when: true, color: '#555555' },
+    ])}>Add lamp</button>
+  </fieldset>;
+}
+
+export function StackLight({ id, label, lamps = [], orientation = 'vertical' }) {
+  const live = useContext(Live);
+  const { text, ui } = useLocalization();
+  return <article className="hmi-control" data-control="stack_light">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    <ul className={`hmi-stack-light ${orientation}`}>
+      {lamps.map((lamp, index) => {
+        const sample = tagValue(live, lamp.tag, 'boolean');
+        const state = !sample.valid ? 'unavailable' : sample.value === lamp.active_when ? 'on' : 'off';
+        return <li key={index} data-lamp-state={state}>
+          <span className="stack-lamp" style={{ '--lamp-color': lamp.color }} aria-hidden="true" />
+          <span className="stack-lamp-label">{text(`control.${id}.lamp.${index}`, lamp.label)}</span>
+          {sample.valid ? <strong>{ui(state)}</strong> : <Quality problem={sample.problem} tag={lamp.tag} />}
+        </li>;
+      })}
+    </ul>
+  </article>;
+}
+
 export function PermissiveFields({ value = [], onChange, catalog }) {
   const tags = catalog.tags.filter(tag => tag.type === 'boolean');
   const edit = (index, key, next) => onChange(value.map((row, i) => i === index ? { ...row, [key]: next } : row));
   return <fieldset className="chart-fields"><legend>Permissive checks</legend>
     {value.map((row, index) => <fieldset key={index}><legend>Check {index + 1}</legend>
-      <label>Check tag<select value={row.tag} onChange={event => edit(index, 'tag', event.target.value)}>
-        {!tags.some(tag => tag.name === row.tag) && <option value={row.tag}>{row.tag}</option>}
-        {tags.map(tag => <option key={tag.name}>{tag.name}</option>)}
-      </select></label>
+      <BooleanTagField label="Check tag" tag={row.tag} tags={tags} onChange={tag => edit(index, 'tag', tag)} />
       <label>Check label<input maxLength={100} value={row.label} onChange={event => edit(index, 'label', event.target.value)} /></label>
       <label>Ready when<select value={String(row.expected)} onChange={event => edit(index, 'expected', event.target.value === 'true')}>
         <option value="true">Tag is true</option><option value="false">Tag is false</option>

@@ -18,6 +18,7 @@ function size(type) {
   if (type === 'RadialGauge') return { width: 176, height: 160 };
   if (type === 'DateTimeDisplay') return { width: 208, height: 56 };
   if (type === 'DurationDisplay') return { width: 144, height: 56 };
+  if (type === 'StackLight') return { width: 160, height: 128 };
   if (type === 'Sparkline') return { width: 176, height: 104 };
   if (type === 'ScreenSymbol') return { width: 48, height: 48 };
   if (type === 'Trend') return { width: 480, height: 320 };

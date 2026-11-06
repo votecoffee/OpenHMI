@@ -34,6 +34,7 @@ export function ProjectSettings({ tab, settings, controls, title, catalog, onCha
       ...(control.kind === 'indicator' ? [[key + '.on_text', control.on_text || 'ON'], [key + '.off_text', control.off_text || 'OFF']] : []),
       ...(control.states || []).map(state => [`${key}.state.${state.value}`, state.label]),
       ...(control.options || []).map((option, index) => [`${key}.choice.${index}`, option.label]),
+      ...(control.lamps || []).map((lamp, index) => [`${key}.lamp.${index}`, lamp.label]),
       ...(control.checks || []).map((check, index) => [`${key}.check.${index}`, check.label]),
       ...(Array.isArray(control.series) ? control.series.flatMap((series, index) => [
         [`${key}.series.${index}.label`, series.label || series.tag || `${series.x_tag} / ${series.y_tag}`],

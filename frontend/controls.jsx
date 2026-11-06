@@ -10,7 +10,7 @@ import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.
 import { WebBrowser } from './web-browser.jsx';
 import { DateTimeLimit, EditControl, formatUtcEpoch, MAX_UTC_EPOCH } from './edit-control.jsx';
 import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
-import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
+import { MultiState, ModeSelector, PermissiveList, StackLight, StackLightFields, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Sparkline, Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
 import { ChartFields, GaugeGraphic, PieChart, ProcessChart, TankGraphic, XYChart, XYFields, chartSeries } from './charts.jsx';
@@ -405,7 +405,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -454,6 +454,17 @@ export function createConfig(catalog) {
       }, defaultProps: { label: 'Machine mode', tag: catalog.tags.find(requestedTag)?.name || '', confirmed_tag: '',
         states: [{ ...defaultStates[0], label: 'Manual' }, { ...defaultStates[1], label: 'Auto' }],
         presentation: 'dropdown', security_groups: [] }, render: ModeSelector },
+      StackLight: { label: 'Stack light', fields: {
+        label: labelField,
+        orientation: { type: 'select', label: 'Orientation', options: [
+          { label: 'Vertical', value: 'vertical' }, { label: 'Horizontal', value: 'horizontal' },
+        ] },
+        lamps: { type: 'custom', render: ({ value, onChange }) =>
+          <StackLightFields value={value} onChange={onChange} catalog={catalog} /> },
+      }, defaultProps: { label: 'Machine signals', orientation: 'vertical', lamps: [
+        { tag: 'ProcessAlarm', label: 'Fault', active_when: true, color: '#b3272a' },
+        { tag: 'MotorRunning', label: 'Running', active_when: true, color: '#36744b' },
+      ] }, render: props => <StackLight {...props} /> },
       PermissiveList: { label: 'Permissive / interlock list', fields: {
         label: labelField, checks: { type: 'custom', render: ({ value, onChange }) =>
           <PermissiveFields value={value} onChange={onChange} catalog={catalog} /> },
@@ -589,8 +600,10 @@ function FaceplateInstance({ id, label, template, root_tag, puck, config, enable
       'minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag', 'refresh_tag', 'confirmed_tag']) {
       if (resolved[field]?.startsWith('$.')) resolved[field] = root_tag + resolved[field].slice(1);
     }
-    if (resolved.checks) resolved.checks = resolved.checks.map(check =>
-      check.tag.startsWith('$.') ? { ...check, tag: root_tag + check.tag.slice(1) } : check);
+    for (const field of ['checks', 'lamps']) {
+      if (resolved[field]) resolved[field] = resolved[field].map(row =>
+        row.tag.startsWith('$.') ? { ...row, tag: root_tag + row.tag.slice(1) } : row);
+    }
     if (resolved.tags) resolved.pens = { tags: resolved.tags, series: resolved.series, root: root_tag };
     if (Array.isArray(resolved.series)) {
       const fields = resolved.kind === 'xy' ? ['x_tag', 'y_tag'] : ['tag'];

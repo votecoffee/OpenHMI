@@ -78,6 +78,19 @@ class PermissiveControl(ControlBase):
     checks: list[PermissiveRow] = Field(min_length=1, max_length=32)
 
 
+class StackLamp(StrictModel):
+    tag: str = Field(min_length=1, max_length=200)
+    label: str = Field(min_length=1, max_length=100)
+    active_when: bool = True
+    color: str = Field(default='#555555', pattern=r'^#[a-fA-F0-9]{6}$')
+
+
+class StackLightControl(ControlBase):
+    kind: Literal['stack_light']
+    lamps: list[StackLamp] = Field(min_length=1, max_length=6)
+    orientation: Literal['vertical', 'horizontal'] = 'vertical'
+
+
 class NumericControl(ControlBase):
     kind: Literal["numeric"]
     tag: str = Field(min_length=1, max_length=200)
@@ -448,7 +461,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | ProgressControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):
