@@ -111,6 +111,8 @@ export const uiText = {
   olderAlarms: 'Older alarms', newestAlarms: 'Newest alarms', olderEvents: 'Older events', newestEvents: 'Newest events', olderNotes: 'Older notes', newestNotes: 'Newest notes',
   alarmEventFilter: 'Event filter', allEvents: 'All events', exportAlarmCsv: 'Export alarm events CSV', alarmHistoryHint: 'History shares priority, search and time filters; occurrence state applies to the alarm list only.',
   alarmCountsHint: 'Global counts include all outstanding alarms, independent of these filters. Acknowledge all includes every unacknowledged occurrence.',
+  alarmOccurrencesUnavailable: 'Alarm occurrences unavailable.', alarmEventsUnavailable: 'Alarm event history unavailable.',
+  alarmLastPage: 'Showing the last page received at {time}.',
   alarmFilteredEmpty: 'No alarms match these filters', alarmReadError: 'Alarm review unavailable; retained rows may be outdated.', recordedUser: 'Recorded user',
   legacyIdentity: 'Not recorded (legacy)', acknowledgementNotRequired: 'Not required (automatic)', monitorEvent: 'Monitor',
   alarmAckPending: 'Acknowledged; activity finalization pending. Operation {id}', alarmNotePending: 'Note saved; activity finalization pending. Operation {id}',

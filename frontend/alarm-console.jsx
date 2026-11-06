@@ -22,6 +22,51 @@ function parameters(filters, before, history = false, event = '') {
   return query;
 }
 
+const positiveId = value => Number.isSafeInteger(value) && value > 0;
+const optionalText = value => value == null || typeof value === 'string';
+
+function hasAlarmMessage(item) {
+  return typeof item?.message === 'string' && (item.messages == null || (typeof item.messages === 'object'
+    && !Array.isArray(item.messages) && Object.values(item.messages).every(message => typeof message === 'string')));
+}
+
+function isOccurrence(item) {
+  return hasAlarmMessage(item) && positiveId(item.occurrence_id) && [1, 2, 3, 4].includes(item.priority)
+    && typeof item.active === 'boolean' && typeof item.raised_at === 'string'
+    && [item.acknowledged_at, item.acknowledged_by, item.retired_at].every(optionalText)
+    && (item.shelf == null || typeof item.shelf.expires_at === 'string');
+}
+
+function isAlarmEvent(item) {
+  return positiveId(item?.id) && typeof item.timestamp === 'string' && typeof item.event === 'string'
+    && typeof item.alarm_id === 'string' && (item.definition === null || hasAlarmMessage(item.definition))
+    && [item.comment, item.actor, item.provider].every(optionalText);
+}
+
+function useAlarmPage(endpoint, isItem, generation) {
+  const [response, setResponse] = useState(null);
+  useEffect(() => {
+    let stopped = false, timer;
+    async function refresh() {
+      try {
+        const page = await api(endpoint);
+        if (!Array.isArray(page?.items) || !page.items.every(isItem) || typeof page.has_more !== 'boolean'
+          || (page.has_more ? !positiveId(page.next_before_id) : page.next_before_id !== null)) {
+          throw new Error('Invalid alarm page response');
+        }
+        if (!stopped) setResponse({ endpoint, page, receivedAt: new Date() });
+      } catch (problem) {
+        const denied = [401, 403].includes(problem.status);
+        if (!stopped) setResponse(previous => ({ ...(!denied && previous?.endpoint === endpoint ? previous : { endpoint }),
+          error: problem.message }));
+      }
+      if (!stopped) timer = setTimeout(refresh, 1000);
+    }
+    refresh(); return () => { stopped = true; clearTimeout(timer); };
+  }, [endpoint, isItem, generation]);
+  return response?.endpoint === endpoint ? response : {};
+}
+
 export function AlarmConsole() {
   const live = useContext(Live);
   const { session } = useContext(SecurityContext) || {};
@@ -33,7 +78,6 @@ export function AlarmConsole() {
   const [feedback, setFeedback] = useState(''), [busy, setBusy] = useState(false);
   const [filters, setFilters] = useState(blankFilters), [applied, setApplied] = useState(blankFilters);
   const [before, setBefore] = useState(null), [eventBefore, setEventBefore] = useState(null), [eventFilter, setEventFilter] = useState('');
-  const [rows, setRows] = useState(null), [history, setHistory] = useState(null), [error, setError] = useState('');
   const [selected, setSelected] = useState([]), [comment, setComment] = useState('');
   const [identifier, setIdentifier] = useState(linkedOccurrence), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState('');
   const detailHeading = useRef(null);
@@ -46,17 +90,14 @@ export function AlarmConsole() {
   const monitorAvailable = !monitorProblem;
   const unavailable = monitorAvailable ? unavailableAlarmTriggers(live) : [];
   const waiting = monitorAvailable && alarmEvaluationPending(live);
+  const { page: rows, error, receivedAt: rowsReceivedAt } = useAlarmPage(
+    `/api/alarms/occurrences?${parameters(applied, before)}`, isOccurrence, generation);
+  const { page: history, error: historyError, receivedAt: historyReceivedAt } = useAlarmPage(
+    `/api/alarms/events?${parameters(applied, eventBefore, true, eventFilter)}`, isAlarmEvent, generation);
   useEffect(() => {
-    let stopped = false, timer;
-    async function refresh() {
-      try {
-        const [occurrences, events] = await Promise.all([api(`/api/alarms/occurrences?${parameters(applied, before)}`), api(`/api/alarms/events?${parameters(applied, eventBefore, true, eventFilter)}`)]);
-        if (!stopped) { setRows(occurrences); setHistory(events); setError(''); setSelected(previous => previous.filter(id => occurrences.items.some(item => item.occurrence_id === id && !item.acknowledged_at))); }
-      } catch (problem) { if (!stopped) setError(problem.message); }
-      if (!stopped) timer = setTimeout(refresh, 1000);
-    }
-    refresh(); return () => { stopped = true; clearTimeout(timer); };
-  }, [applied, before, eventBefore, eventFilter, generation]);
+    setSelected(previous => previous.length
+      ? previous.filter(id => rows?.items.some(item => item.occurrence_id === id && !item.acknowledged_at)) : previous);
+  }, [rows]);
   useEffect(() => {
     if (!identifier) return;
     let stopped = false, timer;
@@ -125,10 +166,11 @@ export function AlarmConsole() {
       {['start', 'end'].map(field => <label key={field}>{ui(field === 'start' ? 'alarmStart' : 'alarmEnd')}<input aria-label={ui(field === 'start' ? 'alarmStart' : 'alarmEnd')} type="datetime-local" value={filters[field]} onChange={event => setFilters({ ...filters, [field]: event.target.value })} /></label>)}
       <button>{ui('filterAlarms')}</button>
     </form>
-    {error && <p role="alert">{ui('alarmReadError')} {error}</p>}
+    {error && <p role="alert">{ui('alarmOccurrencesUnavailable')} {error}
+      {rows && <> {ui('alarmLastPage', { time: timestamp(rowsReceivedAt) })}</>}</p>}
     <div className="alarm-actions"><label>{ui('acknowledgementComment')}<input aria-label={ui('acknowledgementComment')} value={comment} maxLength={1000} onChange={event => setComment(event.target.value)} /></label>
       <button disabled={busy || !!error || !canAcknowledge || !rows?.items.some(item => !item.acknowledged_at)} onClick={() => setSelected(rows.items.filter(item => !item.acknowledged_at).map(item => item.occurrence_id))}>{ui('selectAlarmPage')}</button>
-      <span>{ui('selectedCount', { count: selected.length })}</span><button disabled={busy || !!error || !canAcknowledge || !selected.length} onClick={() => acknowledge(null, true)}>{ui('acknowledgeSelected')}</button>
+      <span>{ui('selectedCount', { count: selected.length })}</span><button disabled={busy || !!error || !canAcknowledge || !rows || !selected.length} onClick={() => acknowledge(null, true)}>{ui('acknowledgeSelected')}</button>
       <button disabled={busy || !!error || !monitorAvailable || !canAcknowledge || !alarms.unacknowledged_count} onClick={() => acknowledge(null)}>{ui('acknowledgeAll')}</button></div>
     <p role="status" aria-label="Alarm operation">{feedback}</p>
     <table className="alarm-occurrences"><thead><tr><th /><th>{ui('priority')}</th><th>{ui('message')}</th><th>{ui('status')}</th><th>{ui('raised')}</th><th /></tr></thead>
@@ -139,7 +181,7 @@ export function AlarmConsole() {
         <td><button disabled={busy || !!error || !canAcknowledge || !!alarm.acknowledged_at} onClick={() => acknowledge(alarm.occurrence_id)} aria-label={`${ui('acknowledge')} ${alarmMessage(alarm, language)}`}>{ui('acknowledge')}</button><button aria-label={ui('inspectAlarm', { id: alarm.occurrence_id })} onClick={() => inspect(alarm.occurrence_id)}>{ui('alarmDetails')}</button></td></tr>)}</tbody></table>
     {rows && !rows.items.length && <p>{applied.state === 'outstanding' && !applied.search && applied.priority === '0' && !applied.start && !applied.end && applied.shelving === 'unshelved' ? ui(!monitorAvailable || waiting || unavailable.length ? 'noRecordedAlarmsInView'
       : alarms.shelved_occurrence_count ? 'noUnshelvedAlarms' : 'noOutstanding') : ui('alarmFilteredEmpty')}</p>}
-    <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
+    <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!!error || !rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
     <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />
     {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2 ref={detailHeading} tabIndex={-1}>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
       {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {triggerProblem
@@ -155,9 +197,11 @@ export function AlarmConsole() {
       </>}
     </section>}
     <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{['active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note', 'shelved', 'shelf_restored', 'shelf_expired', 'shelf_invalidated'].map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={`/api/alarms/events.csv?${parameters(applied, null, true, eventFilter)}`}>{ui('exportAlarmCsv')}</a></div>
+    {historyError && <p role="alert">{ui('alarmEventsUnavailable')} {historyError}
+      {history && <> {ui('alarmLastPage', { time: timestamp(historyReceivedAt) })}</>}</p>}
     <table className="alarm-events"><thead><tr><th>{ui('time')}</th><th>{ui('event')}</th><th>{ui('message')}</th><th>{ui('recordedUser')}</th></tr></thead><tbody>{history?.items.map(item => <tr key={item.id}>
       <td>{timestamp(item.timestamp)}</td><td>{ui(item.event)}</td><td>{item.definition ? alarmMessage(item.definition, language) : item.alarm_id}{item.comment && <p className="alarm-guidance">{item.comment}</p>}</td><td>{item.actor || ui('legacyIdentity')} {item.provider}</td>
     </tr>)}</tbody></table>{history && !history.items.length && <p>{ui('noHistory')}</p>}
-    <button onClick={() => setEventBefore(null)}>{ui('newestEvents')}</button><button disabled={!history?.has_more} onClick={() => setEventBefore(history.next_before_id)}>{ui('olderEvents')}</button>
+    <button onClick={() => setEventBefore(null)}>{ui('newestEvents')}</button><button disabled={!!historyError || !history?.has_more} onClick={() => setEventBefore(history.next_before_id)}>{ui('olderEvents')}</button>
   </section>;
 }

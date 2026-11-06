@@ -39,6 +39,11 @@ records are labelled as legacy rather than assigned an invented user.
 
 ## Details, notes and history
 
+The occurrence list and event history refresh independently. If either page
+becomes unavailable, the console labels its last received results for the
+current filters. Occurrence-dependent acknowledgements pause when the
+occurrence list is unavailable. Access denial clears retained results.
+
 Select the alarm message in the runtime banner to open the details for that
 occurrence directly. Focus moves to the details heading when the data loads.
 If a trigger cannot be evaluated, the banner links to the affected definitions
