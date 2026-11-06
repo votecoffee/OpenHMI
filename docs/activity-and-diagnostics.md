@@ -102,7 +102,9 @@ for that endpoint starts. A delayed response leaves the other status updates
 and their recovery indicators running. An invalid tag status response uses the
 same communication-loss state as a failed tag request. Malformed quality for
 an individual sample shows bad data for that binding while other bindings
-remain available.
+remain available. If the applied project response has an invalid revision,
+project identifier or layout structure, the browser warns that screen updates
+are unavailable and retains the open layout until a valid response arrives.
 
 Tag rows show logical source/type, quality, observation timestamp, age and error.
 A tag-level read error or malformed result in a known batch position marks

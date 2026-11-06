@@ -183,6 +183,41 @@ test('invalid tag replies fail closed and recover without reloading', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('invalid applied project replies preserve the open layout until a valid revision arrives', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const original = await (await page.request.get('/api/project/active')).json();
+  const updated = { ...original, revision: original.revision + 1,
+    project: { ...original.project, title: 'Updated layout after recovery' } };
+  let status = original;
+  let level = 42;
+  await page.route('**/api/project/active', route => route.fulfill({ body: JSON.stringify(status), contentType: 'application/json' }));
+  await page.route('**/api/tags', route => route.fulfill({ json: { values: { TankLevel: level } } }));
+  await page.goto('/runtime');
+  const oldRevision = page.getByText(`Live screen / revision ${original.revision}`, { exact: true });
+  const oldTitle = page.getByRole('heading', { name: original.project.title, exact: true });
+  const warning = page.getByText('Screen updates unavailable. Showing the last applied layout.');
+  const numeric = page.locator('[data-control="numeric"]');
+  await expect(numeric).toContainText('42.0');
+  for (const invalid of [null, {}, { ...original, project_instance: 'damaged' },
+    { ...updated, project: { ...updated.project, controls: [null] } },
+    { ...updated, project: { ...updated.project, screens: [null] } },
+    { ...updated, project: { ...updated.project, layout: { boxes: {} } } }]) {
+    status = invalid;
+    await expect(warning).toBeVisible();
+    await expect(oldRevision).toBeVisible();
+    await expect(oldTitle).toBeVisible();
+    level += 1;
+    await expect(numeric).toContainText(level.toFixed(1));
+    status = original;
+    await expect(warning).toBeHidden();
+  }
+  status = updated;
+  await expect(page.getByRole('heading', { name: updated.project.title, exact: true })).toBeVisible();
+  await expect(page.getByText(`Live screen / revision ${updated.revision}`, { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('a stalled recipe status request does not delay alarms, layout or identity', async ({ page }) => {
   let releaseRecipe;
   const recipePending = new Promise(resolve => { releaseRecipe = resolve; });
