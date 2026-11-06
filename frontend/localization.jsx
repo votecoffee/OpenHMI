@@ -25,6 +25,8 @@ export const uiText = {
   trendAutoSource: 'Latest capture (or historian)', trendHistorySource: 'Continuous historian',
   trendCaptureOption: '#{id} {time}', trendRun: 'Run trend', trendStop: 'Stop trend',
   trendRecording: 'Recording #{id}', trendArmed: 'Armed for start trigger', trendStopped: 'Stopped',
+  trendRecordingUnavailable: 'Recording status unavailable', trendRecordingWaiting: 'Waiting for recording status',
+  trendLastRecordingStatus: 'Showing last received recording status',
   trendRetention: 'Capture #{id} · {retained} / {max} samples retained', trendRolledOff: '{count} rolled off',
   trendCapturePosition: 'Capture position', trendExportCapture: 'Export entire capture CSV',
   trendDeleteCapture: 'Delete saved capture', trendConfirmDelete: 'Confirm delete capture',

@@ -157,6 +157,11 @@ the new window arrives. Export is limited to 20,000 records per requested tag.
 
 ### Saved trend captures
 
+If recording status is unavailable, the trend labels any retained capture
+information and disables Run, Stop and Delete until a valid status arrives.
+Previously listed captures remain available to inspect and export during a
+transient status failure, subject to their own history and export responses.
+
 Set the default viewing window in the designer. In runtime, choose a preset
 such as **10 s** or **1 min**, or enter a custom window of 1 to 604,800 seconds.
 Hover over a trace to align the cursor across all lanes. Tap a trace or use

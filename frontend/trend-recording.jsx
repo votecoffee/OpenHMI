@@ -34,54 +34,79 @@ export function TrendRecordingFields({ value, onChange, catalog }) {
   </fieldset>;
 }
 
+function isCaptureStatus(status) {
+  const epoch = value => Number.isFinite(value) && Math.abs(value) <= 8.64e12;
+  const optionalEpoch = value => value === null || epoch(value);
+  const count = value => Number.isSafeInteger(value) && value >= 0;
+  return typeof status?.enabled === 'boolean' && (status.error == null || typeof status.error === 'string')
+    && Array.isArray(status.captures) && status.captures.every(item => count(item?.id) && item.id > 0
+      && epoch(item.started) && optionalEpoch(item.stopped) && optionalEpoch(item.first) && optionalEpoch(item.last)
+      && (item.reason == null || typeof item.reason === 'string')
+      && [item.retained, item.max_samples, item.rolled_off].every(count)
+      && Array.isArray(item.series) && item.series.every(pen => typeof pen?.tag === 'string'
+        && ['number', 'boolean'].includes(pen.type)
+        && (pen.decimals == null || (count(pen.decimals) && pen.decimals <= 8))
+        && (pen.minimum == null || Number.isFinite(pen.minimum)) && (pen.maximum == null || Number.isFinite(pen.maximum))));
+}
+
 export function useTrendCaptures(id, editing, recording) {
-  const [status, setStatus] = useState(null);
+  const [response, setResponse] = useState(null);
   const [error, setError] = useState('');
-  const [pollError, setPollError] = useState('');
   const [selection, setSelection] = useState('auto');
   const [busy, setBusy] = useState(false);
   const url = '/api/trends/' + encodeURIComponent(id);
+  const current = response?.url === url ? response : null;
+  const status = current?.status;
+  const available = current?.available === true;
   useEffect(() => {
-    if (editing) return;
+    if (editing || busy) return;
     let stopped = false, timer;
     async function poll() {
+      let retry = recording;
       try {
         const next = await api(url);
-        if (!stopped) { setStatus(next); setPollError(''); }
+        if (!isCaptureStatus(next)) throw new Error('Invalid recording status response');
+        if (!stopped) setResponse({ url, status: next, available: true });
       } catch (problem) {
-        if (!stopped) setPollError(problem.message);
+        const discard = [401, 403, 404].includes(problem.status);
+        retry = true;
+        if (!stopped) setResponse(previous => ({ url, available: false,
+          status: !discard && previous?.url === url ? previous.status : null }));
       }
-      if (!stopped && recording) timer = setTimeout(poll, 1000);
+      if (!stopped && retry) timer = setTimeout(poll, 1000);
     }
     poll();
     return () => { stopped = true; clearTimeout(timer); };
-  }, [url, editing, recording]);
+  }, [url, editing, recording, busy]);
 
   const captures = status?.captures ?? [];
   const running = captures.find(item => item.stopped === null);
   const capture = selection === 'auto' ? running ?? captures[0] : captures.find(item => String(item.id) === selection);
 
   async function command(action, captureId) {
+    if (!available || busy) return;
     setBusy(true);
     try {
       await api(url, json('POST', { action, capture_id: captureId }));
-      setStatus(await api(url));
       if (action === 'start' || action === 'delete') setSelection('auto');
       setError('');
     } catch (problem) {
       setError(problem.message);
     } finally {
+      setResponse(previous => previous?.url === url ? { ...previous, available: null } : previous);
       setBusy(false);
     }
   }
-  return { enabled: status?.enabled, captures, running, capture, selection, setSelection, busy, command,
-    error: error || pollError || status?.error };
+  return { enabled: status?.enabled ?? recording, captures, running, capture, selection, setSelection, busy, command,
+    available, unavailable: current?.available === false, retainedStatus: !!status, error: error || status?.error };
 }
 
 export function CaptureTools({ state, recording, setEndTime, endTime }) {
   const { session } = useContext(SecurityContext) ?? {};
   const { language, ui } = useLocalization();
-  const { enabled, captures, running, capture, selection, setSelection, command, busy, error } = state;
+  const { enabled, captures, running, capture, selection, setSelection, command, busy, error,
+    available, unavailable, retainedStatus } = state;
+  const blocked = busy || !available;
   const [confirm, setConfirm] = useState(null);
   if (!recording && !captures.length) return null;
   const canOperate = allowed(session, 'runtime.operate');
@@ -102,12 +127,14 @@ export function CaptureTools({ state, recording, setEndTime, endTime }) {
         <option value="history">{ui('trendHistorySource')}</option>
         {captures.map(item => <option key={item.id} value={item.id}>{ui('trendCaptureOption', { id: item.id, time: captureDate(item.started) })}</option>)}
       </select></label>
-      {enabled && <button type="button" disabled={busy || !!running || !canOperate}
+      {enabled && <button type="button" disabled={blocked || !!running || !canOperate}
         onClick={() => { setEndTime(null); command('start', 0); }}>{ui('trendRun')}</button>}
-      {enabled && <button type="button" disabled={busy || !running || !canOperate}
+      {enabled && <button type="button" disabled={blocked || !running || !canOperate}
         onClick={() => command('stop', running.id)}>{ui('trendStop')}</button>}
-      <span role="status">{running ? ui('trendRecording', { id: running.id })
-        : enabled && recording?.start_tag ? ui('trendArmed') : enabled ? ui('trendStopped') : ''}</span>
+      <span role="status">{unavailable ? <>{ui('trendRecordingUnavailable')}
+        {retainedStatus && <> · {ui('trendLastRecordingStatus')}</>}</>
+        : !available ? ui('trendRecordingWaiting') : running ? ui('trendRecording', { id: running.id })
+          : enabled && recording?.start_tag ? ui('trendArmed') : enabled ? ui('trendStopped') : ''}</span>
     </div>
     {capture && <>
       <span>{ui('trendRetention', { id: capture.id, retained: capture.retained, max: capture.max_samples })}
@@ -120,9 +147,9 @@ export function CaptureTools({ state, recording, setEndTime, endTime }) {
       </label>}
       <div className="trend-tools"><a href={`/api/trend-captures/${capture.id}/csv`}>{ui('trendExportCapture')}</a>
         {canDelete && capture.stopped !== null && (confirm === capture.id ? <>
-          <button type="button" disabled={busy} onClick={() => { command('delete', capture.id); setConfirm(null); setEndTime(null); }}>{ui('trendConfirmDelete')}</button>
+          <button type="button" disabled={blocked} onClick={() => { command('delete', capture.id); setConfirm(null); setEndTime(null); }}>{ui('trendConfirmDelete')}</button>
           <button type="button" onClick={() => setConfirm(null)}>{ui('cancelEntry')}</button>
-        </> : <button type="button" disabled={busy} onClick={() => setConfirm(capture.id)}>{ui('trendDeleteCapture')}</button>)}
+        </> : <button type="button" disabled={blocked} onClick={() => setConfirm(capture.id)}>{ui('trendDeleteCapture')}</button>)}
       </div>
     </>}
     {error && <span role="alert" className="hmi-quality">{error}</span>}
