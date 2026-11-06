@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { uploadProjectImage } from './api.mjs';
+import { ProjectImagePicker, projectImageName, projectImagePath } from './image-picker.jsx';
 import { useLocalization } from './localization.jsx';
 import './canvas.css';
 
@@ -72,7 +73,7 @@ const boxStyle = box => ({ left: box.x, top: box.y, width: box.width, height: bo
 
 function Decoration({ object }) {
   return object.kind === 'image'
-    ? <img className="canvas-decoration-art" src={'/api/canvas-images/' + object.image} alt="" draggable={false} />
+    ? <img className="canvas-decoration-art" src={projectImagePath(object.image)} alt="" draggable={false} />
     : <span className={`canvas-decoration-art canvas-decoration-${object.kind}`} style={{ backgroundColor: object.fill }} aria-hidden="true" />;
 }
 
@@ -127,7 +128,7 @@ export function CanvasSurface({ data, config, editor }) {
       onLostPointerCapture={editor?.cancelMarquee}
       onDragOver={editing ? event => event.preventDefault() : undefined}
       onDrop={editor?.drop}>
-      {layout.background && <img className="canvas-background" src={'/api/canvas-images/' + layout.background} alt="" draggable={false} />}
+      {layout.background && <img className="canvas-background" src={projectImagePath(layout.background)} alt="" draggable={false} />}
       <div className="canvas-background-objects" aria-hidden="true">
         {decorationEntries(layout).filter(([, object]) => object.locked).sort((a, b) => a[1].z - b[1].z)
           .map(([key, object]) => <div key={key} data-canvas-object={key} data-background-locked=""
@@ -298,6 +299,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
   }
 
   function canvasShortcut(event) {
+    if (event.target.closest('dialog')) return;
     if (event.key === 'Escape' && (panMode || panDrag.current)) {
       event.preventDefault();
       finishPan();
@@ -577,6 +579,21 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
     select([]);
   }
 
+  function applyCanvasImage(identifier, label, asObject) {
+    if (!latest.current.canEdit) return;
+    if (asObject) addDecoration('image', label, identifier);
+    else {
+      const activeLayout = latest.current.data.root.props.layout;
+      if (activeLayout.background !== identifier) change(settings(activeLayout, 'background', identifier));
+    }
+  }
+
+  function chooseCanvasImage(identifier, label, asObject = false) {
+    pendingImage.current += 1;
+    applyCanvasImage(identifier, label, asObject);
+    setMessage('');
+  }
+
   async function background(file, asObject = false) {
     if (!file || !canEdit) return;
     const request = ++pendingImage.current;
@@ -584,10 +601,7 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
       setMessage('Uploading image...');
       const image = await uploadProjectImage(file);
       if (request !== pendingImage.current) return;
-      if (asObject) addDecoration('image', file.name.slice(0, 100) || 'Image', image.id);
-      else if (latest.current.data.root.props.layout.background !== image.id) {
-        change(settings(latest.current.data.root.props.layout, 'background', image.id));
-      }
+      applyCanvasImage(image.id, file.name.slice(0, 100) || 'Image', asObject);
       setMessage('');
     } catch (error) { if (request === pendingImage.current) setMessage(error.message); }
   }
@@ -725,7 +739,9 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
       <button type="button" aria-pressed={panMode} onClick={() => setPanMode(value => !value)}>Pan canvas</button>
       <label>Background image<input type="file" accept="image/png,image/jpeg,image/webp"
         onChange={event => { background(event.target.files[0]); event.target.value = ''; }} /></label>
-      {layout.background && <button type="button" onClick={() => change(settings(layout, 'background', ''))}>Clear background</button>}
+      <ProjectImagePicker label="Choose background from project" disabled={!canEdit}
+        onSelect={asset => chooseCanvasImage(asset.id, projectImageName(asset))} />
+      {layout.background && <button type="button" onClick={() => chooseCanvasImage('')}>Clear background</button>}
     </fieldset>
     {message && <p role="status">{message}</p>}
     <div className="canvas-workbench">
@@ -740,6 +756,8 @@ export function CanvasEditor({ data, config, onChange, canEdit, clipboard, onCop
         <fieldset disabled={!canEdit || !canAddDecoration}><legend>Images and shapes</legend>
           <label>Image object<input type="file" accept="image/png,image/jpeg,image/webp"
             onChange={event => { background(event.target.files[0], true); event.target.value = ''; }} /></label>
+          <ProjectImagePicker label="Choose image object from project" disabled={!canEdit || !canAddDecoration}
+            onSelect={asset => chooseCanvasImage(asset.id, projectImageName(asset), true)} />
           <button type="button" onClick={() => addDecoration('rectangle', 'Rectangle')}>Add rectangle</button>
           <button type="button" onClick={() => addDecoration('ellipse', 'Ellipse')}>Add ellipse</button>
         </fieldset>

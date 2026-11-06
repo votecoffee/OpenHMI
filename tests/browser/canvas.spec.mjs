@@ -249,7 +249,7 @@ test('state, position and rotation images follow tags and quality', async ({ pag
   }
 });
 
-test('project image picker reuses assets in grid screens and faceplates', async ({ page }) => {
+test('project image picker reuses assets in controls and freeform layers', async ({ page }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   try {
@@ -285,7 +285,8 @@ test('project image picker reuses assets in grid screens and faceplates', async 
       if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/canvas-images') uploads += 1;
     });
     await upload.getByRole('button', { name: 'Choose from project', exact: true }).click();
-    await upload.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: 'Project images', exact: true });
+    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
     expect(uploads).toBe(0);
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
@@ -300,6 +301,38 @@ test('project image picker reuses assets in grid screens and faceplates', async 
     const configured = active.controls.find(control => control.kind === 'image');
     expect(configured).toMatchObject({ image: id, fit: 'cover', show_label: false });
     expect(Object.hasOwn(configured, 'tag')).toBe(false);
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Enable freeform layout' }).click();
+    const canvas = page.getByLabel('Freeform canvas', { exact: true });
+    const background = page.getByRole('button', { name: 'Choose background from project', exact: true });
+    const pan = page.getByRole('button', { name: 'Pan canvas', exact: true });
+    await pan.click();
+    await background.click();
+    await expect(picker).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+    await expect(pan).toHaveAttribute('aria-pressed', 'true');
+    await expect(background).toBeFocused();
+    await pan.click();
+    await background.click();
+    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    await expect(background).toBeFocused();
+    await expect(canvas.locator('.canvas-background')).toHaveAttribute('src', '/api/canvas-images/' + id);
+
+    await page.getByRole('button', { name: 'Choose image object from project', exact: true }).click();
+    await picker.getByRole('button', { name: 'Use Equipment.png', exact: true }).click();
+    await expect(canvas.locator('.canvas-selected .canvas-decoration-art')).toHaveAttribute('src', '/api/canvas-images/' + id);
+    await page.getByRole('button', { name: 'Lock as background', exact: true }).click();
+    await expect(canvas.locator('[data-background-locked] .canvas-decoration-art')).toHaveAttribute('src', '/api/canvas-images/' + id);
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+    expect(uploads).toBe(0);
+
+    await page.goto('/runtime');
+    const runtime = page.getByLabel('Freeform screen', { exact: true });
+    await expect(runtime.locator('.canvas-background')).toHaveAttribute('src', '/api/canvas-images/' + id);
+    await expect(runtime.locator('[data-background-locked] img')).toHaveAttribute('src', '/api/canvas-images/' + id);
   } finally {
     await save(page, original.active);
     await save(page, original.draft, false);
