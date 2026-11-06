@@ -102,7 +102,7 @@ def add_alarm_routes(app, monitor, security, activity, driver, store):
             item = result['occurrence']
             # Cached quality/time only: viewing alarm details creates no scan lease or equipment read/write.
             sample = driver.sample_snapshot().get(item['tag'])
-            result['trigger'] = {key: sample.get(key) for key in ('quality', 'timestamp', 'age_seconds', 'error')} if sample else {'quality': 'unavailable', 'timestamp': None}
+            result['trigger'] = {key: sample.get(key) for key in ('quality', 'quality_reason', 'timestamp', 'age_seconds', 'error')} if sample else {'quality': 'unavailable', 'timestamp': None}
             target = screen_map(store.snapshot()['active']).get(item.get('related_screen'))
             result['related_screen'] = {'id': target['id'], 'title': target['title'], 'popup': target.get('popup', False)} if target else None
             return result

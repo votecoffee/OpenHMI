@@ -66,7 +66,7 @@ export const uiText = {
   plcHeld: 'PLC acquisition held', routeConnected: 'Connected', routeConnecting: 'Connecting',
   routeRetrying: 'Disconnected / retrying', routeUnknown: 'Status unavailable', routeHeld: 'Held', routeDisabled: 'Disabled',
   tagHeld: 'ACQUISITION HELD', tagDisabled: 'ROUTE DISABLED', tagPlcOffline: 'PLC COMM LOSS',
-  tagRecovering: 'WAITING FOR FRESH DATA', tagWaiting: 'WAITING FOR DATA', tagStale: 'STALE DATA',
+  tagRecovering: 'WAITING FOR FRESH DATA', tagWaiting: 'WAITING FOR DATA', tagStale: 'STALE DATA', tagUnavailable: 'DATA UNAVAILABLE', tagGood: 'Good data',
   cameraRefresh: 'Refresh camera', cameraOpenTab: 'Open camera in new tab',
   cameraDesigner: 'Configure the approved endpoint here. Open the live screen to view it.',
   cameraAddressBlocked: 'CAMERA ADDRESS MISSING OR BLOCKED',

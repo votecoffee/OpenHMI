@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './controls.jsx';
-import { Live } from './live-quality.jsx';
+import { Live, Quality, sampleQualityProblem } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
@@ -38,6 +38,7 @@ export function AlarmConsole() {
   const [identifier, setIdentifier] = useState(linkedOccurrence), [detail, setDetail] = useState(null), [detailError, setDetailError] = useState('');
   const detailHeading = useRef(null);
   const detailReady = Boolean(detail || detailError);
+  const triggerProblem = detail && sampleQualityProblem(detail.trigger);
   const [note, setNote] = useState(''), [notesBefore, setNotesBefore] = useState(null), [notes, setNotes] = useState(null);
   const [generation, setGeneration] = useState(0);
   const alarms = live.alarms || {};
@@ -126,7 +127,9 @@ export function AlarmConsole() {
     <button onClick={() => { setBefore(null); setSelected([]); }}>{ui('newestAlarms')}</button><button disabled={!rows?.has_more} onClick={() => { setBefore(rows.next_before_id); setSelected([]); }}>{ui('olderAlarms')}</button>
     <AlarmShelving reason={shelfReason} setReason={setShelfReason} duration={shelfDuration} setDuration={setShelfDuration} canShelve={canShelve} busy={busy} generation={generation} restore={changeShelf} />
     {identifier && <section className="alarm-detail" aria-label={ui('alarmDetails')}><h2 ref={detailHeading} tabIndex={-1}>{ui('alarmDetails')} #{identifier}</h2>{detailError && <p role="alert">{ui('alarmReadError')} {detailError}</p>}
-      {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {detail.trigger.quality} · {timestamp(detail.trigger.timestamp)} {detail.trigger.error}</p>
+      {detail && <><h3>{alarmMessage(detail.occurrence, language)}</h3><p>{ui('triggerQuality')}: {triggerProblem
+        ? <Quality tag={detail.occurrence.tag} problem={triggerProblem} sample={detail.trigger} />
+        : <>{ui('tagGood')} · {timestamp(detail.trigger.timestamp)}</>}</p>
         <p>{detail.occurrence.shelf ? `${ui('shelved')} · ${timestamp(detail.occurrence.shelf.expires_at)}` : ui('unshelved')}</p><button disabled={!canShelve || busy || !!detailError || !!detail.occurrence.shelf || !!detail.occurrence.retired_at || (!detail.occurrence.active && !!detail.occurrence.acknowledged_at) || !shelfReason.trim()} onClick={() => changeShelf()}>{ui('shelveAlarm')}</button>
         <h3>{ui('possibleCause')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'cause')}</p><h3>{ui('operatorResponse')}</h3><p className="alarm-guidance">{guidance(detail.occurrence, 'response')}</p>
         {detail.related_screen && <a href={`/runtime?screen=${encodeURIComponent(detail.related_screen.id)}`}>{ui('openRelatedScreen')}: {detail.related_screen.title}</a>}{!detail.related_screen && detail.occurrence.related_screen && <p>{ui('relatedScreenUnavailable')}</p>}

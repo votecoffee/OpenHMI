@@ -37,6 +37,23 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
     await expect(detail.getByText('Inspect pressure regulator', { exact: true })).toBeVisible();
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
+    await page.route('**/api/alarms/occurrences/*', async route => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.trigger = { quality: 'bad', quality_reason: 'disconnected', age_seconds: 4.5,
+        timestamp: '2026-01-01T12:00:00Z', error: 'Synthetic trigger route loss' };
+      await route.fulfill({ response, json: state });
+    });
+    const triggerBadge = detail.getByRole('button', { name: 'Inspect ProcessAlarm quality (PLC COMM LOSS)', exact: true });
+    await triggerBadge.press('Enter');
+    const trigger = page.getByRole('dialog', { name: 'Tag quality details', exact: true });
+    await expect(trigger).toContainText('Synthetic trigger route loss');
+    await expect(trigger).toContainText('4.5 s old');
+    await page.keyboard.press('Escape');
+    await expect(triggerBadge).toBeFocused();
+    await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
+    await page.unroute('**/api/alarms/occurrences/*');
+    await expect(detail.getByText(/Current trigger quality: Good data/)).toBeVisible();
     await page.getByLabel('Priority', { exact: true }).selectOption('1');
     await page.getByRole('button', { name: 'Apply alarm filters', exact: true }).click();
     await expect(page.locator('.alarm-occurrences tbody tr')).toHaveCount(1);

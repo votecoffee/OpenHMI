@@ -44,8 +44,10 @@ occurrence directly. Focus moves to the details heading when the data loads.
 
 **Alarm details** shows the captured cause and recovery steps, related-screen navigation,
 first acknowledgement and append-only operator notes. Trigger quality/time comes
-from the cached driver sample; opening details creates no additional PLC scan
-lease. Notes record the authenticated user/provider and an activity operation ID.
+from the cached driver sample. Open the quality badge to inspect the trigger
+tag, reason, sample age and source time when available. Opening details
+creates no additional PLC scan lease. Notes record the authenticated
+user/provider and an activity operation ID.
 The unsecured simulator is explicitly attributed as `unsecured-simulation`.
 
 The event table supports an event-type filter and separate paging. It shares

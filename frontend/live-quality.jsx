@@ -6,13 +6,17 @@ export const Live = createContext({ values: {}, connected: false });
 
 const problems = {
   held: 'tagHeld', disabled: 'tagDisabled', disconnected: 'tagPlcOffline',
-  recovering: 'tagRecovering', pending: 'tagWaiting', stale: 'tagStale',
+  recovering: 'tagRecovering', pending: 'tagWaiting', stale: 'tagStale', unavailable: 'tagUnavailable',
 };
+
+export function sampleQualityProblem(sample) {
+  return sample.quality === 'good' ? null : problems[sample.quality_reason || sample.quality] || 'badData';
+}
 
 export function tagQuality(live, tag) {
   if (!live.connected) return 'commLoss';
   const sample = live.samples?.[tag];
-  if (sample) return sample.quality === 'good' ? null : problems[sample.quality_reason || sample.quality] || 'badData';
+  if (sample) return sampleQualityProblem(sample);
   return Object.hasOwn(live.values, tag) ? null : 'badData';
 }
 
@@ -27,11 +31,11 @@ export function useValue(tag, type) {
   return tagValue(useContext(Live), tag, type);
 }
 
-export function Quality({ problem, tag, text }) {
+export function Quality({ problem, tag, text, sample: suppliedSample }) {
   const live = useContext(Live);
   const { language } = useLocalization() || { language: { code: 'en' } };
   const ui = useUi();
-  const sample = live.samples?.[tag];
+  const sample = suppliedSample ?? live.samples?.[tag];
   const [opener, setOpener] = useState(null);
   const age = sample?.age_seconds;
   const sourceTime = sample?.timestamp && new Date(sample.timestamp);

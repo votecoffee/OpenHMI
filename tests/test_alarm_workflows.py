@@ -36,6 +36,28 @@ class AlarmWorkflowTests(unittest.TestCase):
         saved = self.app.state.store.save(SaveRequest(expected_revision=state['draft_revision'], project=project))
         self.app.state.store.apply(RevisionRequest(expected_revision=saved['draft_revision']))
 
+    def test_detail_explains_cached_trigger_loss_without_returning_the_alarm(self):
+        identifier = self.raise_alarm()
+        driver = self.app.state.driver
+        sample = {'value': False, 'quality': 'bad', 'quality_reason': 'disconnected',
+                  'timestamp': '2026-01-01T12:00:00Z', 'age_seconds': 4.5, 'error': 'Synthetic route loss'}
+        with patch.object(driver, 'sample_snapshot', return_value={'ProcessAlarm': sample}), \
+                patch.object(driver, 'poll') as poll, patch.object(driver, 'write') as write:
+            self.monitor.sample()
+            response = self.client.get(f'/api/alarms/occurrences/{identifier}')
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertTrue(data['occurrence']['active'])
+            self.assertIsNone(data['occurrence']['returned_at'])
+            self.assertEqual(data['trigger'], {key: value for key, value in sample.items() if key != 'value'})
+            poll.assert_not_called()
+            write.assert_not_called()
+
+        self.monitor.sample()
+        recovered = self.client.get(f'/api/alarms/occurrences/{identifier}').json()
+        self.assertTrue(recovered['occurrence']['active'])
+        self.assertEqual(recovered['trigger']['quality'], 'good')
+
     def test_first_ack_identity_is_server_owned_and_idempotent_without_plc_write(self):
         identifier = self.raise_alarm()
         bootstrap(self.app)
