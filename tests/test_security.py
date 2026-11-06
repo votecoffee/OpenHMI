@@ -100,6 +100,60 @@ class SecurityTests(unittest.TestCase):
         self.client.post('/api/security/logout').raise_for_status()
         self.assertEqual(self.client.put(url, json=request).status_code, 401)
 
+    def test_palette_inputs_validate_tag_bindings_and_reject_unlisted_writes(self):
+        state = self.client.get('/api/project').json()
+        draft = state['draft']
+        draft['tags'] += [
+            {'name': 'Choice', 'type': 'integer', 'initial': 0, 'writable': True},
+            {'name': 'Flag', 'type': 'boolean', 'initial': False, 'writable': True},
+            {'name': 'Notes', 'type': 'string', 'initial': '', 'writable': True},
+        ]
+        dropdown = {'id': 'choice', 'kind': 'dropdown', 'tag': 'Choice', 'label': 'Choice',
+                    'options': [{'value': 0, 'label': 'Low'}, {'value': 1, 'label': 'High'}],
+                    'enabled_tag': 'Flag', 'security_groups': ['Administrators']}
+        draft['controls'] += [
+            dropdown, {'id': 'flag', 'kind': 'toggle_switch', 'tag': 'Flag', 'label': 'Flag'},
+            {'id': 'notes', 'kind': 'text_area', 'tag': 'Notes', 'label': 'Notes', 'max_length': 4},
+        ]
+
+        def save():
+            return self.client.put('/api/project/draft', json={'expected_revision': state['draft_revision'], 'project': draft})
+
+        dropdown['tag'] = 'Flag'
+        self.assertEqual(save().status_code, 422)
+        dropdown['tag'] = 'Choice'
+        draft['tags'][-3]['writable'] = False
+        self.assertEqual(save().status_code, 422)
+        draft['tags'][-3]['writable'] = True
+        saved = save()
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        revision = applied.json()['active_revision']
+
+        def write(control, value, expected=revision):
+            return self.client.put(f'/api/controls/{control}/value', json={'value': value, 'expected_revision': expected})
+
+        self.assertEqual(write('flag', True, None).status_code, 422)
+        self.assertEqual(write('flag', True, revision - 1).status_code, 409)
+        self.assertEqual(write('flag', 1).status_code, 422)
+        self.assertEqual(write('choice', 1).status_code, 423)
+        write('flag', True).raise_for_status()
+        for invalid in (True, 1.0, '1', 2):
+            self.assertEqual(write('choice', invalid).status_code, 422)
+        self.assertEqual(write('notes', 'AB\nCD').status_code, 422)
+        driver = self.app.state.driver
+        values = driver.snapshot()
+        values.pop('Choice')
+        with patch.object(driver, 'snapshot', return_value=values):
+            self.assertEqual(write('choice', 1).status_code, 409)
+        write('choice', 1).raise_for_status()
+        write('notes', 'A\n文').raise_for_status()
+        self.assertEqual(driver.read('Choice'), [1])
+        self.assertEqual(driver.read('Notes'), ['A\n文'])
+        self.client.post('/api/security/logout').raise_for_status()
+        self.assertEqual(write('choice', 0).status_code, 401)
+
     def controls(self):
         state = self.client.get('/api/project').json()
         project = state['draft']

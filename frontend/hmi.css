@@ -66,6 +66,16 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .quality-details dt { font-weight: bold; }
 .quality-details dd { margin: 0; overflow-wrap: anywhere; }
 .machine-state-value { display: inline-flex; gap: .4em; align-items: baseline; }
+.hmi-discrete-option { display: flex; align-items: center; gap: 7px; min-height: 32px; cursor: pointer; }
+.hmi-radio-group { margin: 0; padding: 0; border: 0; }
+.hmi-discrete input { accent-color: #444; width: 18px; height: 18px; }
+.hmi-discrete input[role="switch"] { appearance: none; width: 34px; height: 18px; border-radius: 12px; border: 1px solid #555; background: #eee; }
+.hmi-discrete input[role="switch"]::before { content: ""; display: block; width: 12px; height: 12px; margin: 2px; border-radius: 50%; background: #555; }
+.hmi-discrete input[role="switch"]:checked { background: #555; }
+.hmi-discrete input[role="switch"]:checked::before { transform: translateX(15px); background: #fff; }
+.hmi-discrete input[role="switch"]:disabled { opacity: 0.5; }
+[data-control="text_area"] .hmi-value { white-space: pre-wrap; overflow-wrap: anywhere; }
+[data-control="text_area"] textarea { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; resize: vertical; }
 .machine-mode-options, .machine-mode-segments { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .machine-mode-segments [aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: -2px; }
 .machine-permissives { list-style: none; padding: 0; margin: 0; width: 100%; }

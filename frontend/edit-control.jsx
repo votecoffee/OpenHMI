@@ -6,7 +6,7 @@ import { TouchEntry } from './touch-entry.jsx';
 import { api, json } from './api.mjs';
 
 export function EditControl(props) {
-  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false } = props;
+  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false } = props;
   const live = useContext(Live), { session } = useContext(SecurityContext) || {}, { text: translate, ui } = useLocalization();
   const label = translate(`control.${id}.label`, props.label);
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [touch, setTouch] = useState(null);
@@ -62,7 +62,7 @@ export function EditControl(props) {
     finally { setBusy(false); }
   }
   async function submit(event) { event.preventDefault(); try { if (!text && !entry.trim()) throw new Error(ui('enterValue')); await save(text ? entry : Number(entry), draft?.revision ?? revision); } catch (error) { setMessage(error.message); } }
-  return <article className="hmi-control hmi-input security-protected" data-control={text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
+  return <article className="hmi-control hmi-input security-protected" data-control={multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
     {valid ? <strong className="hmi-value">{text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong> : <Quality problem={problem} tag={tag} />}
     <small>{limits.valid ? ui(text ? 'textLength' : 'numericRange', limits) : ui(limitProblem)}</small>
     {limitBindings.filter(state => !state.valid).map(({ field, source, labelKey, problem }) =>
@@ -70,12 +70,17 @@ export function EditControl(props) {
     {enabled && !enabled.valid && <Quality tag={enabled_tag} problem={enabled.problem}
       text={bindingProblem('editEnableBinding', enabled.problem)} />}
     {enabled?.valid && !bindingEnabled && <small>{ui('editEnableOff', { tag: enabled_tag })}</small>}
-    <form onSubmit={submit}><input aria-label={ui('newControlValue', { label })} type={text ? 'text' : 'number'} min={text ? undefined : low} max={text ? undefined : high} step="any" value={entry} onChange={event => {
-      const value = event.target.value;
-      setDraft(previous => value ? { value, revision: previous?.revision ?? revision } : null);
-    }} disabled={disabled} /><button disabled={disabled}>{ui('writeValue')}</button></form>
+    <form onSubmit={submit}>{React.createElement(multiline ? 'textarea' : 'input', {
+      'aria-label': ui('newControlValue', { label }),
+      ...(multiline ? { rows: 3 } : { type: text ? 'text' : 'number', min: text ? undefined : low, max: text ? undefined : high, step: 'any' }),
+      value: entry, disabled,
+      onChange: event => {
+        const value = event.target.value;
+        setDraft(previous => value ? { value, revision: previous?.revision ?? revision } : null);
+      },
+    })}<button disabled={disabled}>{ui('writeValue')}</button></form>
     <button disabled={disabled} onClick={() => setTouch({ revision, initial: draft?.revision === revision && entry ? entry : String(value) })}>{ui(text ? 'openTextKeyboard' : 'openNumericKeypad', { label })}</button>
     <span className="command-feedback">{message}</span>{!authorized && !puck?.isEditing && <SecurityLock label={label} permission="runtime.write" groups={security_groups} />}
-    {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
+    {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} multiline={multiline} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
   </article>;
 }

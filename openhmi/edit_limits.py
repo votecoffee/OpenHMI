@@ -5,7 +5,7 @@ LIMIT_TAGS = ('minimum_tag', 'maximum_tag', 'min_length_tag', 'max_length_tag')
 
 
 def edit_limits(control, values):
-    text = control['kind'] == 'text_input'
+    text = control['kind'] in ('text_input', 'text_area')
     fields = ('min_length', 'max_length') if text else ('minimum', 'maximum')
     result = []
     for field in fields:
@@ -22,7 +22,7 @@ def edit_limits(control, values):
 
 
 def validate_entry(control, value, limits):
-    if control['kind'] == 'text_input':
+    if control['kind'] in ('text_input', 'text_area'):
         if type(value) is not str or not limits[0] <= len(value) <= limits[1] or '\x00' in value:
             raise ValueError('Text length is outside the configured limits or contains a null character')
     elif type(value) not in (int, float) or not math.isfinite(value) or not limits[0] <= value <= limits[1]:

@@ -9,6 +9,7 @@ import { SecurityContext, allowed, SecurityLock, CurrentUser } from './security.
 
 import { WebBrowser } from './web-browser.jsx';
 import { EditControl } from './edit-control.jsx';
+import { ChoiceFields, DiscreteInput } from './discrete-input.jsx';
 import { MultiState, ModeSelector, PermissiveList, StateFields, PermissiveFields } from './machine-state.jsx';
 import { Trend, TrendFields } from './trend.jsx';
 import { TrendRecordingFields } from './trend-recording.jsx';
@@ -205,6 +206,7 @@ function ActionButton({ id, label, action, mode = 'python', command = '', target
 
 function NumericInput(props) { return <EditControl {...props} />; }
 function TextInput(props) { return <EditControl {...props} text />; }
+function TextArea(props) { return <EditControl {...props} text multiline />; }
 
 function SelectedRecipe({ id, label }) {
   const { text } = useLocalization();
@@ -290,6 +292,21 @@ export function createConfig(catalog) {
   const labelField = { type: 'text', label: 'Label' };
   const integerTag = tag => tag.integer && tag.unscaled !== false;
   const requestedTag = tag => integerTag(tag) && tag.writable;
+  const writableText = tag => tag.writable && tag.type === 'string';
+  const writableBoolean = tag => tag.writable && tag.type === 'boolean';
+  const writableChoice = tag => requestedTag(tag) || writableText(tag);
+  const discrete = (kind, label, predicate, choice = false) => {
+    const tag = catalog.tags.find(predicate);
+    const values = tag?.type === 'string' ? ['0', '1'] : [0, 1];
+    return {
+      label, fields: { label: labelField, tag: browserTag('Tag', 'Choose a writable tag', predicate),
+        security_groups: groupsField, ...(choice ? { options: { type: 'custom', render: ({ value, onChange }) =>
+          <ChoiceFields value={value} onChange={onChange} /> } } : {}) },
+      defaultProps: { label, tag: tag?.name || '', security_groups: [],
+        ...(choice ? { options: values.map((value, index) => ({ value, label: 'Choice ' + (index + 1) })) } : {}) },
+      render: props => <DiscreteInput {...props} kind={kind} />,
+    };
+  };
   const statesField = { type: 'custom', render: ({ value, onChange }) => <StateFields value={value} onChange={onChange} /> };
   const defaultStates = [
     { value: 0, label: 'Stopped', symbol: 'square', color: '#555555' },
@@ -297,6 +314,10 @@ export function createConfig(catalog) {
   ];
   const numericFields = { label: labelField, tag: tagField('number'), unit: { type: 'text', label: 'Units' },
     decimals: { type: 'select', label: 'Decimal places', options: [0, 1, 2, 3, 4].map(value => ({ label: String(value), value })) } };
+  const textFields = { label: labelField, tag: tagField('string'),
+    min_length: { type: 'number', label: 'Minimum length' }, max_length: { type: 'number', label: 'Maximum length' },
+    min_length_tag: limitTag('Minimum length from tag'), max_length_tag: limitTag('Maximum length from tag'), security_groups: groupsField };
+  const textDefaults = { label: 'Operator text', tag: 'OperatorText', min_length: 0, max_length: 82, security_groups: [] };
   const numericDefaults = { label: 'Tank level', tag: 'TankLevel', unit: '%', decimals: 1 };
   const scaleFields = { minimum: { type: 'number', label: 'Scale minimum' }, maximum: { type: 'number', label: 'Scale maximum' } };
   const analogFields = { ...numericFields, ...scaleFields,
@@ -307,6 +328,7 @@ export function createConfig(catalog) {
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const chartTypes = ['TankLevel', 'BarGraph', 'RadarChart'];
+  const inputTypes = ['NumericInput', 'TextInput', 'TextArea', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
       fields: { title: { type: 'text', label: 'Screen name' }, columns: { type: 'select', label: 'Columns',
@@ -315,7 +337,8 @@ export function createConfig(catalog) {
     },
     categories: {
       hmi: { title: 'High performance HMI', components: Object.values(controlTypes)
-        .filter(type => !chartTypes.includes(type) && (type !== 'Faceplate' || catalog.faceplates?.length)) },
+        .filter(type => !chartTypes.includes(type) && !inputTypes.includes(type) && (type !== 'Faceplate' || catalog.faceplates?.length)) },
+      inputs: { title: 'Inputs', components: inputTypes },
       charts: { title: 'Live charts', components: chartTypes },
     },
     components: {
@@ -361,7 +384,13 @@ export function createConfig(catalog) {
       CurrentUser: { label: 'Current login user', fields: { label: labelField }, defaultProps: { label: 'Current user' }, render: CurrentUser },
       TextDisplay: { label: 'Text display', fields: { label: labelField, tag: tagField('string') },
         defaultProps: { label: 'Status text', tag: 'OperatorText' }, render: TextDisplay },
-      TextInput: { label: 'Text input', fields: { label: labelField, tag: tagField('string'), min_length: { type: 'number', label: 'Minimum length' }, max_length: { type: 'number', label: 'Maximum length' }, min_length_tag: limitTag('Minimum length from tag'), max_length_tag: limitTag('Maximum length from tag'), security_groups: groupsField }, defaultProps: { label: 'Operator text', tag: 'OperatorText', min_length: 0, max_length: 82, security_groups: [] }, render: TextInput },
+      TextInput: { label: 'Text input', fields: textFields, defaultProps: textDefaults, render: TextInput },
+      TextArea: { label: 'Text area', fields: { ...textFields, tag: browserTag('Tag', 'Choose a writable text tag', writableText) },
+        defaultProps: { ...textDefaults, label: 'Operator notes', tag: catalog.tags.find(writableText)?.name || '' }, render: TextArea },
+      Dropdown: discrete('dropdown', 'Dropdown', writableChoice, true),
+      RadioGroup: discrete('radio_group', 'Radio group', writableChoice, true),
+      Checkbox: discrete('checkbox', 'Checkbox', writableBoolean),
+      ToggleSwitch: discrete('toggle_switch', 'Toggle switch', writableBoolean),
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },
       Indicator: {
@@ -399,7 +428,7 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === ActionButton;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === ActionButton;
     component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
       {renderer(props)}
     </Conditional>;

@@ -188,7 +188,7 @@ class RecipeSelectionControl(ControlBase):
 
 
 class TextInputControl(ControlBase):
-    kind: Literal['text_input']
+    kind: Literal['text_input', 'text_area']
     tag: str = Field(min_length=1, max_length=200)
     min_length: int = Field(default=0, ge=0, le=4096)
     max_length: int = Field(default=82, ge=0, le=4096)
@@ -201,6 +201,31 @@ class TextInputControl(ControlBase):
         if self.min_length > self.max_length:
             raise ValueError('Minimum text length must not exceed maximum text length')
         return self
+
+
+class ChoiceOption(StrictModel):
+    value: StateCode | Annotated[str, Field(max_length=4096, pattern=r'^[^\x00]*$')]
+    label: str = Field(min_length=1, max_length=100)
+
+
+class ChoiceInputControl(ControlBase):
+    kind: Literal['dropdown', 'radio_group']
+    tag: str = Field(min_length=1, max_length=200)
+    options: list[ChoiceOption] = Field(min_length=2, max_length=32)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode='after')
+    def unique_options(self):
+        values = {option.value for option in self.options}
+        if len(values) != len(self.options) or len({type(value) for value in values}) != 1:
+            raise ValueError('Choice values must be unique and all have the same type')
+        return self
+
+
+class BooleanInputControl(ControlBase):
+    kind: Literal['checkbox', 'toggle_switch']
+    tag: str = Field(min_length=1, max_length=200)
+    security_groups: list[str] = Field(default_factory=list, max_length=100)
 
 
 class CurrentUserControl(ControlBase):
@@ -319,7 +344,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | TankControl | BarGraphControl | RadarControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):

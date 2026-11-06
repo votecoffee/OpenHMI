@@ -17,7 +17,7 @@ export function Popup({ title, close, closeLabel, opener, children }) {
   return createPortal(<dialog ref={dialog} aria-label={title} className="hmi-popup" onCancel={event => { event.preventDefault(); close(); }}><header><h2>{title}</h2><button type="button" onClick={close} aria-label={closeLabel || ui('closeDialog', { title })}>{closeLabel || '×'}</button></header>{children}</dialog>, document.body);
 }
 
-export function TouchEntry({ title, initial = '', numeric = false, secret = false, limits, blockedReason = '', close, accept }) {
+export function TouchEntry({ title, initial = '', numeric = false, secret = false, multiline = false, limits, blockedReason = '', close, accept }) {
   const ui = useUi();
   const [entry, setEntry] = useState(initial), [shift, setShift] = useState(false), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const input = useRef(null);
@@ -68,7 +68,10 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
   const rows = numeric ? ['789', '456', '123', '-0.'] : shift ? ['~!@#$%^&*()_+', 'QWERTYUIOP{}|', 'ASDFGHJKL:"', 'ZXCVBNM<>?'] : ['`1234567890-=', 'qwertyuiop[]\\', "asdfghjkl;'", 'zxcvbnm,./'];
   const entryLabel = ui(secret ? 'passwordEntry' : 'entryLabel');
   return <Popup title={title} close={close}><form onSubmit={submit}>
-    <label>{entryLabel}<input ref={input} autoFocus type={secret ? 'password' : 'text'} inputMode={numeric ? 'decimal' : 'text'} autoComplete="off" value={entry} onChange={event => setEntry(event.target.value)} /></label>
+    <label>{entryLabel}{React.createElement(multiline ? 'textarea' : 'input', {
+      ref: input, autoFocus: true, ...(multiline ? { rows: 3 } : { type: secret ? 'password' : 'text' }),
+      inputMode: numeric ? 'decimal' : 'text', autoComplete: 'off', value: entry, onChange: event => setEntry(event.target.value),
+    })}</label>
     {limits && <p>{limits.valid ? ui(numeric ? 'numericRange' : 'textLength', limits) : ui(limits.problem || 'editLimitsUnavailable')}</p>}
     {blockedReason && <p role="status">{blockedReason}</p>}
     <fieldset disabled={busy} className={`touch-keys ${numeric ? 'numeric-keys' : ''}`} onPointerDown={event => {
@@ -76,6 +79,7 @@ export function TouchEntry({ title, initial = '', numeric = false, secret = fals
     }}><legend>{ui(numeric ? 'numericKeypad' : 'textKeyboard')}</legend>
       {rows.map((row, index) => <div className="key-row" key={index}>{Array.from(row).map(key => <button type="button" key={key} onClick={() => editKey(key)}>{key}</button>)}</div>)}
       <div className="key-row">{!numeric && <><button type="button" aria-pressed={shift} onClick={() => setShift(!shift)}>{ui('shiftKey')}</button><button type="button" onClick={() => editKey(' ')}>{ui('spaceKey')}</button></>}
+        {multiline && <button type="button" onClick={() => editKey('\n')}>{ui('newLineKey')}</button>}
         <button type="button" onClick={() => editKey('', 'backspace')}>{ui('backspaceKey')}</button><button type="button" onClick={() => editKey('', 'clear')}>{ui('clearEntry')}</button></div>
     </fieldset><p role="alert">{error}</p><footer><button type="button" disabled={busy} onClick={close}>{ui('cancelEntry')}</button><button disabled={busy || !!blockedReason}>{ui('acceptEntry')}</button></footer>
   </form></Popup>;

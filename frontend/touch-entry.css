@@ -4,7 +4,7 @@ dialog.hmi-popup { box-sizing: border-box; max-height: 92dvh; overflow-wrap: any
 .hmi-popup header, .hmi-popup footer, .key-row { display: flex; justify-content: space-between; gap: 6px; margin: 8px 0; }
 dialog.hmi-popup > header button { flex-shrink: 0; }
 dialog.hmi-popup footer, .key-row { flex-wrap: wrap; }
-.hmi-popup h2 { margin: 0; }.hmi-popup input { width: 100%; min-height: 46px; font: inherit; box-sizing: border-box; }
+.hmi-popup h2 { margin: 0; }.hmi-popup input, .hmi-popup textarea { width: 100%; min-height: 46px; font: inherit; box-sizing: border-box; }
 .hmi-popup button { min-width: 42px; min-height: 46px; font: inherit; background: #eee; border: 1px solid #888; color: #222; cursor: pointer; }
 .hmi-popup button:focus-visible { outline: 3px solid #002878; }
 .touch-keys { min-inline-size: 0; }

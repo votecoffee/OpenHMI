@@ -247,6 +247,14 @@ request. The control shows both tags and waits for PLC confirmation when they
 differ. Mode requests use the existing edit permissions, optional HMI groups,
 audit trail and write verification. The PLC controls whether to accept a mode.
 
+The **Inputs** palette includes **Dropdown** and **Radio group** for 2 to 32
+named values on a writable, unscaled integer or text tag. Set the choice value
+type to match the tag. **Checkbox** and **Toggle switch** bind to writable
+Boolean tags. These controls write when the operator changes the selection and
+display the latest good tag value. Use **Text area** for multiline notes with
+fixed or tag-driven length limits and an optional touch keyboard with a
+**New line** key. Inputs support HMI group restrictions and audited writes.
+
 Update intervals are best-effort acquisition requests, not PLC cyclic I/O
 subscriptions. Alarm/history demand continues without an open viewer. See
 [runtime, UDT and history semantics](docs/runtime-and-projects.md) for quality,

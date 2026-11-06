@@ -2,6 +2,95 @@ import { test, expect } from '@playwright/test';
 
 test.use({ baseURL: 'http://127.0.0.1:8766', hasTouch: true });
 
+test('input palette drag and drop and secured live entry', async ({ page }) => {
+  test.setTimeout(60000);
+  const login = await page.request.post('/api/security/login', {
+    data: { name: 'admin', password: 'SecurityTestOnly-2026!' },
+  });
+  expect(login.ok()).toBe(true);
+  const original = await (await page.request.get('/api/project')).json();
+  async function save(project, apply = true) {
+    const current = await (await page.request.get('/api/project')).json();
+    const saved = await page.request.put('/api/project/draft', { data: { project, expected_revision: current.draft_revision } });
+    expect(saved.ok(), await saved.text()).toBe(true);
+    if (apply) {
+      const applied = await page.request.post('/api/project/apply', { data: { expected_revision: (await saved.json()).draft_revision } });
+      expect(applied.ok(), await applied.text()).toBe(true);
+    }
+  }
+  try {
+    await save({
+      title: 'Input palette station',
+      tags: [
+        { name: 'SpeedChoice', type: 'integer', initial: 0, writable: true },
+        { name: 'ColorChoice', type: 'string', initial: 'r', writable: true },
+        { name: 'Checked', type: 'boolean', initial: false, writable: true },
+        { name: 'Toggled', type: 'boolean', initial: false, writable: true },
+        { name: 'Notes', type: 'string', initial: 'First', writable: true },
+      ],
+      controls: [
+        { id: 'color', kind: 'radio_group', tag: 'ColorChoice', label: 'Color',
+          options: [{ value: 'r', label: 'Red' }, { value: 'b', label: 'Blue' }] },
+        { id: 'checked', kind: 'checkbox', tag: 'Checked', label: 'Check' },
+        { id: 'toggled', kind: 'toggle_switch', tag: 'Toggled', label: 'Enable' },
+        { id: 'notes', kind: 'text_area', tag: 'Notes', label: 'Notes' },
+      ],
+    });
+    await page.goto('/');
+    const block = page.getByRole('button', { name: 'Dropdown', exact: true });
+    await block.scrollIntoViewIfNeeded();
+    const source = await block.boundingBox();
+    const target = await page.locator('.hmi-grid').boundingBox();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 100, target.y + 90, { steps: 10 });
+    await page.mouse.move(target.x + 110, target.y + 100, { steps: 2 });
+    await page.mouse.up();
+    await expect(page.locator('[data-control="dropdown"]')).toHaveCount(1);
+    await page.locator('[data-control="dropdown"] .hmi-label').click();
+    await page.getByRole('textbox', { name: 'Choice label', exact: true }).nth(1).fill('Fast');
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
+    await page.getByRole('button', { name: 'Apply live', exact: true }).click();
+    await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('Applied live');
+
+    await page.goto('/runtime');
+    const dropdown = page.getByRole('combobox', { name: 'Dropdown', exact: true });
+    await dropdown.selectOption({ label: 'Fast' });
+    const blue = page.getByRole('radio', { name: 'Blue', exact: true });
+    await blue.click();
+    await expect(blue).toBeChecked();
+    const checkbox = page.getByRole('checkbox', { name: 'Check', exact: true });
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
+    const toggle = page.getByRole('switch', { name: 'Enable', exact: true });
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    await expect(dropdown).toHaveValue('1');
+
+    await page.getByRole('button', { name: 'Open keyboard for Notes' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Text entry: Notes' });
+    const entry = dialog.locator('textarea');
+    await entry.fill('First');
+    await dialog.getByRole('button', { name: 'New line', exact: true }).click();
+    await dialog.getByRole('button', { name: 'a', exact: true }).click();
+    await expect(entry).toHaveValue('First\na');
+    await dialog.getByRole('button', { name: 'Accept entry', exact: true }).click();
+    await expect(dialog).toBeHidden();
+    const data = await (await page.request.get('/api/tags')).json();
+    expect(data.values).toMatchObject({
+      SpeedChoice: 1, ColorChoice: 'b', Checked: true, Toggled: true, Notes: 'First\na',
+    });
+    data.samples.Checked = { quality: 'stale', age_seconds: 4 };
+    await page.route('**/api/tags', route => route.fulfill({ json: data }));
+    await expect(page.locator('[data-control="checkbox"]')).toContainText('STALE DATA');
+    await expect(checkbox).toBeHidden();
+    await expect(toggle).toBeEnabled();
+  } finally {
+    await save(original.active);
+    if (JSON.stringify(original.draft) !== JSON.stringify(original.active)) await save(original.draft, false);
+  }
+});
+
 test('machine state, mode selection and permissives use live quality and separate feedback', async ({ page }) => {
   const login = await page.request.post('/api/security/login', {
     data: { name: 'admin', password: 'SecurityTestOnly-2026!' },

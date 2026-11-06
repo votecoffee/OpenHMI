@@ -52,9 +52,15 @@ class SubscriptionRequest(BaseModel):
     sequence: int | None = Field(default=None, ge=1, le=MAX_SAFE_INTEGER)
 
 
+CHOICE_INPUTS = ('dropdown', 'radio_group')
+BOOLEAN_INPUTS = ('checkbox', 'toggle_switch')
+PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area')
+EDIT_INPUTS = ('input', 'text_input', 'mode_selector', *PALETTE_INPUTS)
+
+
 class ValueRequest(BaseModel):
     model_config = ConfigDict(extra='forbid', strict=True)
-    value: float | int | str
+    value: float | int | str | bool
     expected_revision: int | None = Field(default=None, ge=1, le=9223372036854775807)
 
 
@@ -238,7 +244,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(422, 'Expanded control IDs collide; rename the screen, control or faceplate member control')
         known_groups = {group['name'] for group in security.snapshot()['groups']}
         for control in controls:
-            if publication.enabled and ((control['kind'] in ('input', 'text_input', 'mode_selector') and control.get('tag') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag)) or (control['kind'] == 'button' and control.get('mode') in ('set', 'toggle') and control.get('target') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag))):
+            if publication.enabled and ((control['kind'] in EDIT_INPUTS and control.get('tag') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag)) or (control['kind'] == 'button' and control.get('mode') in ('set', 'toggle') and control.get('target') in (publication.username_tag, publication.privileges_tag, publication.heartbeat_tag))):
                 raise HTTPException(422, 'Identity publication tags cannot be edit or button write targets')
             for field in LIMIT_TAGS:
                 if control.get(field) and kinds.get(control[field]) not in ('number', 'integer'):
@@ -250,6 +256,14 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             if not set(required) <= known_groups:
                 raise HTTPException(422, 'Control references an unknown HMI security group')
             if control['kind'] in ('recipe', 'current_user'):
+                continue
+            if control['kind'] in PALETTE_INPUTS:
+                target, _ = sources.get(control['tag'], (None, ''))
+                expected = 'string' if control['kind'] == 'text_area' else 'boolean'
+                if control['kind'] in CHOICE_INPUTS:
+                    expected = 'integer' if type(control['options'][0]['value']) is int else 'string'
+                if not target or not target.writable or kinds.get(control['tag']) != expected:
+                    raise HTTPException(422, f"Control requires a configured writable {expected} tag: {control['tag']}")
                 continue
             if control['kind'] in ('multi_state', 'mode_selector'):
                 if kinds.get(control['tag']) != 'integer':
@@ -462,7 +476,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             state = store.snapshot()
             stale = body.expected_revision is not None and body.expected_revision != state['active_revision']
             control = None if stale else next((item for item in expanded_controls(state['active'])
-                                               if item['id'] == control_id and item['kind'] in ('input', 'text_input', 'mode_selector')), None)
+                                               if item['id'] == control_id and item['kind'] in EDIT_INPUTS), None)
             context = {'requested_value': body.value, 'control_id': control_id,
                        'expected_revision': body.expected_revision, 'active_revision': state['active_revision'],
                        'tag': control.get('tag') if control else None, 'screen': control.get('_screen') if control else None}
@@ -482,13 +496,21 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                 raise HTTPException(423, 'Control is disabled by its tag bindings')
             if control['tag'] not in values:
                 raise HTTPException(409, 'Input tag has no good-quality value')
-            if control['kind'] == 'mode_selector':
-                if body.expected_revision is None:
-                    raise HTTPException(422, 'Mode requests require the applied project revision')
+            kind = control['kind']
+            if kind in (*PALETTE_INPUTS, 'mode_selector') and body.expected_revision is None:
+                raise HTTPException(422, 'This input requires the applied project revision')
+            if kind == 'mode_selector':
                 if control['confirmed_tag'] not in values:
                     raise HTTPException(409, 'Mode confirmation tag has no good-quality value')
                 if type(body.value) is not int or body.value not in {state['value'] for state in control['states']}:
                     raise HTTPException(422, 'Unknown machine mode')
+            elif kind in CHOICE_INPUTS:
+                if not any(type(body.value) is type(option['value']) and body.value == option['value']
+                           for option in control['options']):
+                    raise HTTPException(422, 'Value is outside the configured choices')
+            elif kind in BOOLEAN_INPUTS:
+                if type(body.value) is not bool:
+                    raise HTTPException(422, 'Boolean input requires true or false')
             else:
                 try:
                     limits = edit_limits(control, values)
