@@ -283,6 +283,10 @@ past 24 for long-running counters.
 A **Stack light** groups up to six Boolean signals in a vertical or horizontal
 row. Set a label, active color, and active polarity for each lamp. The lamp
 shows on, off, or its own unavailable-data status.
+A **Numeric LED display** renders a tag in 2 to 12 seven-segment positions.
+Set the decimal places and units in the designer. A minus sign uses one
+position. If the rounded value overflows, the control shows the actual value
+as text with an overflow indication.
 
 In the **Display** palette, add a **Static label** for a heading or callout and
 a **Symbol** for an arrow or annotation. Set label size, alignment and weight,

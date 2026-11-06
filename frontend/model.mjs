@@ -1,5 +1,5 @@
 export const controlTypes = {
-  numeric: 'NumericDisplay', indicator: 'Indicator', button: 'ActionButton',
+  numeric: 'NumericDisplay', led_display: 'LedDisplay', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', symbol: 'ScreenSymbol', sparkline: 'Sparkline',
   input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar',
@@ -62,6 +62,7 @@ export function toProject(data, settings = {}) {
       if (type === 'AlarmIndicator') return { ...base, tag: props.tag, priority: Number(props.priority) };
       if (type === 'Indicator') return { ...base, tag: props.tag, on_text: props.on_text ?? 'ON', off_text: props.off_text ?? 'OFF' };
       const numeric = { ...base, tag: props.tag, unit: props.unit, decimals: Number(props.decimals) };
+      if (type === 'LedDisplay') return { ...numeric, digits: Number(props.digits) };
       if (type === 'Sparkline') return { ...numeric, seconds: Number(props.seconds ?? 60) };
       if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
       if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };

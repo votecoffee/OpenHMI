@@ -34,6 +34,46 @@ export function PrioritySymbol({ priority }) {
   </svg>;
 }
 
+const ledSegments = ['M4 3h8', 'M13 4v7', 'M13 14v7', 'M4 22h8', 'M3 14v7', 'M3 4v7', 'M4 12.5h8'];
+const ledGlyphs = {
+  '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg', '4': 'bcfg',
+  '5': 'acdfg', '6': 'acdefg', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg', '-': 'g',
+};
+
+function LedDisplay({ id, label, tag, unit, digits, decimals, puck }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const units = text(`control.${id}.unit`, unit);
+  const configured = Number.isInteger(digits) && digits >= 2 && digits <= 12
+    && Number.isInteger(decimals) && decimals >= 0 && decimals <= 4 && decimals < digits;
+  const rounded = valid && configured ? value.toFixed(decimals) : '';
+  const reading = rounded.startsWith('-') && Number(rounded) === 0 ? rounded.slice(1) : rounded;
+  const glyphs = reading.replace('.', '');
+  const overflow = valid && (/[eE]/.test(reading) || glyphs.length > digits);
+  const dotAfter = reading.includes('.') ? digits - decimals - 1 : -1;
+  return <article className="hmi-control hmi-led" data-control="led_display">
+    <span className="hmi-label">{title}</span>
+    {!configured ? <Quality problem="badRange" /> : !valid ? <Quality problem={problem} tag={tag} /> : overflow ? <>
+      <strong className="range-deviation">{ui('ledOverflow')}</strong><small>{value} {units}</small>
+    </> : <div className="led-reading">
+      <svg role="img" aria-label={[title, reading, units].filter(Boolean).join(' ')}
+        viewBox={`0 0 ${digits * 18} 26`} width={digits * 18} height="26">
+        {Array.from(glyphs.padStart(digits)).map((glyph, index) => {
+          const lit = ledGlyphs[glyph] || '';
+          return <g key={index} transform={`translate(${index * 18} 0)`}>
+            {ledSegments.map((path, segment) => <path key={path} d={path}
+              className={lit.includes('abcdefg'[segment]) ? 'led-lit' : 'led-unlit'} />)}
+            {index === dotAfter && <circle className="led-dot" cx="16.5" cy="22" r="1.4" />}
+          </g>;
+        })}
+      </svg>
+      {units && <small aria-hidden="true">{units}</small>}
+    </div>}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
 function NumericDisplay({ id, label, tag, unit, decimals, puck }) {
   const { value, valid, problem } = useValue(tag, 'number');
   const { text, language } = useLocalization();
@@ -405,7 +445,7 @@ export function createConfig(catalog) {
     <ChartFields value={value} onChange={onChange} catalog={catalog} kind={kind} /> });
   const conditionTag = label => ({ type: 'select', label, options: [{ label: 'Always / none', value: '' }, ...catalog.tags.filter(tag => tag.type === 'boolean').map(tag => ({ label: tag.name, value: tag.name }))] });
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
-  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight'];
+  const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
   const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
@@ -529,6 +569,9 @@ export function createConfig(catalog) {
       Checkbox: discrete('checkbox', 'Checkbox', writableBoolean),
       ToggleSwitch: discrete('toggle_switch', 'Toggle switch', writableBoolean),
       SelectedRecipe: { label: 'Selected recipe', fields: { label: labelField }, defaultProps: { label: 'Loaded recipe' }, render: SelectedRecipe },
+      LedDisplay: { label: 'Numeric LED display', fields: { ...numericFields,
+        digits: { type: 'number', label: 'Digit positions', min: 2, max: 12 },
+      }, defaultProps: { ...numericDefaults, label: 'Numeric readout', digits: 5 }, render: LedDisplay },
       NumericDisplay: { label: 'Numeric display', fields: numericFields, defaultProps: numericDefaults, render: NumericDisplay },
       Indicator: {
         label: 'Indicator', fields: { label: labelField, tag: tagField('boolean'), on_text: { type: 'text', label: 'ON text' }, off_text: { type: 'text', label: 'OFF text' } },

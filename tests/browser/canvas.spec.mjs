@@ -12,12 +12,12 @@ async function save(page, project, apply = true) {
   }
 }
 
-test('compact static labels and symbols survive canvas save and live apply', async ({ page }) => {
+test('compact annotations and LED display survive canvas save and live apply', async ({ page }) => {
   test.setTimeout(60000);
   const original = await (await page.request.get('/api/project')).json();
   try {
     await save(page, { ...original.active, controls: [], screens: [], layout: null,
-      tags: [{ name: 'Highlight', type: 'boolean', initial: true }] });
+      tags: [{ name: 'Highlight', type: 'boolean', initial: true }, { name: 'PanelValue', type: 'number', initial: -4.2 }] });
     await page.goto('/');
     await page.getByRole('button', { name: 'Enable freeform layout' }).click();
     const canvas = page.getByLabel('Freeform canvas', { exact: true });
@@ -41,6 +41,13 @@ test('compact static labels and symbols survive canvas save and live apply', asy
     await fields.getByRole('combobox', { name: 'Rotation', exact: true }).selectOption({ label: '90 degrees' });
     await fields.getByRole('combobox', { name: 'Color when tag is true', exact: true }).selectOption({ label: 'Highlight' });
 
+    await type.selectOption('LedDisplay');
+    await source.dragTo(canvas, { targetPosition: { x: 264, y: 40 } });
+    await expect(canvas.locator('.canvas-selected')).toHaveCSS('height', '64px');
+    await fields.getByRole('combobox', { name: 'Tag', exact: true }).selectOption({ label: 'PanelValue' });
+    await fields.getByRole('spinbutton', { name: 'Digit positions', exact: true }).fill('3');
+    await fields.getByRole('textbox', { name: 'Units', exact: true }).fill('psi');
+
     await page.getByRole('button', { name: 'Save draft', exact: true }).click();
     await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
     await page.getByRole('button', { name: 'Apply live', exact: true }).click();
@@ -56,8 +63,26 @@ test('compact static labels and symbols survive canvas save and live apply', asy
     await expect(arrow.locator('path')).toHaveAttribute('transform', 'rotate(90 12 12)');
     await expect(arrow).toHaveCSS('color', 'rgb(0, 40, 120)');
     const { active } = await (await page.request.get('/api/project')).json();
-    expect(active.controls.map(control => control.kind)).toEqual(['label', 'symbol']);
-    expect(active.controls.every(control => !Object.hasOwn(control, 'tag'))).toBe(true);
+    expect(active.controls.map(control => control.kind)).toEqual(['label', 'symbol', 'led_display']);
+    expect(active.controls.slice(0, 2).every(control => !Object.hasOwn(control, 'tag'))).toBe(true);
+
+    const display = page.locator('[data-control="led_display"]');
+    const reading = display.getByRole('img', { name: 'Numeric readout -4.2 psi', exact: true });
+    await expect(reading.locator('g')).toHaveCount(3);
+    await expect(reading.locator('g').nth(0).locator('.led-lit')).toHaveCount(1);
+    await expect(reading.locator('g').nth(1).locator('.led-dot')).toHaveCount(1);
+    const live = await (await page.request.get('/api/tags')).json();
+    live.values.PanelValue = 99.96;
+    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await expect(display).toContainText('DISPLAY OVERFLOW');
+    await expect(display).toContainText('99.96 psi');
+    await expect(display.getByRole('img')).toHaveCount(0);
+    live.samples.PanelValue = { quality: 'stale', age_seconds: 4 };
+    await expect(display).toContainText('STALE DATA');
+    await expect(display).not.toContainText('DISPLAY OVERFLOW');
+    live.samples.PanelValue = { quality: 'good' };
+    live.values.PanelValue = -0.04;
+    await expect(display.getByRole('img', { name: 'Numeric readout 0.0 psi', exact: true })).toBeVisible();
   } finally {
     await save(page, original.active);
     await save(page, original.draft, false);

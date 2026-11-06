@@ -53,6 +53,11 @@ body { background: #c6c6c6; color: var(--hmi-text); font-family: "OpenHMI Noto",
 .hmi-label { color: #333; font-size: 12.41px; font-weight: normal; overflow-wrap: anywhere; }
 .hmi-value { color: var(--hmi-live); font: 24.83px "OpenHMI Noto", Arial, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .hmi-text-value { color: var(--hmi-live); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.led-reading { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; width: 100%; }
+.led-reading svg { display: block; height: 32px; width: auto; max-width: 100%; color: var(--hmi-live); }
+.led-reading path { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.led-reading .led-unlit { opacity: .16; }
+.led-dot { fill: currentColor; }
 .hmi-value small { color: #666; font-size: 12.41px; font-weight: normal; }
 .hmi-source { color: #555; font: 9.55px "OpenHMI Noto", Arial, sans-serif; overflow-wrap: anywhere; }
 .hmi-state { display: flex; align-items: center; gap: 8px; padding: 0; color: #333; background: transparent; border-radius: 0; font: 14.32px "OpenHMI Noto", Arial, sans-serif; }

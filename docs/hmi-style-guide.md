@@ -47,6 +47,7 @@ redistributed. The detailed local source audit remains outside tracked source.
 | Binary indicator | Stable label, grayscale filled/empty square and configurable ON/OFF text |
 | Analog range | Value and units, scale endpoints, normal band and pointer; out-of-scale indication without falsifying the numeric value |
 | Tank level indicator | Vertical live fill, engineering units, scale endpoints and normal band |
+| Numeric LED display | Compact seven-segment readout with fixed positions, units, and explicit overflow and quality indications |
 | Stack light | Group Boolean signals using configurable active color and polarity, with text and quality on each lamp |
 | Radial gauge | Dial with normal band, engineering readout, and a needle that disappears when the value is unavailable |
 | Bar graph | Compare up to 12 numeric tags with a shared engineering scale and units. Bars extend from zero when zero is in range, or from the endpoint nearest zero |
