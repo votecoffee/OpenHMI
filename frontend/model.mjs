@@ -2,7 +2,7 @@ export const controlTypes = {
   numeric: 'NumericDisplay', led_display: 'LedDisplay', tag_quality: 'TagQuality', connection_status: 'PlcConnectionStatus', indicator: 'Indicator', button: 'ActionButton',
   analog: 'AnalogRange', tank: 'TankLevel', gauge: 'RadialGauge', bar: 'BarGraph', pie: 'PieChart', xy: 'XYChart', radar: 'RadarChart', alarm: 'AlarmIndicator',
   recipe: 'SelectedRecipe', label: 'StaticLabel', image: 'StaticImage', symbol: 'ScreenSymbol', state_image: 'StateImage', multi_state_image: 'MultiStateImage', position_image: 'PositionImage', rotation_image: 'RotationImage', sparkline: 'Sparkline',
-  input: 'NumericInput', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar', setpoint_comparison: 'SetpointComparison',
+  input: 'NumericInput', stepper: 'NumericStepper', slider: 'Slider', date_time: 'DateTimeInput', progress: 'ProgressBar', setpoint_comparison: 'SetpointComparison',
   text_input: 'TextInput', text_area: 'TextArea', barcode_input: 'BarcodeInput', current_user: 'CurrentUser',
   dropdown: 'Dropdown', radio_group: 'RadioGroup', checkbox: 'Checkbox', toggle_switch: 'ToggleSwitch',
   faceplate: 'Faceplate', trend: 'Trend', text: 'TextDisplay', date_time_display: 'DateTimeDisplay', duration: 'DurationDisplay', web_browser: 'WebBrowser',
@@ -81,7 +81,7 @@ export function toProject(data, settings = {}) {
           image: props.image || '', size_percent: Number(props.size_percent), show_label: props.show_label ?? true };
       }
       if (type === 'ProgressBar') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum) };
-      if (type === 'NumericInput' || type === 'Slider') return { ...numeric, minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
+      if (type === 'NumericInput' || type === 'Slider' || type === 'NumericStepper') return { ...numeric, ...(type === 'NumericStepper' ? { step: Number(props.step) } : {}), minimum: Number(props.minimum), maximum: Number(props.maximum), minimum_tag: props.minimum_tag || '', maximum_tag: props.maximum_tag || '', security_groups: props.security_groups || [] };
       if (['AnalogRange', 'TankLevel', 'RadialGauge'].includes(type)) {
         return { ...numeric, ...Object.fromEntries(['minimum', 'maximum', 'normal_low', 'normal_high'].map(key => [key, Number(props[key])])) };
       }

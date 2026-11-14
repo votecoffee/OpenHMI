@@ -536,7 +536,7 @@ export function createConfig(catalog) {
   const commonFields = { visible_tag: conditionTag('Visible when tag is true'), enabled_tag: conditionTag('Enabled when tag is true'), color_tag: conditionTag('Color when tag is true'), active_color: { type: 'select', label: 'Active value color', options: [['#002878', 'Navy'], ['#333333', 'Dark gray'], ['#fa3232', 'Priority 1 red'], ['#fff546', 'Priority 2 yellow'], ['#ff9600', 'Priority 3 orange'], ['#ff64c8', 'Priority 4 magenta']].map(([value, label]) => ({ value, label })) } };
   const displayTypes = ['StaticLabel', 'ScreenSymbol', 'ProgressBar', 'Sparkline', 'DateTimeDisplay', 'DurationDisplay', 'StackLight', 'LedDisplay', 'TagQuality', 'PlcConnectionStatus', 'Bitfield', 'SetpointComparison', 'StateImage', 'MultiStateImage', 'PositionImage', 'RotationImage', 'StaticImage'];
   const chartTypes = ['TankLevel', 'RadialGauge', 'BarGraph', 'RadarChart', 'PieChart', 'XYChart'];
-  const inputTypes = ['NumericInput', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
+  const inputTypes = ['NumericInput', 'NumericStepper', 'Slider', 'TextInput', 'TextArea', 'BarcodeInput', 'DateTimeInput', 'Dropdown', 'RadioGroup', 'Checkbox', 'ToggleSwitch'];
   const config = {
     root: {
       fields: { title: { type: 'text', label: 'Screen name' }, columns: { type: 'select', label: 'Columns',
@@ -607,6 +607,12 @@ export function createConfig(catalog) {
       render: PermissiveList },
       NumericInput: { label: 'Numeric input', fields: numericEditFields,
         defaultProps: { ...numericDefaults, label: 'Tank setpoint', minimum: 0, maximum: 100, security_groups: [] }, render: NumericInput },
+      NumericStepper: { label: 'Numeric stepper', fields: { ...numericEditFields,
+        tag: browserTag('Tag', 'Choose a writable numeric tag', sliderTag),
+        step: { type: 'number', label: 'Increment', min: 0.00000001, max: 1e12 } },
+        defaultProps: { ...numericDefaults, label: 'Setpoint', unit: '', tag: catalog.tags.find(sliderTag)?.name || '',
+          minimum: 0, maximum: 100, step: 1, security_groups: [] },
+        render: props => <EditControl {...props} stepper /> },
       Slider: { label: 'Slider', fields: { ...numericEditFields, tag: browserTag('Tag', 'Choose a writable numeric tag', sliderTag) },
         defaultProps: { ...numericDefaults, label: 'Setpoint slider', unit: '', tag: catalog.tags.find(sliderTag)?.name || '',
           minimum: 0, maximum: 100, security_groups: [] },
@@ -778,7 +784,7 @@ export function createConfig(catalog) {
   for (const component of Object.values(config.components)) {
     component.fields = { ...component.fields, ...commonFields };
     const renderer = component.render;
-    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === DateTimeInput || renderer === BarcodeInput || renderer === ActionButton || component === config.components.Slider;
+    const handlesOwnEnable = renderer === NumericInput || renderer === TextInput || renderer === TextArea || renderer === DateTimeInput || renderer === BarcodeInput || renderer === ActionButton || component === config.components.Slider || component === config.components.NumericStepper;
     component.render = props => <Conditional {...props} enabled_tag={handlesOwnEnable ? '' : props.enabled_tag}>
       {renderer(props)}
     </Conditional>;

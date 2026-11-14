@@ -58,6 +58,7 @@ export const uiText = {
   ledOverflow: 'DISPLAY OVERFLOW',
   durationInvalid: 'Invalid duration',
   dateTimeInvalid: 'Invalid UTC timestamp',
+  stepperDecrease: 'Decrease {label}', stepperIncrease: 'Increase {label}', stepperReset: 'Reset proposed value',
   sliderDraft: 'Proposed value: {value}',
   newControlValue: '{label} new value', writeValue: 'Write value', valueWritten: 'Value written',
   valueWritePending: 'Value written; activity finalization pending. Operation {id}',

@@ -15,6 +15,7 @@ const settings = (layout, key, value) => ({ ...layout, [key]: value });
 const lookup = (map, key) => map && Object.hasOwn(map, key) ? map[key] : undefined;
 
 function size(type) {
+  if (type === 'NumericStepper') return { width: 240, height: 200 };
   if (type === 'StaticLabel') return { width: 144, height: 32 };
   if (type === 'RadialGauge') return { width: 176, height: 160 };
   if (type === 'DateTimeDisplay') return { width: 208, height: 56 };

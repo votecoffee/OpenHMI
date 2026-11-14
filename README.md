@@ -265,7 +265,13 @@ fixed or tag-driven length limits and an optional touch keyboard with a
 **New line** key. Inputs support HMI group restrictions and audited writes.
 A **Slider** previews a proposed numeric setpoint until you select **Write
 value**. It supports numeric tags, fixed or tag-driven limits, and the numeric
-keypad. Unscaled integer tags use whole-number positions. A read-only **Progress bar**
+keypad. Unscaled integer tags use whole-number positions.
+A **Numeric stepper** offers touch-sized plus/minus buttons with a configurable
+increment. It changes a proposed value until **Write value** is pressed and also
+supports the numeric keypad. Fixed or tag-driven limits, permissions, tag
+quality and applied revision are checked before writing. Integer tags require
+whole-number increments. The increment sets button behavior, while the keypad
+can enter any value the tag and limits allow. A read-only **Progress bar**
 shows the live value, configured scale, and out-of-scale or unavailable status.
 A **Barcode scanner input** binds to a writable text tag. Focus the field and
 scan with a keyboard-wedge scanner configured to append Enter, or enter a code

@@ -54,7 +54,7 @@ class SubscriptionRequest(BaseModel):
 
 CHOICE_INPUTS = ('dropdown', 'radio_group')
 BOOLEAN_INPUTS = ('checkbox', 'toggle_switch')
-PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'barcode_input', 'slider', 'date_time')
+PALETTE_INPUTS = (*CHOICE_INPUTS, *BOOLEAN_INPUTS, 'text_area', 'barcode_input', 'slider', 'stepper', 'date_time')
 EDIT_INPUTS = ('input', 'text_input', 'mode_selector', *PALETTE_INPUTS)
 
 
@@ -264,8 +264,10 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     expected = ('integer',) if type(control['options'][0]['value']) is int else ('string',)
                 if control['kind'] == 'date_time':
                     expected = ('integer',)
-                if control['kind'] == 'slider':
+                if control['kind'] in ('slider', 'stepper'):
                     expected = ('integer',) if target and target.type == 'integer' else ('integer', 'number')
+                if control['kind'] == 'stepper' and target and target.type == 'integer' and not control['step'].is_integer():
+                    raise HTTPException(422, 'Integer stepper tags require a whole-number step')
                 if not target or not target.writable or kinds.get(control['tag']) not in expected:
                     raise HTTPException(422, f"Control requires a configured writable tag of type {' or '.join(expected)}: {control['tag']}")
                 continue
@@ -552,7 +554,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     validate_entry(control, body.value, limits)
                 except ValueError as error:
                     raise HTTPException(422, str(error)) from error
-            value = application.driver.coerce_number(control['tag'], body.value) if kind in ('input', 'slider') else body.value
+            value = application.driver.coerce_number(control['tag'], body.value) if kind in ('input', 'slider', 'stepper') else body.value
             ticket.dispatch(tag=control['tag'], screen=control['_screen'], before=application.driver.sample_snapshot().get(control['tag']), requested_value=value)
             try:
                 application.driver.write(control['tag'], [value])

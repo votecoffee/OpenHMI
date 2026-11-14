@@ -207,6 +207,43 @@ class SecurityTests(unittest.TestCase):
                                          json={'value': 0, 'expected_revision': revision}).status_code, 404)
         self.assertEqual(driver.read('Travel'), [5])
 
+    def test_stepper_checks_configuration_revision_limits_and_security(self):
+        state = self.client.get('/api/project').json()
+        project = state['draft']
+        project['tags'] += [
+            {'name': 'StepValue', 'type': 'integer', 'initial': 2, 'writable': True},
+            {'name': 'StepLimit', 'type': 'number', 'initial': 5.5, 'writable': True},
+        ]
+        control = {'id': 'step_value', 'kind': 'stepper', 'tag': 'StepValue',
+                   'label': 'Step value', 'step': 1, 'maximum_tag': 'StepLimit'}
+        project['controls'].append(control)
+        for invalid_step in (0, -1, 0.5, 1e13):
+            control['step'] = invalid_step
+            self.assertEqual(self.client.put('/api/project/draft', json={
+                'expected_revision': state['draft_revision'], 'project': project}).status_code, 422)
+        control['step'] = 1
+        saved = self.client.put('/api/project/draft', json={
+            'expected_revision': state['draft_revision'], 'project': project})
+        saved.raise_for_status()
+        applied = self.client.post('/api/project/apply', json={'expected_revision': saved.json()['draft_revision']})
+        applied.raise_for_status()
+        revision = applied.json()['active_revision']
+        url = '/api/controls/step_value/value'
+        self.assertEqual(self.client.put(url, json={'value': 3}).status_code, 422)
+        self.assertEqual(self.client.put(url, json={'value': 3, 'expected_revision': revision - 1}).status_code, 409)
+        write = lambda value: self.client.put(url, json={'value': value, 'expected_revision': revision})
+        self.assertEqual(write(3.5).status_code, 409)
+        write(5).raise_for_status()
+        driver = self.app.state.driver
+        self.assertEqual(driver.read('StepValue'), [5])
+        driver.write('StepLimit', [4])
+        self.assertEqual(write(5).status_code, 422)
+        driver.write('StepLimit', [-1])
+        self.assertEqual(write(0).status_code, 409)
+        self.client.post('/api/security/logout').raise_for_status()
+        self.assertEqual(write(3).status_code, 401)
+        self.assertEqual(driver.read('StepValue'), [5])
+
     def test_date_time_requires_whole_epoch_seconds_and_current_limits(self):
         state = self.client.get('/api/project').json()
         project = state['draft']

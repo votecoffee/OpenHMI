@@ -9,6 +9,15 @@ configured tag overrides its corresponding fixed value. Text edits provide
 minimum/maximum character counts and optional numeric tag bindings for either
 length limit. Text length tags must contain integers from 0 through 4096.
 
+The **Numeric stepper** adds plus/minus buttons at least 44 CSS pixels wide and
+high. Set **Increment** in the designer. Buttons adjust a proposed value without
+writing until **Write value** is selected. **Reset proposed value** discards the
+proposal and starts again from the live value. Buttons stop at the configured
+limits without rounding an overshoot to the limit. A live apply invalidates an
+old proposal. Start a new proposal from the updated screen. The numeric keypad
+can enter values independently of the button increment. Integer tag bindings
+require whole-number increments.
+
 Limit tags use the screen's shared scan demand. A faceplate resolves relative
 limits such as `$.SpeedHigh` against the UDT bound to that instance.
 The display uses good-quality cached values; stale, missing, nonnumeric or

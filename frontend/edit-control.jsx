@@ -26,7 +26,7 @@ export function DateTimeLimit({ label, value, onChange }) {
 }
 
 export function EditControl(props) {
-  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, barcode = false, dateTime = false, slider = false, sliderInteger = false } = props;
+  const { id, tag, security_groups = [], puck, enabled_tag = '', instance_enabled_tag = '', text = false, multiline = false, barcode = false, dateTime = false, stepper = false, slider = false, sliderInteger = false } = props;
   const live = useContext(Live), { session } = useContext(SecurityContext) || {}, { text: translate, ui } = useLocalization();
   const label = translate(`control.${id}.label`, props.label);
   const [draft, setDraft] = useState(null), [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [touch, setTouch] = useState(null);
@@ -63,7 +63,7 @@ export function EditControl(props) {
   });
 
   function writeBlock(expectedRevision) {
-    if ((slider || barcode || dateTime) && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
+    if ((slider || stepper || barcode || dateTime) && revision == null || expectedRevision !== revision) return ui('editRevisionChanged');
     if (!authorized) return ui('editNotAuthorized');
     if (!valid) return namedProblem('editValueBinding', tag, problem);
     for (const [state, source, labelKey] of [
@@ -99,12 +99,24 @@ export function EditControl(props) {
       await save(text ? entry : Number(entry), draft?.revision ?? revision);
     } catch (error) { setMessage(error.message); }
   }
+  const stepBase = draft?.revision === revision && entry !== '' ? Number(entry) : value;
+  const nextStep = direction => {
+    const sum = stepBase + direction * props.step;
+    const next = Number.isInteger(stepBase) && Number.isInteger(props.step) ? sum : Number(sum.toPrecision(15));
+    return Number.isFinite(next) && next >= low && next <= high && next !== stepBase ? next : null;
+  };
+  const stepDisabled = disabled || draft !== null && draft.revision !== revision;
+  function adjust(direction) {
+    if (stepDisabled) return;
+    const next = nextStep(direction);
+    if (next !== null) { setDraft({ value: String(next), revision }); setMessage(''); }
+  }
   function clearBarcode() {
     setDraft(null);
     setMessage('');
     barcodeField.current?.focus();
   }
-  return <article className="hmi-control hmi-input security-protected" data-control={slider ? 'slider' : dateTime ? 'date_time' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
+  return <article className="hmi-control hmi-input security-protected" data-control={stepper ? 'stepper' : slider ? 'slider' : dateTime ? 'date_time' : barcode ? 'barcode_input' : multiline ? 'text_area' : text ? 'text_input' : 'input'}><span className="hmi-label">{label}</span>
     {!valid ? <Quality problem={problem} tag={tag} /> : dateTime && !validUtcEpoch(value)
       ? <strong className="range-deviation">{ui('dateTimeInvalid')}</strong>
       : <strong className="hmi-value">{dateTime ? formatUtcEpoch(value) : text ? value : `${value.toFixed(props.decimals ?? 1)} ${props.unit || ''}`}</strong>}
@@ -146,6 +158,15 @@ export function EditControl(props) {
         }} />
       <button disabled={disabled || !entry}>{ui('barcodeSubmit')}</button>
       <button type="button" disabled={disabled || !entry} onClick={clearBarcode}>{ui('barcodeClear')}</button>
+    </form> : stepper ? <form className="hmi-stepper" onSubmit={submit}>
+      <button type="button" aria-label={ui('stepperDecrease', { label })}
+        disabled={stepDisabled || nextStep(-1) === null} onClick={() => adjust(-1)}>−</button>
+      <button type="button" aria-label={ui('stepperIncrease', { label })}
+        disabled={stepDisabled || nextStep(1) === null} onClick={() => adjust(1)}>+</button>
+      {draft !== null && <output>{ui('sliderDraft', { value: entry })}</output>}
+      {draft !== null && draft.revision !== revision && <small>{ui('editRevisionChanged')}</small>}
+      <button disabled={disabled || draft === null || draft.revision !== revision}>{ui('writeValue')}</button>
+      <button type="button" disabled={busy || draft === null} onClick={() => { setDraft(null); setMessage(''); }}>{ui('stepperReset')}</button>
     </form> : slider ? <form className="hmi-slider" onSubmit={submit}>
       {sliderRange && <input type="range" aria-label={ui('newControlValue', { label })}
         min={sliderLow} max={sliderHigh} step={sliderInteger ? 1 : 10 ** -(props.decimals ?? 1)}

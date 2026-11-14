@@ -378,6 +378,11 @@ class NumericInputControl(NumericControl):
         return self
 
 
+class NumericStepperControl(NumericInputControl):
+    kind: Literal['stepper']
+    step: float = Field(default=1.0, ge=0.00000001, le=1e12, allow_inf_nan=False)
+
+
 class DateTimeControl(ControlBase):
     kind: Literal['date_time']
     tag: str = Field(min_length=1, max_length=200)
@@ -555,7 +560,7 @@ class WebBrowserControl(ControlBase):
         return self
 
 
-Control = Annotated[NumericControl | NumericInputControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | StaticImageControl | StateImageControl | MultiStateImageControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | PositionImageControl | RotationImageControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
+Control = Annotated[NumericControl | NumericInputControl | NumericStepperControl | LedDisplayControl | TagQualityControl | ConnectionStatusControl | DateTimeControl | DateTimeDisplayControl | DurationDisplayControl | LabelControl | StaticImageControl | StateImageControl | MultiStateImageControl | SymbolControl | SparklineControl | TextDisplayControl | TextInputControl | ChoiceInputControl | BooleanInputControl | CurrentUserControl | IndicatorControl | AnalogControl | SetpointComparisonControl | ProgressControl | PositionImageControl | RotationImageControl | TankControl | GaugeControl | BarGraphControl | PieControl | RadarControl | XYControl | AlarmControl | ButtonControl | RecipeSelectionControl | FaceplateControl | TrendControl | WebBrowserControl | MultiStateControl | ModeSelectorControl | PermissiveControl | StackLightControl | BitfieldControl, Field(discriminator="kind")]
 
 
 class Screen(StrictModel):
