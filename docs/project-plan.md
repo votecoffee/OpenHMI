@@ -207,7 +207,9 @@ not close hardware or operator acceptance gates.
    The engineering catalog now has its own router, and a shared validator
    factory serves draft/save/stage/merge/apply validation. Real catalog-to-picker
    integration tests cover tag-type filtering and rejected-draft preservation.
-   Smaller validation rule groups remain the next backend extraction.
+   Binding rules are now split into project-level, shared/edit, display/state
+   and chart groups. The coordinator preserves project-first and per-control
+   failure order, with API regression checks for rejected-draft preservation.
 4. Separate scheduling policy and sample-cache responsibilities further only
    with explicit lock and lifetime ownership. Preserve shared reads, long
    per-tag retry, route recovery and write non-replay behavior.

@@ -179,7 +179,15 @@ paths, authorization, revision guards and lock ownership.
   compatible. `engineering_routes.py` owns the draft engineering catalog, and
   `project_validation.py` supplies the same binding validator to save, staging,
   merge and apply. The validator closes over explicit services and the asset
-  directory; it does not retain a previous project snapshot.
+  directory; it does not retain a previous project snapshot. The entry point
+  now orchestrates focused rule groups in `binding_project.py` (protocols,
+  tag indices, identity outputs, assets, faceplates/history and expanded IDs),
+  `binding_controls.py` (shared guards, edits and action/value fallback),
+  `binding_displays.py` (display/state/browser bindings), and
+  `binding_charts.py` (chart series and trend triggers). Project-wide checks
+  run in their established order. Each expanded control then completes common
+  guards and its type checks before the next control is inspected. The groups
+  consume the same current project/tag context and perform no controller I/O.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
   lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
@@ -228,8 +236,12 @@ These checks run in normal Python unittest discovery and require Node 20+ and
 .\.venv\Scripts\python.exe -m unittest tests.test_frontend_contract -v
 ```
 
-The next moves are smaller validation rule groups and explicit scheduler versus
-sample-cache ownership. Preserve project-instance identity, apply rollback,
+`tests/test_binding_rules.py` checks the observable order of conflicting
+project/control failures and confirms that rejection preserves both the draft
+and its revision. Correcting the failures in sequence must allow the same
+candidate to save without an apply.
+
+The next move is explicit scheduler versus sample-cache ownership. Preserve project-instance identity, apply rollback,
 command locks and journal reservation/dispatch boundaries in further extractions.
 Further separation of scheduler and sample-cache ownership should keep one
 explicit lock contract and use existing bad-tag retry, receipt freshness,
