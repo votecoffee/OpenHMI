@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { api, json } from './api.mjs';
+import { writeControlValue } from './runtime-api.mjs';
 import { Live, Quality, tagValue } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext, SecurityLock, allowed } from './security.jsx';
@@ -198,8 +198,7 @@ export function ModeSelector({ id, label, tag, confirmed_tag, states = [], prese
     setBusy(true);
     setMessage('');
     try {
-      const result = await api('/api/controls/' + encodeURIComponent(id) + '/value',
-        json('PUT', { value: selected, expected_revision: selection.revision }));
+      const result = await writeControlValue(id, selected, selection.revision);
       setSelection(null);
       setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten'));
     } catch (error) {

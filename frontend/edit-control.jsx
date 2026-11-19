@@ -3,7 +3,7 @@ import { Live, tagValue, Quality } from './live-quality.jsx';
 import { SecurityContext, allowed, SecurityLock } from './security.jsx';
 import { useLocalization } from './localization.jsx';
 import { TouchEntry } from './touch-entry.jsx';
-import { api, json } from './api.mjs';
+import { writeControlValue } from './runtime-api.mjs';
 
 export const MAX_UTC_EPOCH = 253402300799;
 const validUtcEpoch = epoch => Number.isSafeInteger(epoch) && epoch >= 0 && epoch <= MAX_UTC_EPOCH;
@@ -88,7 +88,7 @@ export function EditControl(props) {
     const measured = text ? Array.from(value).length : value;
     if (!text && !Number.isFinite(value) || measured < low || measured > high) throw new Error(ui('editOutsideLimits'));
     setBusy(true);
-    try { const result = await api(`/api/controls/${encodeURIComponent(id)}/value`, json('PUT', { value, expected_revision: expectedRevision })); setDraft(null); setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten')); }
+    try { const result = await writeControlValue(id, value, expectedRevision); setDraft(null); setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten')); }
     finally { setBusy(false); }
   }
   async function submit(event) {
@@ -188,3 +188,9 @@ export function EditControl(props) {
     {touch && <TouchEntry title={ui(text ? 'textEntryTitle' : 'numericEntryTitle', { label })} numeric={!text} multiline={multiline} initial={touch.initial} limits={limits} blockedReason={writeBlock(touch.revision)} close={() => setTouch(null)} accept={value => save(value, touch.revision)} />}
   </article>;
 }
+
+export function NumericInput(props) { return <EditControl {...props} />; }
+export function TextInput(props) { return <EditControl {...props} text />; }
+export function TextArea(props) { return <EditControl {...props} text multiline />; }
+export function DateTimeInput(props) { return <EditControl {...props} dateTime />; }
+export function BarcodeInput(props) { return <EditControl {...props} text barcode />; }

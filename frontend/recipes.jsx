@@ -223,3 +223,9 @@ export function RecipeWorkspace({ edit, catalog }) {
     </details>}
   </section>;
 }
+
+export function SelectedRecipe({ id, label }) {
+  const { text } = useLocalization();
+  return <article className="hmi-control hmi-recipe" data-control="recipe"><span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    <LoadedRecipe compact /></article>;
+}

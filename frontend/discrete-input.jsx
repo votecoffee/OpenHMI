@@ -1,5 +1,5 @@
 import React, { useContext, useId, useState } from 'react';
-import { api, json } from './api.mjs';
+import { writeControlValue } from './runtime-api.mjs';
 import { Live, Quality, tagValue } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext, SecurityLock, allowed } from './security.jsx';
@@ -57,8 +57,7 @@ export function DiscreteInput({ id, label, tag, kind, options = [], security_gro
     setBusy(true);
     setMessage('');
     try {
-      const result = await api('/api/controls/' + encodeURIComponent(id) + '/value',
-        json('PUT', { value, expected_revision: revision }));
+      const result = await writeControlValue(id, value, revision);
       setMessage(result.audit_status === 'pending' ? ui('valueWritePending', { id: result.operation_id }) : ui('valueWritten'));
     } catch (error) {
       setMessage(error.message);

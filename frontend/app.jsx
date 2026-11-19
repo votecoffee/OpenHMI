@@ -11,7 +11,9 @@ import './engineering.css';
 import './operations.css';
 import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operations.jsx';
 import { Live, ConnectionStatus } from './live-quality.jsx';
-import { ScreenControls, ScreenFrame, createConfig } from './controls.jsx';
+import { createConfig } from './controls.jsx';
+import { renewSubscription } from './runtime-api.mjs';
+import { ScreenControls, ScreenFrame } from './screen-frame.jsx';
 import { CanvasEditor, CanvasSurface, initialCanvas } from './canvas.jsx';
 import { controlTypes, toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
 import { EngineeringSettings, engineeringCatalog } from './engineering.jsx';
@@ -408,13 +410,8 @@ function App({ initial, catalog }) {
     const previewRoot = runtime ? '' : editorSubscription.root;
     let generation = 0, timer;
     function subscribe(nextScreens, nextPreview, keepalive = false) {
-      return api('/api/subscriptions', {
-        ...json('POST', {
-          client: clientId.current, screens: nextScreens, preview_root: nextPreview,
-          sequence: ++subscriptionSequence.current,
-        }),
-        keepalive,
-      });
+      return renewSubscription(clientId.current, nextScreens, nextPreview,
+        ++subscriptionSequence.current, keepalive);
     }
     async function heartbeat() {
       const currentGeneration = generation;

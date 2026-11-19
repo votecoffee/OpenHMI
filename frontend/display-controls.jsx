@@ -135,3 +135,25 @@ export function TimeDisplay({ id, label, tag, puck, source_unit, decimals = 0, d
     <TagReference tag={tag} puck={puck} />
   </article>;
 }
+
+export function TextDisplay({ id, label, tag, puck }) {
+  const { value, valid, problem } = useValue(tag, 'string');
+  const { text } = useLocalization();
+  return <article className="hmi-control" data-control="text">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {valid ? <strong className="hmi-text-value">{value}</strong> : <Quality problem={problem} tag={tag} />}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}
+
+export function Indicator({ id, label, tag, on_text = 'ON', off_text = 'OFF', puck }) {
+  const { value, valid, problem } = useValue(tag, 'boolean');
+  const { text } = useLocalization();
+  return <article className="hmi-control hmi-indicator" data-control="indicator">
+    <span className="hmi-label">{text(`control.${id}.label`, label)}</span>
+    {valid ? <strong className={`hmi-state ${value ? 'is-on' : ''}`}>
+      <span className="binary-symbol" aria-hidden="true" />{value ? text(`control.${id}.on_text`, on_text) : text(`control.${id}.off_text`, off_text)}
+    </strong> : <Quality problem={problem} tag={tag} />}
+    <TagReference tag={tag} puck={puck} />
+  </article>;
+}

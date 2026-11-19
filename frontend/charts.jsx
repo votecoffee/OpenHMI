@@ -280,3 +280,8 @@ export function ProcessChart({ id, label, series = [], minimum, maximum, unit, r
     </div>}
   </article>;
 }
+
+export function LiveChart(props) {
+  const live = useContext(Live);
+  return <ProcessChart {...props} live={live} />;
+}

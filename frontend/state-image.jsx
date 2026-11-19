@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { uploadProjectImage } from './api.mjs';
 import { Quality, useValue } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
+import { formatNumeric } from './control-common.jsx';
 import { ProjectImagePicker, projectImagePath as imagePath } from './image-picker.jsx';
 
 export function ImageField({ label, value, onChange, readOnly }) {
@@ -114,4 +115,40 @@ export function MultiStateImage({ id, label, tag, states = [], show_label, puck 
   return <ImageReadout kind="multi_state_image" title={text(`control.${id}.label`, label)} tag={tag} problem={quality}
     stateText={state ? text(`control.${id}.state.${state.value}`, state.label) : ui('machineUnknownState', { value })}
     image={state?.image} caption={show_label || puck?.isEditing} unknown={!state} />;
+}
+
+export function MotionImage({ id, label, tag, unit, decimals, minimum, maximum, image, direction,
+  angle_start, angle_end, size_percent, show_label, puck, rotation = false }) {
+  const { value, valid, problem } = useValue(tag, 'number');
+  const { text, ui, language } = useLocalization();
+  const title = text(`control.${id}.label`, label);
+  const units = text(`control.${id}.unit`, unit);
+  const reading = valid ? `${formatNumeric(value, decimals, language.code)} ${units}`.trim() : '';
+  const span = maximum - minimum;
+  const configured = Number.isFinite(span) && span > 0
+    && (!rotation || [angle_start, angle_end].every(angle => Number.isFinite(angle) && Math.abs(angle) <= 360));
+  const outside = valid && configured && (value < minimum || value > maximum);
+  const caption = show_label || puck?.isEditing;
+  const vertical = direction === 'top_to_bottom' || direction === 'bottom_to_top';
+  const reverse = direction === 'right_to_left' || direction === 'bottom_to_top';
+  const fraction = (value - minimum) / span;
+  const graphicLabel = caption ? '' : `${title}: ${reading}`;
+  const style = rotation
+    ? { '--angle': `${angle_start + fraction * (angle_end - angle_start)}deg`, '--marker-scale': size_percent / 100 }
+    : { '--position': `${(reverse ? 1 - fraction : fraction) * 100}%`, '--marker-size': `${size_percent}%` };
+  return <article className="hmi-control hmi-image-control" data-control={rotation ? 'rotation_image' : 'position_image'}>
+    {caption && <span className="hmi-label">{title}</span>}
+    {!valid ? <Quality problem={problem} tag={tag} /> : <>
+      {(caption || outside) && <strong>{reading}</strong>}
+      {!configured ? <Quality problem="badRange" /> : outside
+        ? <strong className="range-deviation">{ui('outOfScale')}</strong>
+        : <div className={`motion-travel ${rotation ? 'rotation' : vertical ? 'vertical' : 'horizontal'}`} dir="ltr">
+          <div className="motion-marker" style={style}>
+            {image ? <ProjectPicture key={image} identifier={image} alt={graphicLabel} />
+              : <span className="motion-default" role={graphicLabel ? 'img' : undefined}
+                aria-label={graphicLabel || undefined} aria-hidden={!graphicLabel}>{rotation ? '▲' : '◆'}</span>}
+          </div>
+        </div>}
+    </>}
+  </article>;
 }

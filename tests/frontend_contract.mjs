@@ -13,4 +13,4 @@ new Function('require', 'module', 'exports', compiled.outputFiles[0].text)(
   createRequire(import.meta.url), module, module.exports);
 let input = '';
 for await (const part of process.stdin) input += part;
-process.stdout.write(JSON.stringify(module.exports.contract(JSON.parse(input))));
+process.stdout.write(JSON.stringify(await module.exports.contract(JSON.parse(input))));

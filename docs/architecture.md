@@ -147,14 +147,22 @@ Refactor one family at a time while preserving saved-project schemas, endpoint
 paths, authorization, revision guards and lock ownership.
 
 - `frontend/controls.jsx` assembles the palette and screen composition.
-  `display-controls.jsx` owns numeric, LED, quality, label, symbol, progress and
-  time renderers. `control-common.jsx` supplies shared display helpers without
-  importing the palette back into its components. Existing input, chart,
-  machine-state and image families retain their focused modules.
+  `display-controls.jsx` owns readouts and basic indicators; `process-controls.jsx`
+  owns analog ranges and setpoint comparison; `alarm-controls.jsx` owns priority
+  symbols and alarm indicators. `action-button.jsx`, `faceplate.jsx`,
+  `screen-frame.jsx` and `conditional-control.jsx` own their respective runtime
+  behavior. Input, chart, machine-state and image families retain their focused
+  modules. `control-common.jsx` supplies shared display helpers. Components do
+  not import the palette back into their implementation.
 - `openhmi/history_routes.py` registers a focused FastAPI router for historian
   queries, recorded-tag search and CSV export. It receives the historian and
   project instance explicitly. `server.py` remains the composition root and
-  retains the current live-apply and write transaction boundaries.
+  retains the live-apply boundary. `acquisition_routes.py` owns tag snapshots,
+  viewer leases and protected connection metadata. `control_routes.py` owns
+  Python actions, button activation and value writes, retaining the command lock
+  and journal reservation/dispatch/confirmation order. `control_contracts.py`
+  shares request models and input families with project binding validation.
+  Legacy request-model imports from `server.py` remain compatible.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
   lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
@@ -166,9 +174,22 @@ paths, authorization, revision guards and lock ownership.
 and `toProject` functions through a DOM-free Node test entry. It compares every
 palette control kind against Pydantic's discriminated union, validates defaults
 with required bindings configured, checks every nonempty palette select option,
-and round-trips every serialized control field. Field-set checks ensure backend defaults cannot conceal a dropped field.
+and round-trips every serialized control field. Field-set checks ensure backend
+defaults cannot conceal a dropped field.
 Fixtures include nondefault options, Unicode text, image references, security
 and limit bindings, trend settings, secondary screens and UDT faceplates.
+The pure `faceplate-model.mjs` resolver is compared with Python faceplate
+expansion on Overview and secondary screens, including indexed UDT roots,
+conditions, edit limits, nested lamps/checks, chart axes and trend capture tags.
+Both paths must preserve the original template. Relative trend tags and pen
+settings are resolved together before rendering.
+
+`runtime-api.mjs` owns browser value-write, activation and lease requests. The
+contract runner records those actual helpers through a fake fetch implementation
+and validates their methods, paths, project headers, keepalive release and
+strict Pydantic payloads, including Boolean, numeric and Unicode text values.
+No request is sent to a runtime or controller by these contract tests.
+
 These checks run in normal Python unittest discovery and require Node 20+ and
 `npm ci`. To run only the contract checks:
 
@@ -176,9 +197,9 @@ These checks run in normal Python unittest discovery and require Node 20+ and
 .\.venv\Scripts\python.exe -m unittest tests.test_frontend_contract -v
 ```
 
-The next moves are the remaining display families and palette field builders,
-then acquisition/subscription and operator-action routers. Preserve the command
-lock and journal reservation/dispatch boundaries when extracting write APIs.
+The next moves are palette field builders and project lifecycle/alarm
+acknowledgement routing. Preserve project-instance identity, apply rollback,
+command locks and journal reservation/dispatch boundaries in those extractions.
 Further separation of scheduler and sample-cache ownership should keep one
 explicit lock contract and use existing bad-tag retry, receipt freshness,
 reconnect and in-flight-write regression tests. Extend the contract fixtures

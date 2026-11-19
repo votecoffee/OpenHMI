@@ -401,3 +401,8 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
     {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>{ui('trendExportHistory')}</a>}
   </article>;
 }
+
+export function LiveTrend(props) {
+  const live = useContext(Live);
+  return <Trend {...props} live={live} />;
+}

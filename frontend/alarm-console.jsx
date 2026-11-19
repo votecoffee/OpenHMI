@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { PrioritySymbol } from './controls.jsx';
+import { PrioritySymbol } from './alarm-controls.jsx';
 import { Live, Quality, sampleQualityProblem, tagQuality, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';

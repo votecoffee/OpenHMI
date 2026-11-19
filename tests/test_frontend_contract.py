@@ -11,6 +11,9 @@ import unittest
 
 from pydantic import TypeAdapter
 from openhmi.projects import Control, Project
+from openhmi.screens import expanded_controls
+from openhmi.control_contracts import ButtonRequest, ValueRequest, EDIT_INPUTS
+from openhmi.acquisition_routes import SubscriptionRequest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +63,13 @@ class FrontendContractTests(unittest.TestCase):
         project = Project.model_validate(self.defaults['project'])
         self.assertEqual(len(project.controls), len(self.defaults['types']))
 
+    def test_input_palette_kinds_are_routed_as_edits(self):
+        kinds = {kind for kind, component in self.defaults['types'].items()
+                 if component in self.defaults['inputTypes']}
+        # The mode selector also submits audited values, but lives with machine
+        # controls because it displays separate PLC confirmation feedback.
+        self.assertEqual(kinds | {'mode_selector'}, set(EDIT_INPUTS))
+
     def test_palette_select_options_are_accepted_by_backend_models(self):
         # Empty binding sentinels are incomplete forms, not saved configurations.
         # Test every nonempty production select option, including enum choices.
@@ -67,6 +77,78 @@ class FrontendContractTests(unittest.TestCase):
         for selection in self.defaults['selections']:
             with self.subTest(component=selection['component'], field=selection['field'], value=selection['value']):
                 CONTROL.validate_python(selection['control'])
+
+    def test_browser_request_payloads_match_router_models(self):
+        requests = frontend('requests')
+        self.assertEqual(len(requests), 9)
+        values = [0, 0.25, False, True, '001 设备', '']
+        for request, value in zip(requests[:6], values, strict=True):
+            with self.subTest(value=value):
+                self.assertEqual(request['path'], '/api/controls/details__motor__speed/value')
+                self.assertEqual(request['method'], 'PUT')
+                body = ValueRequest.model_validate_json(json.dumps(request['body']))
+                self.assertEqual(body.value, value)
+                self.assertIs(type(body.value), type(value))
+                self.assertEqual(body.expected_revision, 123)
+        self.assertEqual(requests[6]['path'], '/api/controls/details__motor__start/activate')
+        self.assertEqual(requests[6]['method'], 'POST')
+        self.assertEqual(ButtonRequest.model_validate(requests[6]['body']).expected_revision, 123)
+        for request, sequence in zip(requests[7:], [42, 43], strict=True):
+            self.assertEqual(request['path'], '/api/subscriptions')
+            self.assertEqual(request['method'], 'POST')
+            self.assertEqual(SubscriptionRequest.model_validate(request['body']).sequence, sequence)
+        self.assertEqual(requests[7]['body']['screens'], ['overview', 'details'])
+        self.assertEqual(requests[7]['body']['preview_root'], 'MotorA')
+        self.assertEqual(requests[8]['body']['screens'], [])
+        self.assertTrue(requests[8]['keepalive'])
+        for request in requests:
+            self.assertEqual(request['headers']['X-OpenHMI-Project'], 'a' * 32)
+            self.assertEqual(request['headers']['Content-Type'], 'application/json')
+
+    def test_faceplate_bindings_match_backend_on_overview_and_secondary_screens(self):
+        project = Project.model_validate(self.defaults['project']).model_dump(mode='json')
+        members = [control for control in project['controls'] if control['kind'] != 'faceplate']
+        tag_fields = ('tag', 'target', 'visible_tag', 'enabled_tag', 'color_tag', 'minimum_tag',
+                      'maximum_tag', 'min_length_tag', 'max_length_tag', 'address_tag',
+                      'refresh_tag', 'confirmed_tag', 'setpoint_tag', 'tolerance_tag')
+        for control in members:
+            for field in tag_fields:
+                if field in control:
+                    control[field] = '$.' + field
+            for field in ('checks', 'lamps'):
+                for row in control.get(field, []):
+                    row['tag'] = '$.Nested.Signal'
+            if isinstance(control.get('series'), list):
+                for index, row in enumerate(control['series']):
+                    for field in ('tag', 'x_tag', 'y_tag'):
+                        if field in row:
+                            row[field] = f'$.Nested.Axis{index}.' + field
+            if control['kind'] == 'trend':
+                control.update(tags=['$.Speed', 'GlobalValue'],
+                               series={'$.Speed': {'decimals': 3, 'minimum': -10, 'maximum': 100}},
+                               recording={'sample_ms': 500, 'max_samples': 500,
+                                          'start_tag': '$.StartCapture', 'stop_tag': 'GlobalStop'})
+        instance = {'id': 'motor', 'kind': 'faceplate', 'label': 'Motor', 'template': 'motor',
+                    'root_tag': 'Machine.Motors[2]', 'visible_tag': 'ShowMotor', 'enabled_tag': 'PermitMotor'}
+        project.update(controls=[instance], faceplates=[{'id': 'motor', 'name': 'Motor', 'controls': members}],
+                       screens=[{'id': 'details', 'title': 'Details', 'controls': [copy.deepcopy(instance)]}])
+        project = Project.model_validate(project).model_dump(mode='json')
+        original = copy.deepcopy(project)
+        for screen in ('overview', 'details'):
+            actual = frontend('faceplates', project=project, screen=screen)
+            expected = expanded_controls(project, screen)
+            for browser, backend in zip(actual, expected, strict=True):
+                with self.subTest(screen=screen, kind=backend['kind']):
+                    self.assertEqual(browser.pop('instance_enabled_tag'), backend.pop('_parent_enabled'))
+                    backend.pop('_parent_visible')
+                    backend.pop('_screen')
+                    if browser['kind'] == 'trend':
+                        pens = browser.pop('pens')
+                        self.assertEqual(pens['tags'], backend['tags'])
+                        self.assertEqual(pens['series'], backend['series'])
+                        self.assertEqual(pens['root'], instance['root_tag'])
+                    self.assertEqual(browser, backend)
+        self.assertEqual(project, original)
 
     def test_all_control_fields_survive_backend_frontend_roundtrip(self):
         project = Project.model_validate(self.defaults['project']).model_dump(mode='json')

@@ -587,6 +587,8 @@ The Python suite includes frontend/backend contract tests, so install Node 20+
 and run `npm ci` before running it. These tests build the real palette configuration
 in memory, compare its control kinds with Pydantic, and check complete control and
 project serialization round trips, including optional fields and Unicode text.
+They also compare UDT faceplate bindings with backend expansion and validate
+real browser write, button and subscription payloads against the router models.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

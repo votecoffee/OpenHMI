@@ -192,11 +192,15 @@ not close hardware or operator acceptance gates.
    separate pycomm3 transport, pure tag-value rules and timing statistics.
    Added automated Pydantic/browser palette and project-serialization contract
    tests to normal unittest discovery.
-2. Continue extracting remaining renderers and palette property builders by
-   family. Keep `createConfig` as the composition entry point.
-3. Extract acquisition/subscription APIs and operator write/action APIs into
-   focused routers. Preserve permission checks, applied-revision checks,
-   project-instance guards, command locks and durable activity ordering.
+2. Delivered remaining renderer separation by family, including buttons,
+   alarms, process graphics, motion images, screen composition and faceplates.
+   `createConfig` now assembles imported renderers. Palette property builders
+   remain the next frontend extraction.
+3. Delivered acquisition/subscription and operator write/action routers, with
+   existing permission, revision, lock and journal behavior retained. Browser
+   request helpers and UDT faceplate expansion now have compatibility checks.
+   Continue with project lifecycle and alarm acknowledgement routing, preserving
+   project-instance guards, apply rollback and durable activity ordering.
 4. Separate scheduling policy and sample-cache responsibilities further only
    with explicit lock and lifetime ownership. Preserve shared reads, long
    per-tag retry, route recovery and write non-replay behavior.
