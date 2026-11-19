@@ -194,13 +194,16 @@ not close hardware or operator acceptance gates.
    tests to normal unittest discovery.
 2. Delivered remaining renderer separation by family, including buttons,
    alarms, process graphics, motion images, screen composition and faceplates.
-   `createConfig` now assembles imported renderers. Palette property builders
-   remain the next frontend extraction.
+   `createConfig` now assembles imported renderers and uses a fresh shared
+   palette-field factory. Component definitions by family remain the next
+   frontend extraction.
 3. Delivered acquisition/subscription and operator write/action routers, with
    existing permission, revision, lock and journal behavior retained. Browser
    request helpers and UDT faceplate expansion now have compatibility checks.
-   Continue with project lifecycle and alarm acknowledgement routing, preserving
-   project-instance guards, apply rollback and durable activity ordering.
+   Project lifecycle and alarm acknowledgement routes are now extracted too,
+   preserving project-instance guards, apply validation, lock order and durable
+   activity ordering. Their browser helpers have payload compatibility checks.
+   Engineering catalog and binding validation are the next backend extractions.
 4. Separate scheduling policy and sample-cache responsibilities further only
    with explicit lock and lifetime ownership. Preserve shared reads, long
    per-tag retry, route recovery and write non-replay behavior.

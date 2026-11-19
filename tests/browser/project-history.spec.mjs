@@ -34,7 +34,7 @@ test('compare history, stage screen-only rollback and apply a new revision', asy
     if (process.env.OPENHMI_PROJECT_HISTORY_SCREENSHOT) await comparison.screenshot({ path: process.env.OPENHMI_PROJECT_HISTORY_SCREENSHOT });
     await page.getByLabel('Restore reason', { exact: true }).fill('Reviewed screen-only rollback');
     await page.getByRole('button', { name: 'Stage revision as draft', exact: true }).click();
-    await expect(page.getByRole('status')).toContainText('Staged draft');
+    await expect(page.getByRole('region', { name: 'Project revisions', exact: true }).getByRole('status')).toContainText('Staged draft');
     let state = await (await page.request.get('/api/project')).json();
     expect(state.active_revision).toBe(activeBefore);
     expect(state.active.controls.find(item => item.id === numeric.id).label).toBe('Revision trial level');

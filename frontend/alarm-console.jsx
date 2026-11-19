@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './alarm-controls.jsx';
+import { acknowledgeAlarms } from './alarm-api.mjs';
 import { Live, Quality, sampleQualityProblem, tagQuality, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
@@ -107,8 +108,7 @@ export function AlarmConsole() {
   async function acknowledge(id, batch = false) {
     setBusy(true);
     try {
-      const path = batch ? '/api/alarms/acknowledge-selected' : id == null ? '/api/alarms/acknowledge-all' : `/api/alarms/${id}/acknowledge`;
-      const result = await api(path, json('POST', { comment, ...(batch ? { occurrence_ids: selected } : {}) }));
+      const result = await acknowledgeAlarms(id, comment, batch ? selected : null);
       setFeedback(result.audit_status === 'pending' ? ui('alarmAckPending', { id: result.operation_id }) : ui('acknowledgedCount', { count: result.acknowledged.length }));
       setSelected([]); setGeneration(value => value + 1);
     } catch (problem) { setFeedback(problem.message); }

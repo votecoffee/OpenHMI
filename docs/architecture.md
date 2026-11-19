@@ -153,7 +153,9 @@ paths, authorization, revision guards and lock ownership.
   `screen-frame.jsx` and `conditional-control.jsx` own their respective runtime
   behavior. Input, chart, machine-state and image families retain their focused
   modules. `control-common.jsx` supplies shared display helpers. Components do
-  not import the palette back into their implementation.
+  not import the palette back into their implementation. `palette-fields.jsx`
+  builds fresh shared fields, tag filters, defaults and security-group editors
+  for each catalog; it does not cache descriptors across projects.
 - `openhmi/history_routes.py` registers a focused FastAPI router for historian
   queries, recorded-tag search and CSV export. It receives the historian and
   project instance explicitly. `server.py` remains the composition root and
@@ -162,7 +164,13 @@ paths, authorization, revision guards and lock ownership.
   Python actions, button activation and value writes, retaining the command lock
   and journal reservation/dispatch/confirmation order. `control_contracts.py`
   shares request models and input families with project binding validation.
-  Legacy request-model imports from `server.py` remain compatible.
+  `project_lifecycle_routes.py` owns project snapshots, draft saves and live
+  apply, preserving apply validation, identity-publication guards, lock ordering
+  and runtime reconfiguration. `alarm_ack_routes.py` owns alarm snapshots and
+  individual, selected and all acknowledgements, with request models in
+  `alarm_contracts.py`. Existing review/history, note and shelving APIs remain
+  in `alarm_routes.py`. Legacy request-model imports from `server.py` remain
+  compatible.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
   lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
@@ -188,6 +196,12 @@ settings are resolved together before rendering.
 contract runner records those actual helpers through a fake fetch implementation
 and validates their methods, paths, project headers, keepalive release and
 strict Pydantic payloads, including Boolean, numeric and Unicode text values.
+`project-api.mjs` and `alarm-api.mjs` similarly centralize the actual browser
+save/apply and acknowledgement payloads. Compatibility tests validate them
+against the lifecycle models, including revision numbers, Unicode comments,
+selected IDs, default apply reasons and project identity headers. Additional
+catalog cases check unscaled integer, real, text-only, read-only and empty tag
+sets, plus isolation after a prior configuration's options/defaults are mutated.
 No request is sent to a runtime or controller by these contract tests.
 
 These checks run in normal Python unittest discovery and require Node 20+ and
@@ -197,9 +211,10 @@ These checks run in normal Python unittest discovery and require Node 20+ and
 .\.venv\Scripts\python.exe -m unittest tests.test_frontend_contract -v
 ```
 
-The next moves are palette field builders and project lifecycle/alarm
-acknowledgement routing. Preserve project-instance identity, apply rollback,
-command locks and journal reservation/dispatch boundaries in those extractions.
+The next moves are palette component definitions by family and engineering
+catalog/binding-validation modules. Preserve project-instance identity, apply
+rollback, command locks and journal reservation/dispatch boundaries in further
+extractions.
 Further separation of scheduler and sample-cache ownership should keep one
 explicit lock contract and use existing bad-tag retry, receipt freshness,
 reconnect and in-flight-write regression tests. Extend the contract fixtures

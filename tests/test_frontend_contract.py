@@ -10,10 +10,11 @@ import subprocess
 import unittest
 
 from pydantic import TypeAdapter
-from openhmi.projects import Control, Project
+from openhmi.projects import Control, Project, SaveRequest, ApplyRequest
 from openhmi.screens import expanded_controls
 from openhmi.control_contracts import ButtonRequest, ValueRequest, EDIT_INPUTS
 from openhmi.acquisition_routes import SubscriptionRequest
+from openhmi.alarm_contracts import AcknowledgeRequest, SelectedAcknowledgement
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +105,58 @@ class FrontendContractTests(unittest.TestCase):
         for request in requests:
             self.assertEqual(request['headers']['X-OpenHMI-Project'], 'a' * 32)
             self.assertEqual(request['headers']['Content-Type'], 'application/json')
+
+    def test_project_and_alarm_payloads_match_lifecycle_models(self):
+        project = Project.model_validate(self.defaults['project']).model_dump(mode='json')
+        requests = frontend('lifecycle_requests', project=project)
+        self.assertEqual([request['path'] for request in requests], [
+            '/api/project/draft', '/api/project/apply', '/api/project/apply',
+            '/api/alarms/1/acknowledge', '/api/alarms/acknowledge-all', '/api/alarms/acknowledge-selected',
+        ])
+        self.assertEqual([request['method'] for request in requests], ['PUT', *['POST'] * 5])
+        save = SaveRequest.model_validate_json(json.dumps(requests[0]['body']))
+        self.assertEqual(save.expected_revision, 123)
+        self.assertEqual(save.project.model_dump(mode='json'), project)
+        apply = ApplyRequest.model_validate(requests[1]['body'])
+        self.assertEqual((apply.expected_revision, apply.reason), (123, '更改画面'))
+        self.assertEqual(ApplyRequest.model_validate(requests[2]['body']).reason, 'Live apply')
+        self.assertEqual(AcknowledgeRequest.model_validate(requests[3]['body']).comment, '已检查')
+        self.assertEqual(AcknowledgeRequest.model_validate(requests[4]['body']).comment, 'All inspected')
+        selected = SelectedAcknowledgement.model_validate(requests[5]['body'])
+        self.assertEqual(selected.occurrence_ids, [2, 3])
+        self.assertEqual(selected.comment, 'Selected inspected')
+        for request in requests:
+            self.assertEqual(request['headers']['X-OpenHMI-Project'], 'a' * 32)
+
+    def test_catalog_rebuilds_keep_options_fresh_and_match_tag_types(self):
+        catalogs = [
+            {'security_groups': ['Operators'], 'actions': [], 'tags': [
+                {'name': 'IntegerGood', 'type': 'number', 'integer': True, 'unscaled': True, 'writable': True},
+                {'name': 'IntegerScaled', 'type': 'number', 'integer': True, 'unscaled': False, 'writable': True},
+                {'name': 'FloatGood', 'type': 'number', 'writable': True},
+                {'name': 'ReadOnly', 'type': 'number', 'writable': False},
+            ]},
+            {'security_groups': ['Engineers'], 'actions': [], 'tags': [
+                {'name': 'NewReadOnly', 'type': 'number', 'writable': False},
+                {'name': 'TextGood', 'type': 'string', 'writable': True},
+                {'name': 'TextReadOnly', 'type': 'string', 'writable': False},
+            ]},
+            {'security_groups': [], 'actions': [], 'tags': []},
+        ]
+        first, second, empty = frontend('catalogs', catalogs=catalogs)
+        self.assertEqual([option['value'] for option in first['sliderTags']], ['', 'IntegerGood', 'FloatGood'])
+        self.assertEqual([option['value'] for option in first['modeTags']], ['', 'IntegerGood'])
+        self.assertEqual([option['value'] for option in second['numericTags']], ['NewReadOnly'])
+        self.assertEqual(second['slider']['tag'], '')
+        self.assertEqual(second['sliderTags'], [{'label': 'Choose a writable numeric tag', 'value': ''}])
+        self.assertEqual(empty['numericTags'], [])
+        self.assertEqual(empty['dropdown']['tag'], '')
+        for config in (first, second, empty):
+            self.assertEqual(config['states'][0]['label'], 'Stopped')
+            self.assertNotIn('Poison', [option['value'] for option in config['numericTags']])
+        for config, expected_type in ((first, int), (second, str)):
+            dropdown = CONTROL.validate_python({'kind': 'dropdown', 'id': 'choice', **config['dropdown']})
+            self.assertTrue(all(type(option.value) is expected_type for option in dropdown.options))
 
     def test_faceplate_bindings_match_backend_on_overview_and_secondary_screens(self):
         project = Project.model_validate(self.defaults['project']).model_dump(mode='json')

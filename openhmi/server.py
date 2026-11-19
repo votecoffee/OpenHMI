@@ -9,7 +9,6 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .drivers import SimulatorDriver
 from .application import Application
@@ -40,21 +39,9 @@ from .control_contracts import (ActionRequest, ButtonRequest, ValueRequest, CHOI
                                 BOOLEAN_INPUTS, PALETTE_INPUTS, EDIT_INPUTS)
 from .control_routes import add_control_routes
 from .acquisition_routes import SubscriptionRequest, add_acquisition_routes
-
-
-class AcknowledgeRequest(ActionRequest):
-    model_config = ConfigDict(extra='forbid', strict=True)
-    comment: str = Field(default='', max_length=1000)
-
-
-class SelectedAcknowledgement(AcknowledgeRequest):
-    occurrence_ids: list[int] = Field(min_length=1, max_length=200)
-
-    @model_validator(mode='after')
-    def valid_ids(self):
-        if len(set(self.occurrence_ids)) != len(self.occurrence_ids) or any(not 1 <= identifier <= 9223372036854775807 for identifier in self.occurrence_ids):
-            raise ValueError('Select 1–200 unique valid occurrence IDs')
-        return self
+from .alarm_contracts import AcknowledgeRequest, SelectedAcknowledgement
+from .alarm_ack_routes import add_alarm_ack_routes
+from .project_lifecycle_routes import add_project_lifecycle_routes
 
 
 def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None, hold_connections=False) -> FastAPI:
@@ -354,93 +341,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             "security_groups": [group['name'] for group in security.snapshot()['groups']],
         }
 
-    @app.get("/api/project")
-    def project() -> dict:
-        return {**store.snapshot(), 'project_instance': instance}
-
-    @app.get("/api/project/active")
-    def active() -> dict:
-        state = store.snapshot()
-        return {'revision': state['active_revision'], 'project': state['active'], 'project_instance': instance}
-
-    def transact(operation, request):
-        try:
-            return operation(request)
-        except RevisionConflict as error:
-            raise HTTPException(409, str(error)) from error
-        except ValueError as error:
-            raise HTTPException(422, str(error)) from error
-
-    @app.put("/api/project/draft")
-    def save(request: SaveRequest, http: Request) -> dict:
-        security.require(http, 'project.edit')
-        if request.project.identity_publication.model_dump() != Project.model_validate(store.snapshot()['draft']).identity_publication.model_dump():
-            security.require(http, 'security.manage')
-        validate_bindings(request.project)
-        return transact(store.save, request)
-
-    @app.post("/api/project/apply")
-    def apply(request: ApplyRequest, http: Request) -> dict:
-        principal = security.require(http, 'project.edit')
-        identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
-        with commands.lock, monitor.lock, trends.lock, historian.lock:
-            def validate_apply(project):
-                old_publication = (application.driver.project or {}).get('identity_publication', {})
-                if old_publication.get('enabled') or publisher.last_config:
-                    old_tags = {tag['name']: tag for tag in application.driver.project['tags']}
-                    new_tags = {tag.name: tag.model_dump() for tag in project.tags}
-                    protected = publisher.last_config or old_publication
-                    if any(old_tags.get(protected[field]) != new_tags.get(protected[field]) for field in ('username_tag', 'privileges_tag', *(['heartbeat_tag'] if protected.get('heartbeat_tag') else []))) or (project.identity_publication.enabled and any(getattr(project.identity_publication, field) != protected[field] for field in ('username_tag', 'privileges_tag', *(['heartbeat_tag'] if protected.get('heartbeat_tag') else [])))):
-                        raise HTTPException(409, 'Disable identity publication and wait for its cleared status before changing its target tags')
-                if project.identity_publication.model_dump() != Project.model_validate(store.snapshot()['active']).identity_publication.model_dump():
-                    security.require(http, 'security.manage')
-                validate_bindings(project)
-                commands.validate_apply(project.model_dump())
-            result = transact(lambda value: store.apply(value, validate_apply, identity), request)
-            application.driver.plc_hold = False
-            if hasattr(app.state, 'release_connections'):
-                app.state.release_connections()
-            application.driver.configure(Project.model_validate(result['active']).model_dump())
-            historian.configure(application.driver.project['historian'])
-            trends.configure(application.driver.project)
-            sample_alarms()
-            return result
+    add_project_lifecycle_routes(app, store, application, security, commands, monitor, trends,
+                                 historian, publisher, validate_bindings, sample_alarms, instance)
 
     add_project_routes(app, store, security, validate_bindings)
 
-    @app.get("/api/alarms")
-    def alarms() -> dict:
-        return monitor.snapshot()
-
-    @app.post("/api/alarms/acknowledge-all")
-    def acknowledge_all(request: AcknowledgeRequest, http: Request) -> dict:
-        return acknowledge_runtime(None, http, request.comment)
-
-    @app.post('/api/alarms/acknowledge-selected')
-    def acknowledge_selected(request: SelectedAcknowledgement, http: Request):
-        return acknowledge_runtime(None, http, request.comment, request.occurrence_ids)
-
-    @app.post("/api/alarms/{occurrence_id}/acknowledge")
-    def acknowledge(occurrence_id: int, request: AcknowledgeRequest, http: Request) -> dict:
-        if not 1 <= occurrence_id <= 9223372036854775807:
-            raise HTTPException(422, 'Invalid occurrence ID')
-        return acknowledge_runtime(occurrence_id, http, request.comment)
-
-    def acknowledge_runtime(identifier, http, comment='', selected=None):
-        def execute(ticket):
-            principal = security.require(http, 'alarms.acknowledge')
-            identity = (principal.name, principal.provider) if principal else ('unsecured-simulation', 'simulation')
-            with monitor.lock:
-                with store._lock:
-                    identifiers = selected if selected is not None else [identifier] if identifier is not None else None
-                    if identifiers is not None and store._db.execute('SELECT COUNT(*) FROM alarm_occurrence WHERE id IN (' + ','.join('?' for _ in identifiers) + ')', identifiers).fetchone()[0] != len(identifiers):
-                        raise HTTPException(404, 'Alarm occurrence not found')
-                ticket.dispatch()
-                result = monitor.acknowledge(identifier, occurrence_ids=selected, identity=identity, operation_id=ticket.id, comment=comment)
-                ticket.confirm(verification='alarm_acknowledged', occurrences=result['acknowledged'], count=len(result['acknowledged']))
-                return result
-        return activity.run(http, 'alarm_acknowledge', 'selected' if selected is not None else str(identifier) if identifier is not None else 'all',
-                            {'occurrence_id': identifier, 'selected_ids': selected, 'comment': comment}, execute)
+    add_alarm_ack_routes(app, monitor, security, activity, store)
 
     add_alarm_routes(app, monitor, security, activity, application.driver, store)
 

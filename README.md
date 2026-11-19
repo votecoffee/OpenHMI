@@ -588,7 +588,9 @@ and run `npm ci` before running it. These tests build the real palette configura
 in memory, compare its control kinds with Pydantic, and check complete control and
 project serialization round trips, including optional fields and Unicode text.
 They also compare UDT faceplate bindings with backend expansion and validate
-real browser write, button and subscription payloads against the router models.
+real browser write, button, subscription, project save/apply and alarm
+acknowledgement payloads against the router models. Catalog rebuild checks cover
+tag-option freshness and numeric versus text choices.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

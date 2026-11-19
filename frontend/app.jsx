@@ -12,6 +12,7 @@ import './operations.css';
 import { ActivityConsole, DiagnosticsConsole, CommandConsole } from './operations.jsx';
 import { Live, ConnectionStatus } from './live-quality.jsx';
 import { createConfig } from './controls.jsx';
+import { saveProjectDraft, applyLiveProject } from './project-api.mjs';
 import { renewSubscription } from './runtime-api.mjs';
 import { ScreenControls, ScreenFrame } from './screen-frame.jsx';
 import { CanvasEditor, CanvasSurface, initialCanvas } from './canvas.jsx';
@@ -220,9 +221,7 @@ function Builder({ initial, catalog }) {
     chain.current = chain.current.then(async () => {
       if (blocked.current) return false;
       try {
-        const state = await api('/api/project/draft', json('PUT', {
-          expected_revision: revision.current, project: candidate,
-        }));
+        const state = await saveProjectDraft(candidate, revision.current);
         revision.current = state.draft_revision;
         base.current = state.draft;
         cache();
@@ -291,7 +290,7 @@ function Builder({ initial, catalog }) {
     const candidate = latest.current;
     try {
       if (!await save(candidate)) return;
-      const state = await api('/api/project/apply', json('POST', { expected_revision: revision.current, reason: applyReason.trim() || 'Live apply' }));
+      const state = await applyLiveProject(revision.current, applyReason);
       setMessage(`Applied live revision ${state.active_revision}. Existing viewers update automatically.`);
     } catch (error) {
       if (error.conflict) { blocked.current = true; cache(); setRecovery(recoveryCandidate()); }
