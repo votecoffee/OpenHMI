@@ -182,3 +182,24 @@ No calendar dates, controller access or named human assignments are assumed.
 Use small verified commits and frequent pushes to `main`; keep the README and
 GitHub issues/milestones current. Run local checks proportionate to each change;
 no automatically triggered GitHub Actions jobs are introduced.
+
+## Incremental maintainability work
+
+Keep this work alongside the offline pilot and palette effort. Refactoring does
+not close hardware or operator acceptance gates.
+
+1. Delivered the first display-family extraction, dedicated history router,
+   separate pycomm3 transport, pure tag-value rules and timing statistics.
+   Added automated Pydantic/browser palette and project-serialization contract
+   tests to normal unittest discovery.
+2. Continue extracting remaining renderers and palette property builders by
+   family. Keep `createConfig` as the composition entry point.
+3. Extract acquisition/subscription APIs and operator write/action APIs into
+   focused routers. Preserve permission checks, applied-revision checks,
+   project-instance guards, command locks and durable activity ordering.
+4. Separate scheduling policy and sample-cache responsibilities further only
+   with explicit lock and lifetime ownership. Preserve shared reads, long
+   per-tag retry, route recovery and write non-replay behavior.
+
+Each increment must pass relevant regression tests and contract checks before
+publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

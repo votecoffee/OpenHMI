@@ -5,8 +5,8 @@ from contextlib import asynccontextmanager
 import logging
 import asyncio
 import uuid
-from fastapi import FastAPI, HTTPException, Request, Query
-from fastapi.responses import Response, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -20,7 +20,7 @@ from .operations_routes import add_operations_routes
 from .logix import MAX_SAFE_INTEGER, RuntimeDriver
 from .runtime_workers import RuntimeWorkers
 from .historian import Historian
-from .history_export import CSV_COLUMNS, complete_history_csv, csv_row
+from .history_routes import add_history_routes
 from .trend_recording import TrendRecorder, add_trend_routes
 from .screens import CHART_TAG_FIELDS, chart_tags, expanded_controls, screen_map, enabled
 from .alarms import AlarmMonitor
@@ -647,55 +647,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
             raise HTTPException(404, 'Apply and enable the connection first')
         return {'tags': list(connection.metadata.values()), 'error': connection.error}
 
-    def history_window(tags, seconds, end, start=None):
-        import time
-        import math
-        names = list(dict.fromkeys(tags.split(',')))
-        if len(names) > 12 or any(len(name) > 200 for name in names):
-            raise HTTPException(422, 'History tag limits exceeded')
-        finish = end if end is not None else time.time()
-        if not math.isfinite(finish) or not 0 <= finish <= 32503680000:
-            raise HTTPException(422, 'Invalid history end timestamp')
-        if start is not None and (not math.isfinite(start) or not 0 <= start < finish or finish - start > 31536000):
-            raise HTTPException(422, 'History start must be before the end and within 365 days')
-        return names, finish - seconds if start is None else start, finish
-
-    @app.get('/api/history')
-    def history(tags: str, seconds: int = Query(default=300, ge=1, le=31536000), limit: int = Query(default=2000, ge=1, le=20000), end: float | None = None, trend_context: bool = False):
-        return historian.query(*history_window(tags, seconds, end), limit, trend_context)
-
-    def require_history_project(project_instance):
-        if project_instance is not None and project_instance != instance:
-            raise HTTPException(409, 'A different project was opened. Reload before exporting history.')
-
-    @app.get('/api/history/tags')
-    def history_tags(prefix: str = Query(default='', max_length=200), after: str | None = Query(default=None, max_length=200),
-                     limit: int = Query(default=50, ge=1, le=100),
-                     project_instance: str | None = Query(default=None, max_length=32)):
-        require_history_project(project_instance)
-        if after is not None and not after.startswith(prefix):
-            raise HTTPException(422, 'History tag cursor must match the search prefix')
-        return historian.recorded_tags(prefix, after, limit)
-
-    @app.get('/api/history.csv')
-    def history_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
-                    end: float | None = None, start: float | None = None):
-        import csv
-        from io import StringIO
-        data = historian.query(*history_window(tags, seconds, end, start), 20000)
-        output = StringIO()
-        writer = csv.writer(output)
-        writer.writerow(CSV_COLUMNS)
-        for row in data['samples']:
-            writer.writerow(csv_row(row['tag'], row['timestamp'], row['value'], row['quality'], row['source_timestamp']))
-        return Response(output.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="tag-history.csv"', 'X-OpenHMI-Truncated': str(data['truncated']).lower()})
-
-    @app.get('/api/history/full.csv')
-    def history_full_csv(tags: str, seconds: int = Query(default=3600, ge=1, le=31536000),
-                         end: float | None = None, start: float | None = None,
-                         project_instance: str | None = Query(default=None, max_length=32)):
-        require_history_project(project_instance)
-        return complete_history_csv(historian, *history_window(tags, seconds, end, start))
+    add_history_routes(app, historian, instance)
 
     @app.get("/", include_in_schema=False)
     @app.get("/runtime", include_in_schema=False)

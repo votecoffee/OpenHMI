@@ -2,6 +2,7 @@ from contextlib import ExitStack
 from pathlib import Path
 import runpy
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -102,7 +103,9 @@ class BenchBuilderTests(unittest.TestCase):
             self.assertEqual(tags['Names']['dimensions'], [3, 0, 0])
             self.assertEqual(tags['Motor']['members'], {'Running': 'boolean', 'Speed': 'number', 'Label': 'string'})
             self.assertEqual(plc.reads, reads)
-            before = client.get('/api/diagnostics.json').json()
+            # Diagnostics must use the same synthetic clock as poll(1..4).
+            with patch('openhmi.operations_routes.time', SimpleNamespace(monotonic=lambda: 2)):
+                before = client.get('/api/diagnostics.json').json()
             connection = before['connections'][0]
             self.assertEqual(connection['timings']['scan']['count'], 2)
             for metric in ('scan_lateness', 'scan_queue', 'route_lock_wait', 'adapter_read'):
@@ -113,7 +116,8 @@ class BenchBuilderTests(unittest.TestCase):
             plc.fail = True
             driver.poll(3)
             driver.poll(4)
-            after = client.get('/api/diagnostics.json').json()
+            with patch('openhmi.operations_routes.time', SimpleNamespace(monotonic=lambda: 4)):
+                after = client.get('/api/diagnostics.json').json()
             self.assertEqual(after['connections'][0]['state'], 'connected')
             self.assertEqual(after['connections'][0]['timings']['recovery']['last_ms'], 1000)
             compare = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'scripts' / 'compare-plc-diagnostics.py'))['compare']

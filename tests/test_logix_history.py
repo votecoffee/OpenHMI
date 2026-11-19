@@ -219,7 +219,7 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(logix_project())
         driver.lease('viewer', ['slow'], 1)
-        with patch('openhmi.logix.time', clock):
+        with patch('openhmi.logix.time', clock), patch('openhmi.logix_transport.time', clock):
             driver.poll()
             connection = driver.connections['plc']
             self.assertEqual(driver.status(include_timing=True)[0]['timings']['cold_open']['last_ms'], 125)
@@ -755,8 +755,8 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(Project.model_validate(project).model_dump())
         driver.trend_demands = dict.fromkeys(names, 1000)
-        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock)), patch(
-            'openhmi.logix.utc_now', side_effect=lambda: f'2026-01-01T00:00:{clock - 100:02}+00:00',
+        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock)), patch('openhmi.logix_transport.time', SimpleNamespace(monotonic=lambda: clock)), patch(
+            'openhmi.logix_transport.utc_now', side_effect=lambda: f'2026-01-01T00:00:{clock - 100:02}+00:00',
         ):
             driver.poll()
             samples = driver.sample_snapshot()
@@ -941,7 +941,7 @@ class LogixHistoryTests(unittest.TestCase):
                 self.addCleanup(driver.close)
                 driver.configure(Project.model_validate(project).model_dump())
                 clock = SimpleNamespace(now=1)
-                with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)):
+                with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)), patch('openhmi.logix_transport.time', SimpleNamespace(monotonic=lambda: clock.now)):
                     driver.lease('viewer', ['fast', 'slow'])
                     driver.poll()
                     connection = driver.connections['plc']
@@ -971,7 +971,7 @@ class LogixHistoryTests(unittest.TestCase):
         self.addCleanup(driver.close)
         driver.configure(Project.model_validate(project).model_dump())
         clock = SimpleNamespace(now=0)
-        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)):
+        with patch('openhmi.logix.time', SimpleNamespace(monotonic=lambda: clock.now)), patch('openhmi.logix_transport.time', SimpleNamespace(monotonic=lambda: clock.now)):
             driver.poll()
             connection = driver.connections['plc']
             with driver.write_scope(['LevelA']):

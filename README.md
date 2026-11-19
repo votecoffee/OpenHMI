@@ -583,9 +583,16 @@ Keep end-user workflows free of web implementation details. Prefer declarative
 bindings and common actions before requiring custom code. Keep drivers independent
 of editor controls and preserve active tag state during screen updates.
 
-Run local Python and browser checks (browser checks require installed Google Chrome):
+The Python suite includes frontend/backend contract tests, so install Node 20+
+and run `npm ci` before running it. These tests build the real palette configuration
+in memory, compare its control kinds with Pydantic, and check complete control and
+project serialization round trips, including optional fields and Unicode text.
+No browser or PLC is needed for the contract tests.
+
+Run local checks (browser checks require installed Google Chrome):
 
 ```powershell
+npm.cmd run build
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 npx.cmd playwright test
 ```

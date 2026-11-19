@@ -140,3 +140,47 @@ browser mutation headers identify the originating project instance to reject sta
 cross-project edits. Imported connections stay held until explicit apply, and
 imported Python source never executes automatically. The integrated Python IDE
 is explicitly deferred by the project owner.
+
+## Module boundaries and compatibility checks
+
+Refactor one family at a time while preserving saved-project schemas, endpoint
+paths, authorization, revision guards and lock ownership.
+
+- `frontend/controls.jsx` assembles the palette and screen composition.
+  `display-controls.jsx` owns numeric, LED, quality, label, symbol, progress and
+  time renderers. `control-common.jsx` supplies shared display helpers without
+  importing the palette back into its components. Existing input, chart,
+  machine-state and image families retain their focused modules.
+- `openhmi/history_routes.py` registers a focused FastAPI router for historian
+  queries, recorded-tag search and CSV export. It receives the historian and
+  project instance explicitly. `server.py` remains the composition root and
+  retains the current live-apply and write transaction boundaries.
+- `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
+  response receipts, reconnect backoff and write readback. It has no screen,
+  lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
+  shared tag demand and cached sample publication. Pure value/type/freshness
+  rules live in `tag_values.py`; bounded timing statistics live in
+  `scan_timings.py`. Existing imports from `openhmi.logix` remain compatible.
+
+`tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
+and `toProject` functions through a DOM-free Node test entry. It compares every
+palette control kind against Pydantic's discriminated union, validates defaults
+with required bindings configured, checks every nonempty palette select option,
+and round-trips every serialized control field. Field-set checks ensure backend defaults cannot conceal a dropped field.
+Fixtures include nondefault options, Unicode text, image references, security
+and limit bindings, trend settings, secondary screens and UDT faceplates.
+These checks run in normal Python unittest discovery and require Node 20+ and
+`npm ci`. To run only the contract checks:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest tests.test_frontend_contract -v
+```
+
+The next moves are the remaining display families and palette field builders,
+then acquisition/subscription and operator-action routers. Preserve the command
+lock and journal reservation/dispatch boundaries when extracting write APIs.
+Further separation of scheduler and sample-cache ownership should keep one
+explicit lock contract and use existing bad-tag retry, receipt freshness,
+reconnect and in-flight-write regression tests. Extend the contract fixtures
+whenever a saved control field or editor serialization branch is added. These
+software checks do not establish controller or operator-station acceptance.
