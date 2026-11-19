@@ -195,15 +195,19 @@ not close hardware or operator acceptance gates.
 2. Delivered remaining renderer separation by family, including buttons,
    alarms, process graphics, motion images, screen composition and faceplates.
    `createConfig` now assembles imported renderers and uses a fresh shared
-   palette-field factory. Component definitions by family remain the next
-   frontend extraction.
+   palette-field factory. Input, image, process/chart, machine/action and readout
+   definitions now have focused family factories with complete/unique coverage
+   checks and stable designer order.
 3. Delivered acquisition/subscription and operator write/action routers, with
    existing permission, revision, lock and journal behavior retained. Browser
    request helpers and UDT faceplate expansion now have compatibility checks.
    Project lifecycle and alarm acknowledgement routes are now extracted too,
    preserving project-instance guards, apply validation, lock order and durable
    activity ordering. Their browser helpers have payload compatibility checks.
-   Engineering catalog and binding validation are the next backend extractions.
+   The engineering catalog now has its own router, and a shared validator
+   factory serves draft/save/stage/merge/apply validation. Real catalog-to-picker
+   integration tests cover tag-type filtering and rejected-draft preservation.
+   Smaller validation rule groups remain the next backend extraction.
 4. Separate scheduling policy and sample-cache responsibilities further only
    with explicit lock and lifetime ownership. Preserve shared reads, long
    per-tag retry, route recovery and write non-replay behavior.

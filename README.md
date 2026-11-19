@@ -590,7 +590,9 @@ project serialization round trips, including optional fields and Unicode text.
 They also compare UDT faceplate bindings with backend expansion and validate
 real browser write, button, subscription, project save/apply and alarm
 acknowledgement payloads against the router models. Catalog rebuild checks cover
-tag-option freshness and numeric versus text choices.
+tag-option freshness and numeric versus text choices. Family/category coverage
+checks reject missing or duplicated controls, and engineering integration tests
+feed the real draft catalog through browser pickers and backend validation.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

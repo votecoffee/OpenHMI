@@ -155,7 +155,13 @@ paths, authorization, revision guards and lock ownership.
   modules. `control-common.jsx` supplies shared display helpers. Components do
   not import the palette back into their implementation. `palette-fields.jsx`
   builds fresh shared fields, tag filters, defaults and security-group editors
-  for each catalog; it does not cache descriptors across projects.
+  for each catalog; it does not cache descriptors across projects. Definition
+  factories in `palette-inputs.jsx`, `palette-images.jsx`, `palette-process.jsx`,
+  `palette-machine.jsx` and `palette-readouts.jsx` own the matching fields,
+  defaults and renderer selection. `palette-components.jsx` composes them with
+  duplicate/missing-component guards and preserves the established control order.
+  Faceplate rendering receives a deferred lookup of the completed configuration
+  so nested child renderers still use the shared conditional wrappers.
 - `openhmi/history_routes.py` registers a focused FastAPI router for historian
   queries, recorded-tag search and CSV export. It receives the historian and
   project instance explicitly. `server.py` remains the composition root and
@@ -170,7 +176,10 @@ paths, authorization, revision guards and lock ownership.
   individual, selected and all acknowledgements, with request models in
   `alarm_contracts.py`. Existing review/history, note and shelving APIs remain
   in `alarm_routes.py`. Legacy request-model imports from `server.py` remain
-  compatible.
+  compatible. `engineering_routes.py` owns the draft engineering catalog, and
+  `project_validation.py` supplies the same binding validator to save, staging,
+  merge and apply. The validator closes over explicit services and the asset
+  directory; it does not retain a previous project snapshot.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
   lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
@@ -202,7 +211,15 @@ against the lifecycle models, including revision numbers, Unicode comments,
 selected IDs, default apply reasons and project identity headers. Additional
 catalog cases check unscaled integer, real, text-only, read-only and empty tag
 sets, plus isolation after a prior configuration's options/defaults are mutated.
-No request is sent to a runtime or controller by these contract tests.
+The DOM-free contract tests send no runtime/controller requests.
+
+`tests/test_engineering_contract.py` additionally uses an in-process TestClient
+to feed the real draft catalog through `engineeringCatalog` and palette tag
+pickers. It checks writable and unscaled integer filtering, UDT aliases,
+relative template members and nested-faceplate suppression, while ensuring
+unapplied draft tags have not reached the runtime. Invalid saved bindings must
+return 422 without changing the draft or its revision. Its PLC fixture is
+disabled and the runtime starts with acquisition held; no controller I/O is used.
 
 These checks run in normal Python unittest discovery and require Node 20+ and
 `npm ci`. To run only the contract checks:
@@ -211,10 +228,9 @@ These checks run in normal Python unittest discovery and require Node 20+ and
 .\.venv\Scripts\python.exe -m unittest tests.test_frontend_contract -v
 ```
 
-The next moves are palette component definitions by family and engineering
-catalog/binding-validation modules. Preserve project-instance identity, apply
-rollback, command locks and journal reservation/dispatch boundaries in further
-extractions.
+The next moves are smaller validation rule groups and explicit scheduler versus
+sample-cache ownership. Preserve project-instance identity, apply rollback,
+command locks and journal reservation/dispatch boundaries in further extractions.
 Further separation of scheduler and sample-cache ownership should keep one
 explicit lock contract and use existing bad-tag retry, receipt freshness,
 reconnect and in-flight-write regression tests. Extend the contract fixtures

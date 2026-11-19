@@ -60,6 +60,13 @@ class FrontendContractTests(unittest.TestCase):
         self.assertEqual(set(self.defaults['types'].values()), set(self.defaults['components']))
         self.assertEqual(len(self.defaults['types']), len(set(self.defaults['types'].values())))
 
+    def test_palette_families_and_categories_cover_each_component_once(self):
+        for label in ('families', 'categories'):
+            names = [name for group in self.defaults[label] for name in group]
+            with self.subTest(registry=label):
+                self.assertEqual(len(names), len(set(names)))
+                self.assertEqual(set(names), set(self.defaults['components']))
+
     def test_palette_defaults_with_required_bindings_validate_as_a_project(self):
         project = Project.model_validate(self.defaults['project'])
         self.assertEqual(len(project.controls), len(self.defaults['types']))

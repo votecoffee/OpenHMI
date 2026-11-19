@@ -6,8 +6,18 @@ import { api } from '../frontend/api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject } from '../frontend/project-api.mjs';
 import { acknowledgeAlarms } from '../frontend/alarm-api.mjs';
+import { engineeringCatalog } from '../frontend/engineering.jsx';
+import { createPaletteFields } from '../frontend/palette-fields.jsx';
+import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'engineering') {
+    const catalog = engineeringCatalog(request.catalog, request.project, request.template ?? null);
+    const config = createConfig(catalog);
+    return { catalog, modeTags: config.components.ModeSelector.fields.tag.options,
+      sliderTags: config.components.Slider.fields.tag.options,
+      components: Object.keys(config.components) };
+  }
   if (request.operation === 'catalogs') {
     const first = createConfig(request.catalogs[0]);
     first.components.NumericInput.fields.tag.options.push({ label: 'Poison', value: 'Poison' });
@@ -36,7 +46,10 @@ export async function contract(request) {
         component: item.type, field: name, value: option.value,
         control: toProject({ ...editor, content: [{ ...item, props: { ...item.props, [name]: option.value } }] }).controls[0],
       }))));
+    const fields = createPaletteFields(request.catalog);
+    const families = paletteFactories.map(factory => Object.keys(factory(request.catalog, fields, () => config)));
     return { types: controlTypes, components: Object.keys(config.components), inputTypes: config.categories.inputs.components,
+      families, categories: Object.values(config.categories).map(category => category.components),
       project: toProject(editor), selections };
   }
   if (request.operation === 'roundtrip') {
