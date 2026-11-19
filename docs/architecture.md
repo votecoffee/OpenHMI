@@ -190,8 +190,11 @@ paths, authorization, revision guards and lock ownership.
   consume the same current project/tag context and perform no controller I/O.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
-  lease, historian or sample-cache dependency. `logix.py` owns runtime scheduling,
-  shared tag demand and cached sample publication. Pure value/type/freshness
+  lease, historian or sample-cache dependency. `logix.py` coordinates physical
+  scan deadlines, route workers, writes and sample publication. Viewer leases,
+  sequence retention, screen-rate demand and trend demand live in
+  `tag_subscriptions.py`. Cached PLC samples, scalar/UDT decoding, good/stale/bad
+  projection and usable-generation checks live in `tag_samples.py`. Pure value/type/freshness
   rules live in `tag_values.py`; bounded timing statistics live in
   `scan_timings.py`. Existing imports from `openhmi.logix` remain compatible.
 
@@ -241,10 +244,27 @@ project/control failures and confirms that rejection preserves both the draft
 and its revision. Correcting the failures in sequence must allow the same
 candidate to save without an apply.
 
-The next move is explicit scheduler versus sample-cache ownership. Preserve project-instance identity, apply rollback,
-command locks and journal reservation/dispatch boundaries in further extractions.
-Further separation of scheduler and sample-cache ownership should keep one
-explicit lock contract and use existing bad-tag retry, receipt freshness,
-reconnect and in-flight-write regression tests. Extend the contract fixtures
+The subscription and sample components deliberately own no locks or worker
+pools. The driver retains its state `RLock`, configuration/write `io_lock` and
+per-route locks. Lease mutation and sample projection use the existing state
+lock; a route lock is never acquired while projecting samples. Transport work
+still runs outside the state lock, and the project-generation fence is checked
+before publishing a completed scan. The existing caller-coordinated `demands`
+contract is unchanged. Concurrent component access requires the driver's state
+lock.
+
+Legacy `samples`, `leases`, `trend_demands`, `_screen_demands` and
+`_lease_sequences` attributes forward to live component-owned dictionaries,
+including replacement assignments. No detached compatibility copies are kept.
+The metadata-only diagnostics regression now guards the cache owner's copy
+function so it still detects an accidental deep copy of tag values.
+`tests/test_tag_state.py` checks shared consumer demand after expiry/release,
+sequence ordering, independent driver state, nested snapshot isolation, legacy
+dictionary replacement and cache cleanup. Existing blocked-route, freshness,
+bad-tag retry, reconnect and in-flight-write tests remain applicable.
+
+The next move is separating physical deadline policy and receipt publication
+while retaining the same atomic state-lock boundary. Preserve project-instance
+identity, apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures
 whenever a saved control field or editor serialization branch is added. These
 software checks do not establish controller or operator-station acceptance.

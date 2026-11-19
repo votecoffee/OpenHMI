@@ -359,7 +359,7 @@ class LogixHistoryTests(unittest.TestCase):
         client = TestClient(app)
         self.addCleanup(client.close)
 
-        with patch('openhmi.logix.deepcopy', side_effect=AssertionError('Diagnostics copied a tag value')):
+        with patch('openhmi.tag_samples.deepcopy', side_effect=AssertionError('Diagnostics copied a tag value')):
             diagnostics = client.get('/api/diagnostics')
             exported = client.get('/api/diagnostics.json', params={'connection': 'plc'})
 

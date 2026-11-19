@@ -594,7 +594,9 @@ tag-option freshness and numeric versus text choices. Family/category coverage
 checks reject missing or duplicated controls, and engineering integration tests
 feed the real draft catalog through browser pickers and backend validation.
 API regression checks also preserve validation precedence and the saved draft
-when a candidate contains multiple invalid bindings.
+when a candidate contains multiple invalid bindings. Driver regression checks
+cover subscription expiry/release, shared demand, independent caches, snapshot
+isolation and compatibility with existing sample/lease dictionary access.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

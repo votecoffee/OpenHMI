@@ -1,4 +1,4 @@
-"""Runtime tag scheduling, shared scan demand and cached sample management."""
+"""Coordinate subscriptions, route scan workers, writes and sample publication."""
 
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -12,7 +12,9 @@ import time
 
 from .drivers import SimulatorDriver
 from .runtime_models import MAX_PLC_CONNECTIONS
-from .screens import screen_map, expanded_controls, referenced_tags
+from .tag_subscriptions import (TagSubscriptions, build_screen_demands,
+                                 MAX_VIEWER_LEASES, MAX_SUBSCRIPTION_SEQUENCES)
+from .tag_samples import SampleCache
 from .alarms import utc_now
 
 
@@ -22,8 +24,6 @@ from .scan_timings import ScanTimings
 from .logix_transport import (LogixConnection, TagWriteError, REAL_MAX, PLC_INTEGER_LIMITS,
                               overlapping_addresses, verify_result_address)
 
-MAX_VIEWER_LEASES = 1000
-MAX_SUBSCRIPTION_SEQUENCES = 2 * MAX_VIEWER_LEASES
 BAD_TAG_RETRY_SECONDS = 30
 
 
@@ -37,28 +37,63 @@ class RuntimeDriver(SimulatorDriver):
         self._scans = {}
         self._scan_started = {}
         self._closing = False
-        self.connections, self.definitions, self.sources, self.samples = {}, {}, {}, {}
+        self.connections, self.definitions, self.sources = {}, {}, {}
+        self.subscriptions = TagSubscriptions()
+        self.sample_cache = SampleCache()
         self.address_aliases = {}
         self.project = None
-        self._screen_demands = {}
-        self.trend_demands = {}
-        self.leases, self.deadlines, self.last_rates = {}, {}, {}
+        self.deadlines, self.last_rates = {}, {}
         self._refresh_after = {}
         self._bad_tag_retry_at = {}
         self._demanded_aliases = {}
-        self._lease_sequences = {}
         self.local_names = set()
         self.plc_hold = False
+
+    # Compatibility views are live component-owned dictionaries, not copies.
+    @property
+    def samples(self):
+        return self.sample_cache.samples
+
+    @samples.setter
+    def samples(self, value):
+        self.sample_cache.samples = value
+
+    @property
+    def leases(self):
+        return self.subscriptions.leases
+
+    @leases.setter
+    def leases(self, value):
+        self.subscriptions.leases = value
+
+    @property
+    def trend_demands(self):
+        return self.subscriptions.trend_demands
+
+    @trend_demands.setter
+    def trend_demands(self, value):
+        self.subscriptions.trend_demands = value
+
+    @property
+    def _screen_demands(self):
+        return self.subscriptions.screen_demands
+
+    @_screen_demands.setter
+    def _screen_demands(self, value):
+        self.subscriptions.screen_demands = value
+
+    @property
+    def _lease_sequences(self):
+        return self.subscriptions.sequences
+
+    @_lease_sequences.setter
+    def _lease_sequences(self, value):
+        self.subscriptions.sequences = value
 
     def configure(self, project):
         with self.io_lock:
             project = deepcopy(project)
-            screens = screen_map(project)
-            screen_tags = {identifier: {} for identifier in screens}
-            for control in expanded_controls(project):
-                screen_tags[control['_screen']].update(dict.fromkeys(referenced_tags(control)))
-            screen_demands = {identifier: (screen.get('update_ms', 500), tuple(screen_tags[identifier]))
-                              for identifier, screen in screens.items()}
+            screen_demands = build_screen_demands(project)
             retired = []
             with self.lock:
                 configs = {config['id']: config for config in project.get('connections', []) if config['enabled'] and not self.plc_hold}
@@ -106,52 +141,12 @@ class RuntimeDriver(SimulatorDriver):
         now = time.monotonic() if now is None else now
         screens = set(screens)
         with self.lock:
-            if sequence is not None and sequence <= self._lease_sequences.get(client, 0):
-                return
-            if any(screen not in self._screen_demands for screen in screens):
-                raise ValueError('Unknown subscription screen')
-            if preview_root and (preview_root not in self.definitions or self.definitions[preview_root]['type'] != 'struct'):
-                raise ValueError('Faceplate preview requires a configured UDT tag')
-            self.leases.pop(client, None)
-            self.leases = {key: value for key, value in self.leases.items() if value[1] > now}
-            if screens or preview_root:
-                self.leases[client] = (screens, now + 15, preview_root)
-            if len(self.leases) > MAX_VIEWER_LEASES:
-                self.leases.pop(next(iter(self.leases)))
-            if sequence is not None:
-                # Retain the latest sequence even after a viewer releases its lease.
-                self._lease_sequences.pop(client, None)
-                self._lease_sequences[client] = sequence
-                if len(self._lease_sequences) > MAX_SUBSCRIPTION_SEQUENCES:
-                    self._lease_sequences.pop(next(iter(self._lease_sequences)))
+            return self.subscriptions.lease(client, screens, self.definitions, now,
+                                             preview_root, sequence=sequence)
 
     def demands(self, now):
-        rates = {}
-        def demand(tag, rate):
-            rates[tag] = min(rate, rates.get(tag, rate))
-        project = self.project
-        if not project:
-            return rates
-        wanted = set()
-        for screens, expires_at, preview_root in self.leases.values():
-            if expires_at > now:
-                wanted.update(screens)
-                if preview_root:
-                    demand(preview_root, 500)
-        for identifier in wanted & self._screen_demands.keys():
-            rate, tags = self._screen_demands[identifier]
-            for tag in tags:
-                demand(tag, rate)
-        for alarm in project.get('alarms', []):
-            if alarm['enabled']:
-                demand(alarm['tag'], 250)
-        for tag, rate in self.trend_demands.items():
-            demand(tag, rate)
-        for history in project.get('historian', {}).get('tags', []):
-            demand(history['tag'], history['sample_ms'])
-        for command in project.get('commands', []):
-            demand(command['root_tag'], command['update_ms'])
-        return rates
+        # Poll holds self.lock; standalone callers retain the existing contract.
+        return self.subscriptions.demands(now, self.project)
 
     def _due_addresses(self, identifier, now):
         due = {address: self.deadlines.get((route, address), 0) for route, address in self.last_rates
@@ -305,23 +300,7 @@ class RuntimeDriver(SimulatorDriver):
                         self.deadlines[key] = scan_finished + rate / 1000
                     usable_address = False
                     for alias, tag, member in self.address_aliases[key]:
-                        try:
-                            if result is None or result.error:
-                                raise ValueError(result.error if result is not None else 'PLC adapter returned a malformed tag result')
-                            value = member_value(result.value, member) if member else result.value
-                            kind = tag['members'][member] if member else tag['type']
-                            if not type_ok(value, kind):
-                                raise ValueError('PLC value does not match configured type or browser numeric limits')
-                            if not member and kind in ('number', 'integer'):
-                                if tag['scale'] != 1 or tag['offset'] != 0:
-                                    value = value * tag['scale'] + tag['offset']
-                                elif kind == 'number':
-                                    value = float(value)
-                                if not math.isfinite(value):
-                                    raise ValueError('Scaled PLC value is not finite')
-                            sample = {'value': value, 'quality': 'good', 'error': None}
-                        except (ValueError, KeyError, TypeError, IndexError) as failure:
-                            sample = {'value': None, 'quality': 'bad', 'error': str(failure)}
+                        sample = self.sample_cache.decode(result, tag, member)
                         self.samples[alias] = {
                             **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
                             'failure_generation': connection.failure_generation,
@@ -343,60 +322,11 @@ class RuntimeDriver(SimulatorDriver):
     def sample_snapshot(self, now=None, *, include_values=True):
         now = time.monotonic() if now is None else now
         with self.lock:
-            result = {}
-            for name, value in self._tags.items():
-                sample = {'quality': 'good', 'timestamp': utc_now(), 'error': None}
-                if include_values:
-                    sample['value'] = deepcopy(value)
-                elif name not in self.definitions:
-                    sample['value_type'] = type(value).__name__
-                result[name] = sample
-            for name, tag in self.definitions.items():
-                if not tag['connection']:
-                    for member in tag['members']:
-                        try:
-                            value = member_value(self._tags[name], member)
-                            sample = result[name].copy()
-                        except (KeyError, TypeError, IndexError):
-                            value = None
-                            sample = {'quality': 'bad', 'timestamp': utc_now(), 'error': 'Missing UDT member'}
-                        if include_values:
-                            sample['value'] = value
-                        result[f'{name}.{member}'] = sample
-            held = {config['id'] for config in (self.project or {}).get('connections', [])
-                    if self.plc_hold and config['enabled']}
-            for alias, (root, _) in self.sources.items():
-                tag = self.definitions[root]
-                if not tag['connection']:
-                    continue
-                cached = self.samples.get(alias)
-                sample = cached.copy() if cached is not None else {
-                    'value': None, 'quality': 'pending', 'timestamp': None, 'error': 'Waiting for PLC sample',
-                }
-                connection = self.connections.get(tag['connection'])
-                generation = sample.pop('failure_generation', 0)
-                if connection is None:
-                    reason = 'held' if tag['connection'] in held else 'disabled'
-                    error = 'PLC acquisition is held' if reason == 'held' else 'Connection is disabled'
-                    sample.update(value=None, quality='bad', quality_reason=reason, error=error)
-                elif not connection.connected and connection.error is not None:
-                    sample.update(value=None, quality='bad', quality_reason='disconnected', error=connection.error)
-                elif cached is not None and generation != connection.failure_generation:
-                    sample.update(value=None, quality='bad', quality_reason='recovering',
-                                  error='Waiting for a fresh PLC sample after connection loss')
-                elif (tag['connection'], tag['address']) in self._refresh_after:
-                    sample.update(value=None, quality='pending', error='Waiting for a PLC sample for renewed demand')
-                elif sample['quality'] == 'good' and now - sample['monotonic'] > freshness_seconds(sample['rate_ms']):
-                    sample.update(quality='stale', error='PLC sample is stale')
-                sample.pop('monotonic', None)
-                if cached is not None:
-                    sample['age_seconds'] = max(0, now - cached['monotonic'])
-                if include_values:
-                    sample['value'] = deepcopy(sample['value'])
-                else:
-                    sample.pop('value', None)
-                result[alias] = sample
-            return result
+            return self.sample_cache.snapshot(
+                now, local_values=self._tags, definitions=self.definitions, sources=self.sources,
+                connections=self.connections, project=self.project, plc_hold=self.plc_hold,
+                refresh_after=self._refresh_after, include_values=include_values, timestamp=utc_now,
+            )
 
     def snapshot(self):
         return {name: sample['value'] for name, sample in self.sample_snapshot().items() if sample['quality'] == 'good'}
@@ -528,13 +458,8 @@ class RuntimeDriver(SimulatorDriver):
         return value
 
     def _has_usable_data(self, identifier, generation, now):
-        for alias, key in self._demanded_aliases.get(identifier, {}).items():
-            sample = self.samples.get(alias)
-            if (sample is not None and sample['quality'] == 'good' and key not in self._refresh_after
-                    and sample.get('failure_generation', 0) == generation
-                    and now - sample['monotonic'] <= freshness_seconds(sample['rate_ms'])):
-                return True
-        return False
+        return self.sample_cache.has_usable_data(identifier, generation, now,
+                                                 self._demanded_aliases, self._refresh_after)
 
     def status(self, *, include_timing=False, include_groups=True, now=None):
         now = time.monotonic() if now is None else now

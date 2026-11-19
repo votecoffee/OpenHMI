@@ -208,7 +208,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     await expect(quality).toContainText('Synthetic stale faceplate permit');
     await quality.getByRole('button', { name: 'Close Tag quality details' }).click();
     await expect(output).toBeDisabled();
-    await viewer.unroute('**/api/tags');
+    await viewer.unrouteAll({ behavior: 'wait' });
     await viewer.getByRole('button', { name: 'Enable unit controls', exact: true }).click();
     await expect(output).toBeEnabled();
     await output.click();
@@ -228,7 +228,7 @@ test('UDT definition designer, multiple screens, popup actions and recorded tren
     });
     await expect(keypad.getByRole('status')).toHaveText('Faceplate enable tag FaceplatePermit · STALE DATA');
     await expect(keypad.getByRole('button', { name: 'Accept entry', exact: true })).toBeDisabled();
-    await viewer.unroute('**/api/tags');
+    await viewer.unrouteAll({ behavior: 'wait' });
     await expect(keypad.getByRole('button', { name: 'Accept entry', exact: true })).toBeEnabled();
     await keypad.getByRole('button', { name: 'Cancel', exact: true }).click();
     const rejected = await viewer.request.put(`/api/controls/equipment__${instance.id}__setpoint/value`, { data: { value: 25 } });

@@ -210,9 +210,12 @@ not close hardware or operator acceptance gates.
    Binding rules are now split into project-level, shared/edit, display/state
    and chart groups. The coordinator preserves project-first and per-control
    failure order, with API regression checks for rejected-draft preservation.
-4. Separate scheduling policy and sample-cache responsibilities further only
-   with explicit lock and lifetime ownership. Preserve shared reads, long
-   per-tag retry, route recovery and write non-replay behavior.
+4. Delivered separate viewer-subscription/demand and sample-cache components,
+   retaining the existing locks and live dictionary compatibility. Fake-PLC
+   comparisons cover demand changes, reconnect, bad tags and write/readback.
+   Physical scan deadlines, retries and receipt publication remain coordinated
+   in the driver. Separate those policies next while preserving shared reads,
+   long per-tag retry, project-generation fences and write non-replay behavior.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
