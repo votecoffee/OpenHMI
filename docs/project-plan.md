@@ -488,11 +488,21 @@ not close hardware or operator acceptance gates.
     Complete OpenAPI is unchanged. This scope does not add a generic unhandled
     exception response policy or change lifecycle ownership.
 
+44. Delivered focused runtime lifecycle ownership across assembly, startup and
+    shutdown. Constructed resources close after configuration, handler, service,
+    route or asset setup failures. Initial-sample and worker-entry/exit failures
+    also run cleanup; cleanup errors are logged independently and do not replace
+    the original failure. Assembly/initial-sample cleanup skips identity publication.
+    Normal shutdown retains worker-drain then trends/identity/acquisition/store
+    order. Worker scheduling and transport remain separate; public factory,
+    models, route order and complete OpenAPI are preserved.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next audit initialization and
-lifespan cleanup, including partial startup failures and independent shutdown
-cleanup. Prioritize observable failure behavior and contract coverage over further
-file splitting. Controller, operator-station and endurance acceptance stay deferred.
+Recipe HTTP separation is complete for this scope. Next review per-route transport
+shutdown isolation so one connection-close failure cannot skip other routes.
+Preserve scan draining and transport ownership. Prioritize observable failure
+behavior and contract coverage over further file splitting. Controller,
+operator-station and endurance acceptance stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

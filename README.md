@@ -646,6 +646,11 @@ Runtime and workspace requests share project-instance guards and response contex
 headers. Stale-project rejections and generated workspace HTTP errors include the
 request project identity. Cross-language checks preserve operation receipts and
 confirm that a new identity header cannot rebind a stale browser or replay writes.
+Runtime lifecycle ownership is separate from application assembly and worker
+scheduling. Partial assembly/startup failures close constructed resources, preserve
+the original failure and continue past individual cleanup errors. Assembly and initial-sample
+cleanup do not invoke identity publication; normal shutdown still drains
+workers before stopping trends, clearing identity, closing acquisition and storage.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

@@ -63,6 +63,9 @@ test('stale editor survives reload, merges explicit conflicts and imports a reco
     await Promise.all([page.goto('/'), other.goto('/')]);
     const numeric = original.draft.controls.find(item => item.kind === 'numeric');
     const indicator = original.draft.controls.find(item => item.kind === 'indicator');
+    // Inject the outage only after both editors have confirmed their identity.
+    await expect(page.locator('[data-control="numeric"]').first()).toBeVisible();
+    await expect(other.locator('[data-control="numeric"]').first()).toBeVisible();
     await page.route('**/api/security/session', route => route.abort());
     await expect(page.getByText('HMI identity status unavailable. Showing the last confirmed sign-in; the server checks permission on every operation.', { exact: true })).toBeVisible();
     await page.locator('[data-control="numeric"]').first().click();

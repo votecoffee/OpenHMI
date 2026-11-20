@@ -41,6 +41,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
 | Recipe component import compatibility | `test_frontend_contract.py`: legacy picture/loaded/selected exports and direct readout palette binding retain focused-module function identity; recipe browser workflow checks all four parameter types, preview/images and loaded values | Component bodies and saved schemas are unchanged; existing project/palette contracts cover persistence; no controller acceptance implied |
 | Recipe authentication registrar | `test_recipe_auth_routes.py`: standalone HTTPS cookie/origin/rate-limit/shared-authorizer behavior, HMI delegation, idempotent HMI logout, stable model/OpenAPI ownership and fresh-process import isolation | Auth/recipe/transfer service construction remains in the combined registrar; Windows identity is mocked and no OS/domain acceptance is claimed |
+| Runtime lifecycle ownership | `test_runtime_lifecycle.py`, `test_runtime_workers.py`: partial assembly across driver/configuration/services/routes/assets, real handler failure, initial sample and worker entry/exit failures, original-error preservation, cleanup isolation/order and no pre-worker identity publication | In-memory SQLite and default simulator with forbidden PLC factory; worker scheduling/transport remain separate; complete OpenAPI is unchanged |
 | HTTP project context and operation receipts | `test_http_context.py`: runtime/workspace stale guards before handlers, read/headerless compatibility, generated HTTP error headers, real SQL journal outcomes through the actual JS API, pinned browser identity and no automatic write replay | Simulator/default runtime and controlled journal callbacks only; generic unhandled server exceptions remain outside this response policy; OpenAPI is unchanged |
 | Recipe library registrars | `test_recipe_library_routes.py`: public reads, six canonical typed mutation adapters, identity/identifier forwarding, invalid body/path rejection before authorization, denied identity and error propagation; focused import isolation | Adapter stubs do not duplicate service policy; existing real SQL/JS/browser contracts cover revisions, self-approval, loaded copies and policy behavior; complete OpenAPI and route order are preserved |
 | Recipe transfer registrar | `test_recipe_transfer_routes.py`: standalone history/export bounds, role checks, binary-safe query forwarding, export headers, recipe-local/HMI journal identity, conditional group authorization and journal-before-dispatch guards | In-memory SQL journal and controlled transfer callback; existing transfer domain/HTTP/browser contracts cover actual service and simulator behavior; complete OpenAPI output is preserved |
@@ -309,8 +310,8 @@ SQL/domain and browser tests retain actual normalization, images and approvals.
 
 ## Next bounded work
 
-1. Audit initialization/lifespan cleanup contracts, including partial startup
-   failure and independent shutdown cleanup; keep workers and transport separate.
+1. Review per-route transport shutdown isolation: failure closing one PLC route
+   must not skip the others. Keep active scan draining and cleanup ownership intact.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

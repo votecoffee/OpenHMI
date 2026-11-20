@@ -587,8 +587,22 @@ and audit status remain attached only when the request owns an activity operatio
 Real HTTP/SQL responses passed through the production JS API cover succeeded,
 denied, rejected, uncertain and pending outcomes. The browser retains its initial
 project identity after refresh/conflict and does not replay writes. Complete
-OpenAPI is unchanged. This does not add a generic unhandled-exception response
-policy or alter application initialization/shutdown ownership.
+OpenAPI is unchanged. Request context does not add a generic unhandled-exception
+response policy.
+Runtime assembly/startup/shutdown ownership now lives in `runtime_lifecycle.py`.
+The public `create_app` signature delegates assembly under a failure cleanup scope;
+store, driver, trend recorder and identity publisher are tracked as construction
+succeeds. Failed assembly closes constructed trends/acquisition/storage, including
+handler, configuration and late route/static registration failures. It does not
+invoke identity shutdown/publication before workers have been attempted. Lifespan
+cleanup now also covers failure of the initial alarm sample or worker context
+entry. Worker exit precedes trend/identity/acquisition/store cleanup, and one
+cleanup exception is logged without skipping the remaining resources or replacing
+the original startup/body/worker-exit exception. Callback methods are resolved at
+cleanup time, preserving runtime instrumentation. Worker scheduling, transport
+ownership, HTTP models, route order and complete OpenAPI remain unchanged. Tests
+inject failures using real in-memory SQL resources and a forbidden PLC factory;
+no hardware acceptance is implied.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

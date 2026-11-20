@@ -1,9 +1,7 @@
 """Local live HMI builder with simulation and startup-loaded Python actions."""
 
 from pathlib import Path
-from contextlib import asynccontextmanager
 import logging
-import asyncio
 import uuid
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -17,6 +15,7 @@ from .command_routes import add_command_routes
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .runtime_workers import RuntimeWorkers
+from .runtime_lifecycle import RuntimeLifecycle
 from .historian import Historian
 from .history_routes import add_history_routes
 from .trend_recording import TrendRecorder
@@ -48,20 +47,23 @@ from .engineering_routes import add_engineering_routes
 
 
 def create_app(project_path: Path | None = None, handlers: Path | None = None, recipe_users=None, hold_connections=False) -> FastAPI:
-    store = ProjectStore(project_path)
-    application = Application(RuntimeDriver())
+    lifecycle = RuntimeLifecycle()
+    with lifecycle.building():
+        return _create_app(project_path, handlers, recipe_users, hold_connections, lifecycle)
+
+
+def _create_app(project_path, handlers, recipe_users, hold_connections, lifecycle):
+    store = lifecycle.store = ProjectStore(project_path)
+    driver = lifecycle.driver = RuntimeDriver()
+    application = Application(driver)
     application.driver.plc_hold = hold_connections
     application.driver.configure(Project.model_validate(store.snapshot()['active']).model_dump())
     historian = Historian(store, application.driver)
     historian.configure(application.driver.project['historian'])
-    trends = TrendRecorder(store, application.driver)
+    trends = lifecycle.trends = TrendRecorder(store, application.driver)
     trends.configure(application.driver.project)
     if handlers:
-        try:
-            application.load_handlers(handlers)
-        except Exception:
-            store.close()
-            raise
+        application.load_handlers(handlers)
 
     def sample_values():
         with application.lock:
@@ -79,23 +81,8 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
                     raise
                 logging.exception("Alarm monitor sampling failed")
 
-    @asynccontextmanager
-    async def lifespan(app):
-        await asyncio.to_thread(sample_alarms)
-        try:
-            async with workers.running():
-                yield
-        finally:
-            for name, cleanup in (
-                ('trends', trends.shutdown), ('identity', publisher.shutdown),
-                ('acquisition', application.driver.close), ('project store', store.close),
-            ):
-                try:
-                    await asyncio.to_thread(cleanup)
-                except Exception:
-                    logging.exception('Runtime cleanup failed for %s', name)
-
-    app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifespan)
+    lifecycle.sample_alarms = sample_alarms
+    app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifecycle.lifespan)
     instance = app.state.project_instance = uuid.uuid4().hex
 
     add_project_context_middleware(app, instance)
@@ -106,12 +93,12 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app.state.historian = historian
     app.state.trends = trends
     security = app.state.security = Security(store)
-    publisher = app.state.identity_publisher = IdentityPublisher(application.driver, security)
+    publisher = lifecycle.publisher = app.state.identity_publisher = IdentityPublisher(application.driver, security)
     add_identity_routes(app, publisher)
     activity = app.state.activity = ActivityJournal(store, security)
     commands = app.state.commands = CommandService(store, application.driver)
     add_command_routes(app, commands, security)
-    workers = RuntimeWorkers({
+    workers = lifecycle.workers = RuntimeWorkers({
         'acquisition': (0.05, lambda: application.driver.poll(wait=False)),
         'commands': (0.05, lambda: commands.poll()),
         'alarms': (0.25, lambda: sample_alarms(propagate=True)),
