@@ -431,8 +431,17 @@ not close hardware or operator acceptance gates.
     faults verify no write or page error. Live selected-copy and raw permit
     metadata remain independent; hash/write rules stay server-owned.
 
+37. Delivered recipe session/sign-in/sign-out response validation. Local and
+    HMI identity shapes, expiry/logout, mock-Windows mappings, empty/future roles
+    and legacy metadata are covered. Malformed replies retain confirmed identity;
+    refresh reconciles actual cookie state without replay. Read faults block
+    workspace writes, while confirmed updates clear stale errors/passwords. Browser
+    regressions cover corrupted auth confirmations and session recovery. Earlier
+    checkpoint notes are preserved in [history](maintainability-checkpoints.md)
+    so the GitHub issue can retain its acceptance criteria within the body limit.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe session response validation and compatibility next. Keep further module extraction tied
+Prioritize recipe preview/parameter component separation next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

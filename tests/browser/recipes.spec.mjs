@@ -1,6 +1,51 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
+test('malformed recipe identity replies retain confirmed identity and recover by refresh', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/recipe-editor');
+  const session = page.locator('.recipe-session');
+  let logins = 0, logouts = 0;
+  await page.route('**/api/recipe-auth/login', async route => {
+    logins += 1;
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: { ...body, user: { ...body.user, roles: {} } } });
+  });
+  await session.getByLabel('Recipe user', { exact: true }).fill('engineer');
+  await session.getByLabel('Password', { exact: true }).fill('RecipeTestOnly-2026!');
+  await session.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(session.getByRole('alert')).toContainText('Invalid recipe sign-in response');
+  await expect(session.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+  await page.unroute('**/api/recipe-auth/login');
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(session).toContainText('Signed in: engineer');
+  await expect(session.getByRole('alert')).toHaveCount(0);
+  await page.route('**/api/recipe-auth/session', route => route.fulfill({ json: { configured: true, user: { name: 'Malformed', roles: {} } } }));
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Invalid recipe session response');
+  await expect(session).toContainText('Signed in: engineer');
+  await expect(page.getByRole('button', { name: 'Create recipe', exact: true })).toBeDisabled();
+  await page.unroute('**/api/recipe-auth/session');
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.route('**/api/recipe-auth/logout', async route => {
+    logouts += 1;
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ok: false } });
+  });
+  await session.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(session.getByRole('alert')).toContainText('Invalid recipe sign-out response');
+  await expect(session).toContainText('Signed in: engineer');
+  await page.unroute('**/api/recipe-auth/logout');
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(session.getByLabel('Password', { exact: true })).toHaveValue('');
+  await expect(session.getByRole('alert')).toHaveCount(0);
+  expect(logins).toBe(1); expect(logouts).toBe(1);
+  expect(errors).toEqual([]);
+});
+
 test('recipe library faults retain unsaved edits and recover without writing', async ({ page }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

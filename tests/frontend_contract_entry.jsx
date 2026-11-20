@@ -1,6 +1,6 @@
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
-import { readRecipeSession, signInRecipe, signOutRecipe } from '../frontend/recipe-auth.mjs';
+import { readRecipeSession, signInRecipe, signOutRecipe, requireRecipeSession, requireRecipeSignIn, requireRecipeSignOut } from '../frontend/recipe-auth.mjs';
 import { isRecipeLibrary } from '../frontend/recipe-library.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
 import { isRecipeTransferPage, isRecipeTransferRecord, requireRecipeTransferReceipt, recipeTransferFailureMessage } from '../frontend/recipe-transfer-responses.mjs';
@@ -28,6 +28,18 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_session_responses') {
+    const before = JSON.stringify(request.entries);
+    const results = request.entries.map(item => {
+      try {
+        const value = item.kind === 'session' ? requireRecipeSession(item.data)
+          : item.kind === 'login' ? requireRecipeSignIn(item.data) : requireRecipeSignOut(item.data);
+        return { valid: true, same: value === item.data };
+      } catch (error) { return { valid: false, error: error.message }; }
+    });
+    if (JSON.stringify(request.entries) !== before) throw new Error('Session validation mutated input');
+    return results;
+  }
   if (request.operation === 'recipe_libraries') {
     const before = JSON.stringify(request.libraries);
     const valid = request.libraries.map(isRecipeLibrary);

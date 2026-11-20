@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { signInRecipe, signOutRecipe } from './recipe-auth.mjs';
 
 export function RecipeSession({ session, onChange }) {
@@ -6,6 +6,7 @@ export function RecipeSession({ session, onChange }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  useEffect(() => { if (session.user) setPassword(''); setError(''); }, [session.user]);
   async function signIn(event) {
     event.preventDefault(); setBusy(true); setError('');
     try {

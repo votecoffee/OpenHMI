@@ -15,20 +15,24 @@ from tests.test_recipes import USERS, PASSWORD as RECIPE_PASSWORD
 from tests.test_security import FakeWindows, PASSWORD as HMI_PASSWORD
 
 
+def recipe_session_fixture(test_case, users=USERS):
+    store = ProjectStore()
+    test_case.addCleanup(store.close)
+    driver = Mock(spec=['load_recipe', 'read'])
+    driver.read.side_effect = AssertionError('Session contracts cannot read PLC tags')
+    application = SimpleNamespace(lock=RLock(), driver=driver)
+    security = Security(store, windows=FakeWindows())
+    app = FastAPI()
+    add_recipe_routes(app, store, application, users=users, security=security, commands=SimpleNamespace())
+    client = TestClient(app)
+    test_case.addCleanup(client.close)
+    driver.reset_mock()
+    return client, security, app.state.recipe_auth, driver
+
+
 class RecipeSessionContractTests(unittest.TestCase):
     def fixture(self, users=USERS):
-        store = ProjectStore()
-        self.addCleanup(store.close)
-        driver = Mock(spec=['load_recipe', 'read'])
-        driver.read.side_effect = AssertionError('Session contracts cannot read PLC tags')
-        application = SimpleNamespace(lock=RLock(), driver=driver)
-        security = Security(store, windows=FakeWindows())
-        app = FastAPI()
-        add_recipe_routes(app, store, application, users=users, security=security, commands=SimpleNamespace())
-        client = TestClient(app)
-        self.addCleanup(client.close)
-        driver.reset_mock()
-        return client, security, app.state.recipe_auth, driver
+        return recipe_session_fixture(self, users)
 
     def browser(self, actions, **kwargs):
         return frontend('recipe_sessions', actions=actions, **kwargs)

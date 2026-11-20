@@ -527,7 +527,15 @@ readable library/draft state and block writes; an initial failure offers retry.
 Successful refresh restores actions without discarding dirty content. SQL/HTTP
 contracts cover all six revision states and unavailable permits; browser faults
 cover nested malformed policy, HTTP failure, no writes and draft recovery. Recipe
-session response validation remains the next boundary. Preserve model/import
+session reads, sign-in replies and sign-out confirmations now have consumed-field
+guards in `recipe-auth.mjs`. Local and HMI users require a string name and string
+role list; empty/future roles and extra provider metadata remain compatible. A
+malformed session cannot replace confirmed identity, and the existing workspace
+read-failure gate blocks writes until recovery. Invalid auth confirmations retain
+identity with refresh guidance, without replaying login/logout. Confirmed identity
+updates clear stale form errors and credentials. Real auth/security tests and
+browser faults cover recovery, including mock-Windows mappings. Parameter/preview
+component separation is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

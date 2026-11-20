@@ -642,6 +642,8 @@ Dispatch receipts must match the requested target/revision and durable transacti
 ambiguous replies show verification guidance and refresh status without replay.
 Recipe library validation retains readable history and unsaved edits on refresh
 failure, blocks writes until recovery, and offers retry after initial-load failure.
+Recipe session/sign-in/sign-out replies are validated before identity updates.
+Earlier verification notes are retained in the [checkpoint history](docs/maintainability-checkpoints.md).
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

@@ -38,6 +38,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe transfer responses | `test_recipe_transfer_responses.py`: real SQL/HTTP history/detail/verified responses through production record/page guards; all eight modeled command states, verified records outside the page, retired targets, nullable metadata and malformed paging | States are seeded offline; browser guards validate consumed fields, while server checks enforce hashes/integrity; no controller acceptance or strict response DTO filtering |
 | Transfer dispatch receipts | `test_recipe_transfer_receipts.py`: actual simulator-backed success/pending/uncertain HTTP outcomes through pure receipt correlation and error-formatting helpers; malformed identities and no confirmation/replay | A validated receipt confirms request dispatch, not PLC completion; server/domain checks retain hash and running-copy authority; optional legacy receipt headers remain supported |
 | Recipe library responses | `test_recipe_library_contract.py`: SQL/HTTP lifecycle snapshots through the production guard; all six revision states, typed values, policy/gates, audit differences, legacy optional fields and unavailable permits | Guard covers workspace-consumed fields, not full write-schema validation or hash integrity; selection/live-copy status and recipe session replies are separate boundaries |
+| Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -262,10 +263,20 @@ Failed refreshes retain readable library and unsaved content, block writes and
 keep a manual recovery path. Initial failure offers retry. Browser regressions
 confirm retained identity/draft fields, no recipe writes and valid-reply recovery.
 
+Recipe session/sign-in/sign-out guards now share `recipe-auth.mjs`. Real local
+authentication and SQL-backed HMI security replies pass across expiry, logout,
+mock-Windows mappings and empty role grants. Legacy user fields, future string
+roles and extra metadata remain compatible. Malformed replies do not replace
+confirmed identity or imply successful logout. Session-read faults reuse the
+workspace write gate; manual refresh reconciles the actual server session without
+replaying auth requests. Confirmed identity updates clear stale form errors and
+password state. Browser faults exercise real cookie-changing login/logout with
+corrupted confirmations, malformed session reads and recovery without page errors.
+
 ## Next bounded work
 
-1. Validate recipe session response fields consumed by local/HMI delegation,
-   preserving legacy roles and failure/recovery behavior.
+1. Separate recipe preview/parameter components from workspace orchestration,
+   preserving public exports and editor/runtime contracts.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
