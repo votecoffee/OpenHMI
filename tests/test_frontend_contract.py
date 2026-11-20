@@ -57,6 +57,10 @@ def palette_defaults():
 
 
 class FrontendContractTests(unittest.TestCase):
+    def test_recipe_component_exports_and_palette_preserve_function_identity(self):
+        self.assertEqual(frontend('recipe_component_exports', catalog={'tags': [], 'actions': [], 'security_groups': []}),
+                         dict(picture=True, loaded=True, selected=True, palette=True))
+
     @classmethod
     def setUpClass(cls):
         cls.defaults = palette_defaults()

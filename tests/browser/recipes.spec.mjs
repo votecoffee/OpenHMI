@@ -184,6 +184,22 @@ test('recipe image, same-user approval and independent production copy', async (
   await page.getByLabel('Parameter 1 units', { exact: true }).fill('rpm');
   await page.getByLabel('Parameter 1 minimum', { exact: true }).fill('0');
   await page.getByLabel('Parameter 1 maximum', { exact: true }).fill('100');
+  for (const [index, name, label, type, value] of [
+    [2, 'enabled', 'Enabled fixture', 'boolean', true],
+    [3, 'batch', 'Batch fixture', 'text', '001, 设备 Δ'],
+    [4, 'count', 'Count fixture', 'integer', '7'],
+  ]) {
+    await page.getByRole('button', { name: 'Add parameter', exact: true }).click();
+    await page.getByLabel(`Parameter ${index} name`, { exact: true }).fill(name);
+    await page.getByLabel(`Parameter ${index} label`, { exact: true }).fill(label);
+    await page.getByLabel(`Parameter ${index} type`, { exact: true }).selectOption(type);
+    const entry = page.getByLabel(`Parameter ${index} value`, { exact: true });
+    if (type === 'boolean') await entry.check(); else await entry.fill(value);
+    if (type === 'boolean' || type === 'text') await expect(page.getByLabel(`Parameter ${index} minimum`, { exact: true })).toBeDisabled();
+  }
+  await page.getByRole('button', { name: 'Add parameter', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove 5', exact: true }).click();
+  await expect(page.locator('[data-parameter-row]')).toHaveCount(4);
   await page.getByRole('button', { name: 'Create recipe', exact: true }).click();
   await expect(page.locator('.recipe-review-state')).toContainText('draft');
   const viewer = await context.newPage();
@@ -195,6 +211,12 @@ test('recipe image, same-user approval and independent production copy', async (
   await viewer.getByRole('button', { name: 'Load recipe', exact: true }).click();
   await expect(viewer.locator('.recipe-loaded')).toContainText('NOT PRODUCTION APPROVED');
   await expect(viewer.locator('.recipe-loaded')).toContainText('45.5');
+  await expect(viewer.locator('.recipe-loaded .recipe-values')).toContainText('001, 设备 Δ');
+  await expect(viewer.locator('.recipe-loaded .recipe-values tr').filter({ hasText: 'Enabled fixture' }).getByRole('cell', { name: 'ON', exact: true })).toBeVisible();
+  const typed = (await (await viewer.request.get('/api/recipes/selected')).json()).snapshot.content.parameters;
+  expect(typed.map(parameter => [parameter.type, parameter.value])).toEqual([
+    ['number', 45.5], ['boolean', true], ['text', '001, 设备 Δ'], ['integer', 7],
+  ]);
   await page.getByLabel('Change / approval / load reason', { exact: true }).fill('Trial complete; ready for review');
   await page.getByRole('button', { name: 'Submit for approval', exact: true }).click();
   await expect(page.locator('.recipe-review-state')).toContainText('in_review');

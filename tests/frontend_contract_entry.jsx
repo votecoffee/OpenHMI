@@ -10,6 +10,9 @@ import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from 
 import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
 // Exercise production palette defaults and serializers without a DOM or PLC.
 import { createConfig } from '../frontend/controls.jsx';
+import * as legacyRecipes from '../frontend/recipes.jsx';
+import { RecipePicture, LoadedRecipe, SelectedRecipe } from '../frontend/recipe-controls.jsx';
+import { createReadoutsPalette } from '../frontend/palette-readouts.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
 import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
 import { api, uploadProjectImage } from '../frontend/api.mjs';
@@ -28,6 +31,11 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_component_exports') {
+    const palette = createReadoutsPalette(request.catalog, createPaletteFields(request.catalog));
+    return { picture: legacyRecipes.RecipePicture === RecipePicture, loaded: legacyRecipes.LoadedRecipe === LoadedRecipe,
+      selected: legacyRecipes.SelectedRecipe === SelectedRecipe, palette: palette.SelectedRecipe.render === SelectedRecipe };
+  }
   if (request.operation === 'recipe_session_responses') {
     const before = JSON.stringify(request.entries);
     const results = request.entries.map(item => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { PlcConnectionStatus } from './live-quality.jsx';
-import { SelectedRecipe } from './recipes.jsx';
+import { SelectedRecipe } from './recipe-controls.jsx';
 import { CurrentUser } from './security.jsx';
 import { LedDisplay, TagQuality, NumericDisplay, StaticLabel, ScreenSymbol, TimeDisplay, TextDisplay, annotationSymbols } from './display-controls.jsx';
 

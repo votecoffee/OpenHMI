@@ -8,64 +8,13 @@ import { Live } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext } from './security.jsx';
 import { RecipeTransferPanel } from './recipe-transfers.jsx';
+import { RecipePicture, LoadedRecipe, ParameterValues } from './recipe-controls.jsx';
+import { ParameterEditor } from './recipe-parameters.jsx';
+
+export { RecipePicture, LoadedRecipe, SelectedRecipe } from './recipe-controls.jsx';
 
 const blank = () => ({ title: '', description: '', image_id: null, parameters: [] });
 const clone = value => JSON.parse(JSON.stringify(value));
-
-export function RecipePicture({ content }) {
-  const { ui } = useLocalization();
-  return content?.image_id ? <img className="recipe-image" src={`/api/recipe-images/${content.image_id}`} alt={content.title} />
-    : <div className="recipe-no-image">{ui('recipeNoImage')}</div>;
-}
-
-export function LoadedRecipe({ compact = false }) {
-  const live = useContext(Live);
-  const { ui } = useLocalization();
-  const selected = live.recipeSelection?.snapshot;
-  if (!live.recipeConnected) return <p className="hmi-quality">{ui('recipeUnavailable')}</p>;
-  if (!selected) return <p>{ui('recipeNotLoaded')}</p>;
-  return <div className={`loaded-recipe ${compact ? 'compact' : ''}`}>
-    <RecipePicture content={selected.content} />
-    <div><strong>{selected.content.title}</strong><p>{selected.code} / {ui('recipeRevision')} {selected.number}</p>
-      <p className="recipe-production">{selected.production_approved ? ui('recipeProduction') : ui('recipeTest')}</p>
-      {!compact && <><p>{ui('recipeLoadedBy')}: {selected.loaded_by} · {selected.loaded_at}</p>
-        {selected.approved_by && <p>{ui('recipeApprovedBy')}: {selected.approved_by}</p>}
-        <ParameterValues content={selected.content} /></>}
-    </div>
-  </div>;
-}
-
-function ParameterValues({ content }) {
-  const { ui } = useLocalization();
-  return <table className="recipe-values"><thead><tr><th>{ui('recipeParameter')}</th><th>{ui('recipeValue')}</th><th>{ui('recipeUnits')}</th></tr></thead>
-    <tbody>{content.parameters.map(parameter => <tr key={parameter.name}><td>{parameter.label}</td>
-      <td>{typeof parameter.value === 'boolean' ? ui(parameter.value ? 'on' : 'off') : String(parameter.value)}</td><td>{parameter.unit}</td></tr>)}</tbody></table>;
-}
-
-function ParameterEditor({ content, update, disabled }) {
-  function change(index, patch) { update({ ...content, parameters: content.parameters.map((parameter, i) => i === index ? { ...parameter, ...patch } : parameter) }); }
-  return <fieldset disabled={disabled}><legend>Recipe parameters</legend>
-    <table className="parameter-editor"><thead><tr><th>Name</th><th>Label</th><th>Type</th><th>Value</th><th>Units</th><th>Minimum</th><th>Maximum</th><th /></tr></thead>
-      <tbody>{content.parameters.map((parameter, index) => <tr key={index} data-parameter-row>
-        <td><input aria-label={`Parameter ${index + 1} name`} value={parameter.name} onChange={event => change(index, { name: event.target.value })} /></td>
-        <td><input aria-label={`Parameter ${index + 1} label`} value={parameter.label} onChange={event => change(index, { label: event.target.value })} /></td>
-        <td><select aria-label={`Parameter ${index + 1} type`} value={parameter.type} onChange={event => change(index, { type: event.target.value,
-          value: event.target.value === 'boolean' ? false : event.target.value === 'text' ? '' : 0, minimum: null, maximum: null })}>
-          {['number', 'integer', 'boolean', 'text'].map(type => <option key={type}>{type}</option>)}</select></td>
-        <td>{parameter.type === 'boolean' ? <input aria-label={`Parameter ${index + 1} value`} type="checkbox" checked={parameter.value} onChange={event => change(index, { value: event.target.checked })} />
-          : <input aria-label={`Parameter ${index + 1} value`} value={parameter.value} onChange={event => change(index, { value: event.target.value })} />}</td>
-        <td><input aria-label={`Parameter ${index + 1} units`} value={parameter.unit} onChange={event => change(index, { unit: event.target.value })} /></td>
-        <td><input aria-label={`Parameter ${index + 1} minimum`} disabled={!['number', 'integer'].includes(parameter.type)} value={parameter.minimum ?? ''} onChange={event => change(index, { minimum: event.target.value })} /></td>
-        <td><input aria-label={`Parameter ${index + 1} maximum`} disabled={!['number', 'integer'].includes(parameter.type)} value={parameter.maximum ?? ''} onChange={event => change(index, { maximum: event.target.value })} /></td>
-        <td><button onClick={() => update({ ...content, parameters: content.parameters.filter((_, i) => i !== index) })}>Remove {index + 1}</button></td>
-      </tr>)}</tbody></table>
-    <button onClick={() => {
-      let next = content.parameters.length + 1;
-      while (content.parameters.some(parameter => parameter.name === `parameter_${next}`)) ++next;
-      update({ ...content, parameters: [...content.parameters, { name: `parameter_${next}`, label: `Parameter ${next}`, type: 'number', value: 0, unit: '', minimum: null, maximum: null }] });
-    }}>Add parameter</button>
-  </fieldset>;
-}
 
 export function RecipeWorkspace({ edit, catalog }) {
   const live = useContext(Live);
@@ -199,10 +148,4 @@ export function RecipeWorkspace({ edit, catalog }) {
         <td>{event.timestamp}</td><td>{event.actor}</td><td>{event.operation}</td><td>{event.details.reason}</td></tr>)}</tbody></table>
     </details>}
   </section>;
-}
-
-export function SelectedRecipe({ id, label }) {
-  const { text } = useLocalization();
-  return <article className="hmi-control hmi-recipe" data-control="recipe"><span className="hmi-label">{text(`control.${id}.label`, label)}</span>
-    <LoadedRecipe compact /></article>;
 }

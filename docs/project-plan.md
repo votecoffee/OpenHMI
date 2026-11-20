@@ -440,8 +440,15 @@ not close hardware or operator acceptance gates.
     checkpoint notes are preserved in [history](maintainability-checkpoints.md)
     so the GitHub issue can retain its acceptance criteria within the body limit.
 
+38. Delivered focused recipe display and parameter-editor components. The
+    workspace retains orchestration; legacy picture/loaded/selected exports alias
+    the same functions, and the palette imports the selected renderer directly.
+    Moved bodies and saved schemas remain unchanged. Export identity, palette/
+    project contracts and expanded browser coverage preserve typed parameters,
+    image previews, loaded copies and runtime behavior.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe preview/parameter component separation next. Keep further module extraction tied
+Prioritize recipe authentication HTTP router separation next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

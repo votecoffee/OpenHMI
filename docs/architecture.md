@@ -534,8 +534,15 @@ malformed session cannot replace confirmed identity, and the existing workspace
 read-failure gate blocks writes until recovery. Invalid auth confirmations retain
 identity with refresh guidance, without replaying login/logout. Confirmed identity
 updates clear stale form errors and credentials. Real auth/security tests and
-browser faults cover recovery, including mock-Windows mappings. Parameter/preview
-component separation is next. Preserve model/import
+browser faults cover recovery, including mock-Windows mappings. Recipe picture,
+loaded-copy, value-table and selected-recipe controls now live in
+`recipe-controls.jsx`; parameter editing lives in `recipe-parameters.jsx`. The
+workspace imports them directly and retains state/API orchestration. Existing
+`recipes.jsx` picture/loaded/selected exports are aliases to the same functions;
+the readout palette imports its renderer directly. Moved component bodies and
+saved schemas are unchanged. An export/palette identity contract and expanded
+typed-parameter browser workflow protect this boundary. Recipe authentication
+HTTP route separation is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

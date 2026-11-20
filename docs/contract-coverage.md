@@ -39,6 +39,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Transfer dispatch receipts | `test_recipe_transfer_receipts.py`: actual simulator-backed success/pending/uncertain HTTP outcomes through pure receipt correlation and error-formatting helpers; malformed identities and no confirmation/replay | A validated receipt confirms request dispatch, not PLC completion; server/domain checks retain hash and running-copy authority; optional legacy receipt headers remain supported |
 | Recipe library responses | `test_recipe_library_contract.py`: SQL/HTTP lifecycle snapshots through the production guard; all six revision states, typed values, policy/gates, audit differences, legacy optional fields and unavailable permits | Guard covers workspace-consumed fields, not full write-schema validation or hash integrity; selection/live-copy status and recipe session replies are separate boundaries |
 | Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
+| Recipe component import compatibility | `test_frontend_contract.py`: legacy picture/loaded/selected exports and direct readout palette binding retain focused-module function identity; recipe browser workflow checks all four parameter types, preview/images and loaded values | Component bodies and saved schemas are unchanged; existing project/palette contracts cover persistence; no controller acceptance implied |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -273,10 +274,19 @@ replaying auth requests. Confirmed identity updates clear stale form errors and
 password state. Browser faults exercise real cookie-changing login/logout with
 corrupted confirmations, malformed session reads and recovery without page errors.
 
+Recipe readouts/value rendering and parameter editing now have focused component
+modules. The workspace retains API, state and dirty-draft ownership. Public
+picture/loaded/selected exports retain function identity through aliases; the
+palette binds directly to the focused selected-recipe renderer. Saved schemas
+and moved bodies are unchanged. Browser coverage includes add/remove parameter
+rows, all four types, disabled nonnumeric limits, Unicode/leading-zero text and
+typed values read back from the SQL-loaded copy, alongside image/approval/runtime
+workflows.
+
 ## Next bounded work
 
-1. Separate recipe preview/parameter components from workspace orchestration,
-   preserving public exports and editor/runtime contracts.
+1. Separate recipe authentication HTTP routes from the combined recipe registrar,
+   preserving import paths, cookie/delegation behavior and permissions.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
