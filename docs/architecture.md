@@ -668,6 +668,24 @@ rollback and uncertain post-commit failures. These are process-level complete-fi
 checks, not multi-file crash/power-loss durability or adversarial external-writer
 acceptance. Original files and uncertain outcomes are preserved. Complete OpenAPI
 is unchanged.
+`workspace_inventory.py` owns metadata scanning plus canonical query/page models
+for the new workspace ASGI GET `/api/workspace/artifacts`. The existing HMI
+`security.manage` and legacy recipe-administrator gates run before scans. Default
+pages contain at most 50 entries (100 maximum), using filename cursors and a
+10,000-entry directory scan bound. Known top-level hold/Python/accounts/WAL/SHM/
+journal names are associated with expected database filenames using lstat metadata
+only. Contents and link targets are never opened; directory/link/unavailable and
+missing-database states remain explicit. Byte sizes are nullable and JS-safe.
+Limited scans or names that cannot be represented in UTF-8 mark results incomplete.
+`workspace-api.mjs` validates canonical identity, enums, sizes, uniqueness, code-point
+ordering and cursors before display. `workspace-artifacts.jsx` owns the read-only
+panel: manual paging/refresh, last-good data on malformed/unavailable replies and
+clearing on permission denial. It offers no cleanup/repair/open actions. Python/JS
+contracts cover actual metadata and HTTP query bounds, including Unicode beyond
+the BMP; browser faults cover preservation, denial and refresh. This is neither a
+database-integrity check nor a verdict that WAL/SHM/journals are abnormal. Existing
+FastAPI OpenAPI is unchanged; the manual workspace route has direct Pydantic/JS
+contract coverage.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

@@ -548,10 +548,21 @@ not close hardware or operator acceptance gates.
     failure, destination races and uncertain completion. Complete OpenAPI is
     unchanged; process-crash/power-loss durability is not claimed.
 
+50. Delivered protected read-only project file inventory and an engineering panel.
+    Known support/recovery files show their associated database, entry type and
+    nullable size from metadata only; contents and link targets are not read.
+    Query/page Pydantic models and production JS guards share real HTTP metadata
+    contracts, including Unicode ordering and bounded cursors. Directory scans
+    stop at 10,000 entries, pages at 100, and incomplete scans are explicit.
+    The panel preserves confirmed results on bad replies, clears denied data and
+    recovers by refresh without file actions or operation replay. Normal SQLite
+    recovery files are not labeled corrupt. Existing FastAPI OpenAPI is unchanged;
+    the manual workspace route is covered directly by schema/HTTP/browser checks.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review project-library
-diagnostics for retained support and recovery artifacts, preserving every file
-and avoiding automatic cleanup or repair. Preserve scan/resource draining and
+Recipe HTTP separation is complete for this scope. Next harden the main project-
+library listing and operation response contracts, retaining unsaved fields and
+rejecting malformed replies without replay. Preserve scan/resource draining and
 transport ownership. Prioritize observable failure behavior and contract coverage
 over further file splitting. Controller, operator-station and endurance acceptance
 stay deferred.

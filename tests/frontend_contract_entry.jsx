@@ -1,3 +1,4 @@
+import { workspaceArtifactPath, isWorkspaceArtifactPage, readWorkspaceArtifacts } from '../frontend/workspace-api.mjs';
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe, requireRecipeSession, requireRecipeSignIn, requireRecipeSignOut } from '../frontend/recipe-auth.mjs';
@@ -31,6 +32,10 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'workspace_artifacts') {
+    return { paths: (request.queries ?? []).map(workspaceArtifactPath),
+      valid: (request.pages ?? []).map(item => isWorkspaceArtifactPage(item.data, item.after ?? '')) };
+  }
   if (request.operation === 'http_context') {
     const calls = [], results = [];
     let index = 0;

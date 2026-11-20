@@ -18,3 +18,5 @@
 .hmi-popup { max-height: 90vh; overflow: auto; background: #ddd; border: 2px solid #555; width: min(1000px,95vw); padding: 12px; }
 .hmi-popup > header { display: flex; justify-content: space-between; padding: 8px; }
 .hmi-popup > header button { font: inherit; padding: 6px 12px; }
+
+.workspace-artifacts td { overflow-wrap: anywhere; }

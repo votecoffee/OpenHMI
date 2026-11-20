@@ -672,6 +672,11 @@ before the completed database becomes visible; existing files are never replaced
 Orphan support/SQLite recovery files block name reuse. Failed attempts roll back
 only unchanged files they own; changed artifacts or companions beside a visible
 database are retained for review, including imported PLC connection holds.
+Projects now includes a read-only file inventory for known support and SQLite
+recovery files. It shows database association and entry type without reading
+contents or following links, with bounded paging and incomplete-scan indications.
+Project-management permissions apply. The panel retains confirmed results on bad
+replies, clears denied data, and supports manual refresh without changing files.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

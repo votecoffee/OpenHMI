@@ -43,3 +43,45 @@ test('project library creates, opens, exports and imports a complete backup', as
   await login();
   await expect(page.locator('.station-title h1')).toContainText('Browser machine');
 });
+
+
+test('file inventory retains confirmed metadata on malformed replies, clears denial and recovers', async ({ page }) => {
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const signedIn = await page.request.post('/api/security/login', { data: { name: 'admin', password: 'SecurityTestOnly-2026!' } });
+  expect(signedIn.ok()).toBe(true);
+  const first = { items: [{ file: 'Retained.openhmi.hold', project_file: 'Retained.openhmi.sqlite3', kind: 'connection_hold',
+    entry_type: 'file', project_entry_type: 'missing', size_bytes: 24 }], next_after: 'Retained.openhmi.hold', scan_limited: false };
+  let reply = { json: first };
+  const requests = [];
+  await page.route('**/api/workspace/artifacts*', route => {
+    requests.push({ method: route.request().method(), url: route.request().url() });
+    return route.fulfill(reply);
+  });
+  await page.goto('/projects');
+  const panel = page.getByRole('region', { name: 'Project file inventory', exact: true });
+  const rows = panel.locator('tbody');
+  await expect(rows).toContainText('Retained.openhmi.hold');
+  await expect(rows).toContainText('No database present');
+  await page.getByLabel('New project ID', { exact: true }).fill('KeepMyDraft');
+  reply = { json: { items: [null], next_after: null, scan_limited: false } };
+  await panel.getByRole('button', { name: 'Next files', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('Showing the last confirmed file inventory');
+  await expect(rows).toContainText('Retained.openhmi.hold');
+  await expect(panel.getByRole('button', { name: 'Next files', exact: true })).toBeDisabled();
+  expect(new URL(requests.at(-1).url).searchParams.get('after')).toBe(first.next_after);
+  reply = { json: { ...first, scan_limited: true } };
+  await panel.getByRole('button', { name: 'Refresh file inventory', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('directory scan was limited');
+  await expect(rows).toContainText('Retained.openhmi.hold');
+  reply = { status: 403, json: { detail: 'Synthetic permission denial' } };
+  await panel.getByRole('button', { name: 'Refresh file inventory', exact: true }).click();
+  await expect(panel.getByRole('alert')).toContainText('File inventory unavailable');
+  await expect(panel.locator('tbody')).toHaveCount(0);
+  reply = { json: first };
+  await panel.getByRole('button', { name: 'Refresh file inventory', exact: true }).click();
+  await expect(rows).toContainText('Retained.openhmi.hold');
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByLabel('New project ID', { exact: true })).toHaveValue('KeepMyDraft');
+  expect(requests.every(request => request.method === 'GET')).toBe(true);
+  expect(errors).toEqual([]);
+});

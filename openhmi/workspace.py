@@ -12,6 +12,7 @@ import sqlite3
 import tempfile
 import zipfile
 
+from pydantic import ValidationError
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from .http_context import require_project_instance, set_response_context
@@ -19,6 +20,7 @@ from .async_cleanup import finish_cleanup
 from .project_models import Project, default_project
 from .projects import ProjectStore
 from .workspace_publication import PublicationError, ensure_available, publish_project
+from .workspace_inventory import ArtifactQuery, InventoryUnavailable, inventory
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -225,6 +227,16 @@ class ProjectWorkspace:
             if not legacy_user or not legacy_user.permits('administrator'):
                 raise HTTPException(403, 'A legacy recipe administrator or HMI security administrator is required for project management')
         path = request.url.path
+        if request.method == 'GET' and path == '/api/workspace/artifacts':
+            try:
+                query = ArtifactQuery.model_validate(dict(request.query_params))
+            except ValidationError as error:
+                raise HTTPException(422, error.errors(include_url=False)) from error
+            try:
+                return JSONResponse(await finish_cleanup(asyncio.to_thread(inventory, self.root, query)))
+            except InventoryUnavailable as error:
+                logging.exception('Project file inventory failed')
+                raise HTTPException(503, str(error)) from error
         if request.method == 'GET' and path == '/api/workspace':
             return JSONResponse(self.listing())
         if request.method == 'GET' and path == '/api/workspace/backup':

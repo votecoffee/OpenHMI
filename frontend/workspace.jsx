@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
+import { WorkspaceArtifacts } from './workspace-artifacts.jsx';
 
 export function WorkspacePage() {
   const [state, setState] = useState(null);
@@ -19,6 +20,6 @@ export function WorkspacePage() {
       <fieldset disabled={busy}><legend>Complete backup</legend><a href="/api/workspace/backup" download>Export complete backup</a><p>Includes database content, recipe images, security/password hashes, alarms, history and the startup Python entry file when configured. Store backups as private project data.</p>
         <label>Imported project ID<input value={importName} onChange={event => setImportName(event.target.value)} /></label><label>OpenHMI backup ZIP<input type="file" accept=".zip" onChange={event => { const file = event.target.files?.[0]; if (file) run(async () => { const result = await api(`/api/workspace/import?name=${encodeURIComponent(importName)}`, { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file }); setMessage(`Imported ${result.file}. PLC connections are held until Apply live.`); }); event.target.value = ''; }} /></label>
         <p>Import creates a new project, verifies checksums and holds PLC connections until Apply live. Imported Python is saved for review and never loaded automatically.</p>
-      </fieldset></>}
+      </fieldset><WorkspaceArtifacts /></>}
   </section>;
 }
