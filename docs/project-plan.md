@@ -353,8 +353,15 @@ not close hardware or operator acceptance gates.
     CSV quoting/formula escaping. History/export scope, note POST paths and UI
     polling/recovery remain unchanged. Detailed response DTO parity is next.
 
+27. Delivered DOM-free detailed alarm response validators with a compatible
+    message-helper export. Real SQL/HTTP contracts cover occurrence/event/note
+    pages, shelved/acknowledged alarms, cached trigger details and legacy nullable
+    metadata. Paging rejects duplicate/reversed IDs, wrong cursors and oversized
+    pages. Browser regressions preserve readable results, disable older navigation
+    and recover on valid replies; row/detail rules remain compatible.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize detailed alarm response validators and real query-service parity next. Keep further module extraction tied
+Prioritize alarm note/shelve/restore mutation helpers and request-model contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.mjs';
 
-export function hasAlarmMessage(item) {
-  return typeof item?.message === 'string' && (item.messages == null || (typeof item.messages === 'object'
-    && !Array.isArray(item.messages) && Object.values(item.messages).every(message => typeof message === 'string')));
-}
+export { hasAlarmMessage } from './alarm-responses.mjs';
 
 export function useAlarmRead(endpoint, validate, generation, identifier) {
   const [response, setResponse] = useState(null);

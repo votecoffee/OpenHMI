@@ -19,6 +19,34 @@ from tests.test_frontend_contract import frontend
 FILTERS = dict(priority='0', search='', state='outstanding', shelving='unshelved', start='', end='')
 
 
+def alarm_query_fixture(test_case):
+    store = ProjectStore()
+    test_case.addCleanup(store.close)
+    project = Project.model_validate(store.snapshot()['active'])
+    project.alarms[0].message = '=设备 A,+%_ =x'
+    project.alarms[0].related_screen = 'overview'
+    saved = store.save(SaveRequest(expected_revision=1, project=project))
+    store.apply(RevisionRequest(expected_revision=saved['draft_revision']))
+    values = {'ProcessAlarm': False}
+    source = Mock(side_effect=lambda: values.copy())
+    monitor = AlarmMonitor(store, source)
+    monitor.sample()
+    values['ProcessAlarm'] = True
+    monitor.sample()
+    identifier = monitor.snapshot()['outstanding'][0]['occurrence_id']
+    monitor.note(identifier, '@Review,设备\nStep 2', ('Fixture Operator', 'local'), '1' * 32)
+    monitor.note(identifier, 'Second note', ('Fixture Operator', 'local'), '2' * 32)
+    driver = Mock(spec=['sample_snapshot'])
+    driver.sample_snapshot.return_value = {'ProcessAlarm': {'quality': 'good', 'timestamp': None,
+                                                            'value': 'must not be exposed'}}
+    app = FastAPI()
+    add_alarm_routes(app, monitor, Mock(), Mock(), driver, store)
+    queries = app.state.alarm_queries
+    for name in ('occurrences', 'history', 'detail', 'notes'):
+        setattr(queries, name, Mock(wraps=getattr(queries, name)))
+    return TestClient(app), queries, driver, source, identifier
+
+
 class AlarmQueryContractTests(unittest.TestCase):
     def browser(self, occurrences=(), history=(), details=(), notes=()):
         def complete(items):
@@ -27,31 +55,7 @@ class AlarmQueryContractTests(unittest.TestCase):
                         details=list(details), notes=list(notes))
 
     def fixture(self):
-        store = ProjectStore()
-        self.addCleanup(store.close)
-        project = Project.model_validate(store.snapshot()['active'])
-        project.alarms[0].message = '=设备 A,+%_ =x'
-        project.alarms[0].related_screen = 'overview'
-        saved = store.save(SaveRequest(expected_revision=1, project=project))
-        store.apply(RevisionRequest(expected_revision=saved['draft_revision']))
-        values = {'ProcessAlarm': False}
-        source = Mock(side_effect=lambda: values.copy())
-        monitor = AlarmMonitor(store, source)
-        monitor.sample()
-        values['ProcessAlarm'] = True
-        monitor.sample()
-        identifier = monitor.snapshot()['outstanding'][0]['occurrence_id']
-        monitor.note(identifier, '@Review,设备\nStep 2', ('Fixture Operator', 'local'), '1' * 32)
-        monitor.note(identifier, 'Second note', ('Fixture Operator', 'local'), '2' * 32)
-        driver = Mock(spec=['sample_snapshot'])
-        driver.sample_snapshot.return_value = {'ProcessAlarm': {'quality': 'good', 'timestamp': None,
-                                                                'value': 'must not be exposed'}}
-        app = FastAPI()
-        add_alarm_routes(app, monitor, Mock(), Mock(), driver, store)
-        queries = app.state.alarm_queries
-        for name in ('occurrences', 'history', 'detail', 'notes'):
-            setattr(queries, name, Mock(wraps=getattr(queries, name)))
-        return TestClient(app), queries, driver, source, identifier
+        return alarm_query_fixture(self)
 
     def test_actual_browser_filters_cursors_detail_notes_and_csv_bind_to_routes(self):
         special = dict(priority='2', search='设备 A,+%_', start='2026-01-01T05:30:00+05:30', end='2026-12-31T23:59:59Z')

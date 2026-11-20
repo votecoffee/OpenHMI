@@ -1,3 +1,4 @@
+import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
@@ -22,6 +23,14 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'alarm_responses') {
+    const before = JSON.stringify(request);
+    const result = { occurrences: request.occurrences.map(isOccurrencePage), events: request.events.map(isEventPage),
+      notes: request.notes.map(isNotePage), details: request.details.map(item => isAlarmDetail(item.data, item.identifier)) };
+    if (JSON.stringify(request) !== before) throw new Error('Alarm response validation mutated input');
+    return result;
+  }
+
   if (request.operation === 'alarm_queries') return {
     states: alarmStates, shelving: alarmShelvingFilters, events: alarmEvents,
     occurrences: request.occurrences.map(item => alarmOccurrencesPath(item.filters, item.before, item.options)),

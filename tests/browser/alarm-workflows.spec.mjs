@@ -33,6 +33,11 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     raised = true;
     await page.reload();
     const notesEndpoint = '**/api/alarms/occurrences/*/notes';
+    async function breakCursor(route, key = 'id') {
+      const response = await route.fetch();
+      const data = await response.json();
+      return route.fulfill({ response, json: { ...data, has_more: true, next_before_id: data.items.at(-1)[key] + 1 } });
+    }
     await page.route(notesEndpoint, route => route.fulfill({ status: 503, json: { detail: 'Synthetic notes outage' } }));
     await page.getByLabel('Screen alarm status').getByRole('link', { name: 'Alarm details: P1 Supply fault' }).press('Enter');
     const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
@@ -80,18 +85,20 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     const occurrences = page.locator('.alarm-occurrences tbody');
     const events = page.locator('.alarm-events tbody');
     await expect(events).toContainText('Supply fault');
-    await page.route('**/api/alarms/occurrences?*', route => route.fulfill({ json: { items: [null] } }));
+    await page.route('**/api/alarms/occurrences?*', route => breakCursor(route, 'occurrence_id'));
     const occurrencesWarning = page.getByRole('alert').filter({ hasText: 'Alarm occurrences unavailable' });
     await expect(occurrencesWarning).toContainText('Showing the last page received');
+    await expect(page.getByRole('button', { name: 'Older alarms', exact: true })).toBeDisabled();
     await expect(occurrences).toContainText('Supply fault');
     await expect(events).toContainText('Supply fault');
     await expect(ackAll).toBeDisabled();
     await page.unroute('**/api/alarms/occurrences?*');
     await expect(occurrencesWarning).toBeHidden();
 
-    await page.route('**/api/alarms/events?*', route => route.fulfill({ json: { items: [null] } }));
+    await page.route('**/api/alarms/events?*', route => breakCursor(route));
     const historyWarning = page.getByRole('alert').filter({ hasText: 'Alarm event history unavailable' });
     await expect(historyWarning).toContainText('Showing the last page received');
+    await expect(page.getByRole('button', { name: 'Older events', exact: true })).toBeDisabled();
     await expect(events).toContainText('Supply fault');
     await expect(ackAll).toBeEnabled();
     await page.getByLabel('Acknowledgement comment', { exact: true }).fill('Inspecting supply');
@@ -110,8 +117,9 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await detail.getByRole('button', { name: 'Save operator note', exact: true }).click();
     await expect(detail.getByRole('cell', { name: 'Regulator inspected; awaiting supply', exact: true })).toBeVisible();
     await expect(detail.getByRole('cell').filter({ hasText: 'admin (local)' })).toBeVisible();
-    await page.route(notesEndpoint, route => route.fulfill({ json: { items: [null] } }));
+    await page.route(notesEndpoint, route => breakCursor(route));
     await expect(notesWarning).toContainText('Showing the last page received');
+    await expect(detail.getByRole('button', { name: 'Older notes', exact: true })).toBeDisabled();
     await expect(detail.getByText('Regulator inspected; awaiting supply', { exact: true })).toBeVisible();
     await expect(detail.getByText(/Current trigger quality: Good data/)).toBeVisible();
     await expect(detail.getByLabel('Operator note', { exact: true })).toBeDisabled();

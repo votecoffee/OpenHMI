@@ -448,8 +448,15 @@ URL order, local-date conversion, history/export scope and note POST paths remai
 intact. `test_alarm_query_contract.py` binds generated URLs through the real
 SQL-backed registrar, covering defaults, bounds, precise cursors, Unicode,
 metadata-only detail reads and CSV quoting/formula escaping. UI validation,
-polling and recovery remain in the console/read hook. Next, extract detailed
-alarm response validators and compare real query-service payloads with them. Preserve model/import
+polling and recovery remain in the console/read hook. Detailed alarm validators
+now live in DOM-free `alarm-responses.mjs`; `alarm-read.mjs` retains its message
+helper compatibility export. Occurrence/event/note pages require bounded counts,
+strictly descending unique IDs and a cursor matching the last row. Existing row/
+detail and nullable metadata rules remain compatible. Real SQL/HTTP response
+contracts cover paging, shelving, notes, cached trigger details and legacy null
+event attribution; browser tests retain readable pages and block older navigation
+through incoherent replies. Next, extract note/shelve/restore mutation helpers
+and verify their request-model/authorization contracts. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

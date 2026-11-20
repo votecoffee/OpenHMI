@@ -28,6 +28,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Applied-project snapshots | `test_applied_project_contract.py`: real palette/Pydantic/SQLite save/apply and active HTTP responses through the production guard; all control kinds, screens, faceplates, freeform/flow layout metadata, legacy and malformed replies | Runtime callbacks are stubbed; schema/display compatibility does not prove PLC binding validity, asset availability or native station acceptance |
 | Tag-status snapshots | `test_tag_snapshot_contract.py`: real acquisition/cache responses with FakePLC through the production normalizer; held/pending, partial bad-tag faults, stale recovery, disabled and status-only metadata; GET cannot poll/subscribe or copy samples in status-only mode | Top-level validation retains per-tag fault isolation; control-specific quality/type handling remains separate; FakePLC is not controller acceptance |
 | Alarm-console queries and exports | `test_alarm_query_contract.py`: generated occurrence/event/detail/note/CSV URLs through real SQL-backed routes; UI enum parity, Unicode/UTC/cursors, limits, errors and CSV escaping | Read contracts do not validate detailed response DTO parity or exercise note-write authorization; source sampling is excluded and detail trigger values are omitted |
+| Detailed alarm responses | `test_alarm_response_contract.py`: real SQL occurrence/event/note pages and cached details through DOM-free production validators; legacy null attribution/metadata, shelving, wrong identities and malformed paging | Validators cover fields consumed by each view, not strict HTTP response filtering; CSV bulk pages and shelving-list DTOs are separate boundaries |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -148,11 +149,21 @@ filter/date errors and missing IDs retain their existing status codes. CSV expor
 retains quoting, formula escaping, full matching scope and truncation headers.
 Console polling, generation guards and read-error retention are unchanged.
 
+Detailed alarm response validators now live in `alarm-responses.mjs`, with the
+message helper re-exported from the existing read hook for compatibility. Real
+query-service payloads validate across cursor pages, shelved/acknowledged alarms,
+notes, cached/unavailable triggers and legacy null event attribution. Pages must
+be strictly descending with unique safe IDs and last-row cursors, bounded at
+200 occurrences/events or 100 notes. Malformed paging retains prior readable
+results with warnings and disables older navigation; valid replies recover.
+Row/detail nullable-field rules remain unchanged, without strict HTTP filtering.
+
 ## Next bounded work
 
-1. Extract alarm occurrence/event/note/detail response validators and compare real
-   query-service payloads with them, retaining nullable/legacy metadata rules.
-2. Continue response parity across other operator pages as concrete gaps arise.
+1. Extract shared alarm note/shelve/restore mutation helpers and verify real
+   request-model/authorization contracts.
+2. Cover shelving-list query/response contracts separately from occurrence pages.
+3. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
 Keep further refactoring tied to a boundary or contract gap in this list rather
