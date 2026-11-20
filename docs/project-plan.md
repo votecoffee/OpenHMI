@@ -447,8 +447,15 @@ not close hardware or operator acceptance gates.
     project contracts and expanded browser coverage preserve typed parameters,
     image previews, loaded copies and runtime behavior.
 
+39. Delivered a focused recipe authentication HTTP registrar and shared
+    user authorizer. The combined registrar retains service ownership and public
+    request models, preserving qualified OpenAPI references and imports. Complete
+    OpenAPI parity, standalone HTTPS cookies/origin/rate-limit behavior, HMI
+    delegation, logout semantics and focused import isolation are verified.
+    Recipe/domain/driver responsibilities and existing permissions remain intact.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe authentication HTTP router separation next. Keep further module extraction tied
+Prioritize recipe image HTTP router separation next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

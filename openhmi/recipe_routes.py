@@ -10,12 +10,10 @@ from .recipe_auth import RecipeAuth
 from .recipe_models import ChangeReason, RecipeCreate, RecipeSave, RecipeTransition, RecipeSelect, RecipeTransfer, PolicyChange, SimulationPermit
 from .recipe_transfers import RecipeTransfers
 from .recipes import RecipeService, RecipeError
-from .security import COOKIE as APP_COOKIE
-from .security_routes import set_session
-
-COOKIE = 'openhmi_recipe_session'
+from .recipe_auth_routes import COOKIE, APP_COOKIE, add_recipe_auth_routes, require_recipe_user
 
 
+# Keep request-model ownership here for legacy imports and qualified OpenAPI refs.
 class Login(StrictModel):
     name: str = Field(min_length=1, max_length=60)
     password: str = Field(min_length=1, max_length=256)
@@ -33,13 +31,7 @@ def add_recipe_routes(app, store, application, users=None, security=None, comman
     transfers = app.state.recipe_transfers = RecipeTransfers(store, application, service, commands)
 
     def user(request):
-        origin = request.headers.get('origin')
-        if origin and origin != f'{request.url.scheme}://{request.url.netloc}':
-            raise HTTPException(403, 'Recipe changes require a same-origin request')
-        current = security.user(request.cookies.get(APP_COOKIE)) if security and security.configured() else auth.user(request.cookies.get(COOKIE))
-        if not current:
-            raise HTTPException(401, 'Sign in to perform a recipe operation')
-        return current
+        return require_recipe_user(request, auth, security)
 
     def invoke(method, *args):
         try:
@@ -47,46 +39,7 @@ def add_recipe_routes(app, store, application, users=None, security=None, comman
         except RecipeError as error:
             raise HTTPException(error.status, str(error)) from error
 
-    @app.get('/api/recipe-auth/session')
-    def session(request: Request):
-        if security and security.configured():
-            current = security.user(request.cookies.get(APP_COOKIE))
-            return {'configured': True, 'user': current.public() if current else None}
-        current = auth.user(request.cookies.get(COOKIE))
-        return {'configured': bool(auth.users), 'user': {'name': current.name, 'roles': sorted(current.roles)} if current else None}
-
-    @app.post('/api/recipe-auth/login')
-    def login(body: Login, request: Request, response: Response):
-        origin = request.headers.get('origin')
-        if origin and origin != f'{request.url.scheme}://{request.url.netloc}':
-            raise HTTPException(403, 'Sign-in requires a same-origin request')
-        if security and security.configured():
-            token, current = security.login(body.name, body.password, request.client.host if request.client else 'local')
-            security.logout(request.cookies.get(APP_COOKIE))
-            set_session(response, request, token)
-            return {'user': current.public()}
-        try:
-            token = auth.login(body.name, body.password, request.client.host if request.client else 'local')
-        except ValueError as error:
-            raise HTTPException(429, str(error)) from error
-        if not token:
-            raise HTTPException(401, 'Invalid recipe credentials')
-        auth.logout(request.cookies.get(COOKIE))
-        response.set_cookie(COOKIE, token, httponly=True, samesite='strict', secure=request.url.scheme == 'https', max_age=3600)
-        current = auth.user(token)
-        return {'user': {'name': current.name, 'roles': sorted(current.roles)}}
-
-    @app.post('/api/recipe-auth/logout')
-    def logout(body: Empty, request: Request, response: Response):
-        if security and security.configured():
-            security.origin(request)
-            security.logout(request.cookies.get(APP_COOKIE))
-            response.delete_cookie(APP_COOKIE)
-            return {'ok': True}
-        user(request)
-        auth.logout(request.cookies.get(COOKIE))
-        response.delete_cookie(COOKIE)
-        return {'ok': True}
+    add_recipe_auth_routes(app, auth, security, Login, Empty)
 
     @app.get('/api/recipes')
     def recipes():

@@ -40,6 +40,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe library responses | `test_recipe_library_contract.py`: SQL/HTTP lifecycle snapshots through the production guard; all six revision states, typed values, policy/gates, audit differences, legacy optional fields and unavailable permits | Guard covers workspace-consumed fields, not full write-schema validation or hash integrity; selection/live-copy status and recipe session replies are separate boundaries |
 | Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
 | Recipe component import compatibility | `test_frontend_contract.py`: legacy picture/loaded/selected exports and direct readout palette binding retain focused-module function identity; recipe browser workflow checks all four parameter types, preview/images and loaded values | Component bodies and saved schemas are unchanged; existing project/palette contracts cover persistence; no controller acceptance implied |
+| Recipe authentication registrar | `test_recipe_auth_routes.py`: standalone HTTPS cookie/origin/rate-limit/shared-authorizer behavior, HMI delegation, idempotent HMI logout, stable model/OpenAPI ownership and fresh-process import isolation | Auth/recipe/transfer service construction remains in the combined registrar; Windows identity is mocked and no OS/domain acceptance is claimed |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -283,10 +284,20 @@ rows, all four types, disabled nonnumeric limits, Unicode/leading-zero text and
 typed values read back from the SQL-loaded copy, alongside image/approval/runtime
 workflows.
 
+Recipe authentication HTTP registration and shared recipe-user authorization now
+have a focused module. Request-model ownership stays in the combined registrar
+and is supplied explicitly so existing imports and qualified OpenAPI references
+remain stable. A full before/after OpenAPI comparison is unchanged. Standalone
+HTTPS tests verify cookies, same-origin checks, rate limits, legacy/HMI delegation
+and the existing difference between anonymous legacy and idempotent HMI logout.
+Fresh-process imports do not pull in recipe/transfer services or the server;
+application service ownership remains unchanged. Existing model, session, recipe
+and transfer regressions exercise the delegated authorization path.
+
 ## Next bounded work
 
-1. Separate recipe authentication HTTP routes from the combined recipe registrar,
-   preserving import paths, cookie/delegation behavior and permissions.
+1. Separate recipe image read/upload HTTP routes, preserving byte limits, MIME
+   checks, permissions, normalization and response headers.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

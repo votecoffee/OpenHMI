@@ -541,8 +541,17 @@ workspace imports them directly and retains state/API orchestration. Existing
 `recipes.jsx` picture/loaded/selected exports are aliases to the same functions;
 the readout palette imports its renderer directly. Moved component bodies and
 saved schemas are unchanged. An export/palette identity contract and expanded
-typed-parameter browser workflow protect this boundary. Recipe authentication
-HTTP route separation is next. Preserve model/import
+typed-parameter browser workflow protect this boundary. Authentication/session
+HTTP handlers and the shared recipe-user authorizer now live in
+`recipe_auth_routes.py`. The combined registrar still constructs the same auth,
+recipe and transfer services and delegates registration/authorization. Login/Empty
+request models remain owned by `recipe_routes.py` and are passed to the focused
+registrar, preserving legacy imports and qualified OpenAPI references when both
+recipe and HMI Login models are present. A before/after comparison verified the
+complete OpenAPI document unchanged. Standalone HTTPS tests cover cookies, origin/
+rate-limit guards, HMI delegation and logout behavior without recipe/driver setup.
+Focused-module imports do not load recipe services or the application server.
+Recipe image HTTP route separation is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

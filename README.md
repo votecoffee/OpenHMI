@@ -644,7 +644,9 @@ Recipe library validation retains readable history and unsaved edits on refresh
 failure, blocks writes until recovery, and offers retry after initial-load failure.
 Recipe session/sign-in/sign-out replies are validated before identity updates.
 Recipe readouts and parameter editing now use focused component modules, with
-legacy exports and palette bindings preserved.
+legacy exports and palette bindings preserved. Recipe authentication handlers
+have a focused HTTP registrar while retaining existing model imports and OpenAPI
+references, cookies, origin checks and HMI delegation.
 Earlier verification notes are retained in the [checkpoint history](docs/maintainability-checkpoints.md).
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
