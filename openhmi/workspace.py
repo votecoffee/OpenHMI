@@ -13,7 +13,8 @@ import zipfile
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from .projects import Project, ProjectStore, default_project
+from .project_models import Project, default_project
+from .projects import ProjectStore
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',

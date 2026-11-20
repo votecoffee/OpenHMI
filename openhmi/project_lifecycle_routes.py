@@ -1,7 +1,8 @@
 """Project snapshots, draft saves and guarded live apply for one runtime."""
 
 from fastapi import APIRouter, HTTPException, Request
-from .projects import Project, ApplyRequest, SaveRequest, RevisionConflict
+from .project_models import Project, ApplyRequest, SaveRequest
+from .projects import RevisionConflict
 
 
 def add_project_lifecycle_routes(app, store, application, security, commands, monitor, trends,

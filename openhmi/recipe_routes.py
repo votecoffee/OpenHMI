@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from types import SimpleNamespace
 from pydantic import Field
 from .alarms import utc_now
-from .projects import StrictModel
+from .project_models import StrictModel
 from .recipe_auth import RecipeAuth
 from .recipe_models import ChangeReason, RecipeCreate, RecipeSave, RecipeTransition, RecipeSelect, RecipeTransfer, PolicyChange, SimulationPermit
 from .recipe_transfers import RecipeTransfers

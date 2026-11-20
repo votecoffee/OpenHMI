@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import json
 
 from .alarms import utc_now
-from .projects import Project
+from .project_models import Project
 
 
 class ShelfConflict(ValueError):

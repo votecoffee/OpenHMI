@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from .alarms import utc_now
 from .commands import contract
 from .logix import member_value
-from .projects import Project
+from .project_models import Project
 from .recipes import canonical, content_hash, RecipeError
 
 META_TYPES = {'RecipeCode': 'string', 'RevisionId': 'integer', 'RevisionNumber': 'integer',

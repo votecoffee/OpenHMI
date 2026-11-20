@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 from .drivers import SimulatorDriver
-from .projects import Project
+from .project_models import Project
 
 
 def add_engineering_routes(app, store, application, security, web):

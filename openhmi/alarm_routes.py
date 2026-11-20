@@ -4,7 +4,7 @@ import csv
 from io import StringIO
 from fastapi import HTTPException, Path, Query, Request, Response
 from pydantic import Field
-from .projects import StrictModel
+from .project_models import StrictModel
 from .alarm_queries import AlarmQueries
 from .alarm_shelves import ShelfConflict
 from .operations_routes import csv_text

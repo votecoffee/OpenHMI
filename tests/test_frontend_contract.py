@@ -10,7 +10,7 @@ import subprocess
 import unittest
 
 from pydantic import TypeAdapter, ValidationError
-from openhmi.projects import Control, Project, SaveRequest, ApplyRequest
+from openhmi.project_models import Control, Project, SaveRequest, ApplyRequest
 from openhmi.screens import expanded_controls
 from openhmi.control_contracts import ButtonRequest, ValueRequest, EDIT_INPUTS
 from openhmi.acquisition_routes import SubscriptionRequest

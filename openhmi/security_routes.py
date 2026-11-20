@@ -3,7 +3,7 @@
 from typing import Literal
 from fastapi import HTTPException, Request, Response
 from pydantic import Field, model_validator
-from .projects import StrictModel
+from .project_models import StrictModel
 from .security import COOKIE
 
 

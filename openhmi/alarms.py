@@ -6,7 +6,8 @@ import math
 from threading import RLock
 from time import monotonic
 
-from .projects import Project, ProjectStore
+from .project_models import Project
+from .projects import ProjectStore
 
 
 def utc_now():

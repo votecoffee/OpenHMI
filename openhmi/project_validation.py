@@ -1,6 +1,6 @@
 """Ordered binding validation shared by draft, merge, staging and live apply."""
 
-from .projects import Project
+from .project_models import Project
 from .binding_project import (validate_protocols, build_tag_index, validate_identity,
                               validate_resources, validate_faceplates_and_history, expand_checked_controls)
 from .binding_controls import validate_common_control, validate_edit_control, validate_action_or_value

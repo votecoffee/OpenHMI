@@ -3,7 +3,7 @@
 import math
 from typing import Literal
 from pydantic import Field, model_validator
-from .projects import StrictModel
+from .project_models import StrictModel
 
 
 class RecipeParameter(StrictModel):

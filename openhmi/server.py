@@ -28,7 +28,8 @@ from .identity_routes import add_identity_routes
 from .recipe_routes import add_recipe_routes
 from .security import Security
 from .security_routes import add_security_routes
-from .projects import Project, ProjectStore, RevisionConflict, ApplyRequest, SaveRequest
+from .project_models import Project, ApplyRequest, SaveRequest
+from .projects import ProjectStore, RevisionConflict
 from .project_routes import add_project_routes
 from .canvas import CanvasImages
 from .canvas_routes import add_canvas_routes

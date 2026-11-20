@@ -1,7 +1,8 @@
 """Protected history, draft staging and reviewed merge endpoints; no equipment writes."""
 
 from fastapi import HTTPException, Path, Query, Request
-from .projects import Project, StageRequest, RecoveryRequest, MergePreview, MergeRequest, RevisionConflict
+from .project_models import Project, StageRequest, RecoveryRequest, MergePreview, MergeRequest
+from .projects import RevisionConflict
 from .project_diff import differences, merge_project, SCREEN_FIELDS
 
 

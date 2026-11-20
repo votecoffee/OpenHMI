@@ -234,9 +234,16 @@ not close hardware or operator acceptance gates.
    Pydantic/transport compatibility coverage. Authorization, limits, error mapping
    and service transactions retain their existing boundaries.
 
-The current control/router/driver separation baseline is delivered. Next, review
-project schema definitions versus SQLite revision persistence in `projects.py`;
-keep model/import compatibility and revision/migration/apply transactions intact.
+9. Delivered canonical project/control schemas and defaults in `project_models.py`,
+   separate from the SQLite revision store. Model-only consumers import schemas
+   directly, while explicit legacy exports preserve model identity. Migration,
+   save/apply/stage/merge, integrity checks and transaction boundaries stay in
+   `projects.py`. Tests cover persistence-free schema import/validation and
+   canonical requests passing through the existing revision store.
+
+The current control/router/driver/schema-store separation baseline is delivered.
+Next, split control schemas by family while retaining the canonical discriminated
+union, model/import compatibility and validation order.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

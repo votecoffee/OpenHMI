@@ -605,7 +605,10 @@ isolation across aliases/routes, and polling-owned display updates after verifie
 writes. Logical write checks and readback comparison use shared pure rules.
 Tag-catalog reconciliation and route-status projection have separate modules;
 tests cover local edits across applies, route replacement, held acquisition,
-legacy catalog access and independent diagnostic results.
+legacy catalog access and independent diagnostic results. Project/control schemas
+and defaults live in `openhmi.project_models`, separately from SQLite revision
+persistence; legacy imports from `openhmi.projects` remain supported. Schema-only
+validation is tested in a fresh process without loading the store or SQLite.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

@@ -222,6 +222,15 @@ paths, authorization, revision guards and lock ownership.
   after releasing the state lock. Project copying, assignment and obsolete-scan
   rejection retain their existing boundaries.
 
+- `openhmi/project_models.py` defines control/project schemas, revision request
+  models and the default project. Schema-only consumers import it directly;
+  import and validation do not load the revision store or SQLite. `projects.py`
+  retains `ProjectStore`, `RevisionConflict`, migration, recovery, revision
+  integrity checks and save/apply/stage/merge transactions. Existing model,
+  type-alias, domain-schema and default-factory imports from `projects.py` are
+  explicit compatibility exports of the same objects. No model rules, defaults,
+  storage SQL, version or transaction boundaries change in this separation.
+
 `tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
 and `toProject` functions through a DOM-free Node test entry. It compares every
 palette control kind against Pydantic's discriminated union, validates defaults
@@ -320,10 +329,15 @@ hold. It verifies the retired-connection lock boundary, live catalog replacement
 independent driver instances, status DTO isolation and lazy optional diagnostics.
 Existing blocked-read/project-switch tests continue to check obsolete receipts.
 
-The current control-family, HTTP-registration and driver-responsibility
-separation baseline is delivered. Next, review the boundary between project
-schema definitions and SQLite revision persistence in `projects.py`. Preserve
-model/import compatibility, project-instance identity, write non-replay behavior,
-apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
+`tests/test_project_models.py` checks schema-only validation in a fresh process,
+legacy/canonical model identity and canonical requests passing through the
+existing store's save/apply/history contract. Frontend compatibility checks now
+use the canonical schemas while existing persistence tests retain legacy imports.
+
+The current control-family, HTTP-registration, driver and schema/store separation
+baseline is delivered. Next, split control schemas by family while retaining the
+canonical discriminated union and validation order. Preserve model/import
+compatibility, project-instance identity, write non-replay behavior, apply
+rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
 checks do not establish controller or operator-station acceptance.
