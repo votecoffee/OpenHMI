@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { api } from './api.mjs';
+import { listProjectImages, isProjectImagePage } from './image-api.mjs';
 import { Popup } from './touch-entry.jsx';
 
 export const projectImagePath = identifier => '/api/canvas-images/' + identifier;
@@ -19,16 +19,16 @@ export function ProjectImagePicker({ label = 'Choose from project', disabled, on
     setBusy(true);
     try {
       const before = cursors.at(-1);
-      const params = new URLSearchParams();
-      if (before) params.set('before', before);
-      if (term) params.set('search', term);
-      const page = await api('/api/canvas-images' + (params.size ? '?' + params : ''));
-      if (!Array.isArray(page?.items) || page.items.some(asset => !/^[a-f0-9]{64}$/.test(asset?.id) || typeof asset.name !== 'string')) {
+      const page = await listProjectImages({ before, search: term });
+      if (!isProjectImagePage(page)) {
         throw new Error('Project images could not be listed.');
       }
       if (sequence === request.current) setLibrary({ ...page, cursors, term });
     } catch (problem) {
-      if (sequence === request.current) setError(problem.message);
+      if (sequence === request.current) {
+        if ([401, 403].includes(problem.status)) setLibrary(null);
+        setError(problem.message);
+      }
     } finally {
       if (sequence === request.current) setBusy(false);
     }

@@ -881,3 +881,64 @@ test('step selected objects one layer at a time while preserving the background'
     await save(page, original.draft, false);
   }
 });
+
+
+test('image picker pages recover from malformed cursors and clear rows on access denial', async ({ page }) => {
+  const firstId = 'a'.repeat(64), secondId = 'b'.repeat(64);
+  const drawing = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGPsMZVgwAaYsIoOWgkAr1IA6dkMhO8AAAAASUVORK5CYII=', 'base64');
+  const queries = [];
+  let mode = 'valid';
+  await page.route(/\/api\/canvas-images(?:\?.*)?$/, route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const params = new URL(route.request().url()).searchParams;
+    queries.push(Object.fromEntries(params));
+    if (mode === 'denied') return route.fulfill({ status: 403, json: { detail: 'Synthetic image access denial' } });
+    if (mode === 'malformed') return route.fulfill({ json: { items: [{ id: secondId, name: 'Second.png' }], next_before: 'bad cursor' } });
+    const older = params.get('before') === '42';
+    return route.fulfill({ json: { items: [{ id: older ? secondId : firstId, name: older ? 'Second.png' : 'First.png' }], next_before: older ? null : 42 } });
+  });
+  await page.route(/\/api\/canvas-images\/[ab]{64}$/, route => route.fulfill({ contentType: 'image/png', body: drawing }));
+  try {
+    await page.goto('/');
+    const freeform = page.getByRole('button', { name: 'Enable freeform layout', exact: true });
+    await expect(freeform).toBeVisible();
+    await freeform.click();
+    await page.getByRole('button', { name: 'Choose background from project', exact: true }).click();
+    const picker = page.getByRole('dialog', { name: 'Project images', exact: true });
+    const first = picker.getByRole('button', { name: 'Use First.png (aaaaaaaa)', exact: true });
+    const second = picker.getByRole('button', { name: 'Use Second.png (bbbbbbbb)', exact: true });
+    const more = picker.getByRole('button', { name: 'More images', exact: true });
+    const previous = picker.getByRole('button', { name: 'Previous images', exact: true });
+    await expect(first).toBeVisible();
+    await more.click();
+    await expect(second).toBeVisible();
+    await expect(first).toBeHidden();
+    await previous.click();
+    await expect(first).toBeVisible();
+    mode = 'malformed';
+    await more.click();
+    await expect(picker.getByRole('alert')).toHaveText('Project images could not be listed.');
+    await expect(first).toBeVisible();
+    await expect(second).toBeHidden();
+    expect(queries.filter(query => query.before).every(query => query.before === '42')).toBe(true);
+    mode = 'valid';
+    await more.click();
+    await expect(second).toBeVisible();
+    await expect(picker.getByRole('alert')).toBeHidden();
+    mode = 'denied';
+    await previous.click();
+    await expect(picker.getByRole('alert')).toHaveText('Synthetic image access denial');
+    await expect(picker.locator('.project-image-list button')).toHaveCount(0);
+    await expect(previous).toBeHidden();
+    await expect(more).toBeHidden();
+    mode = 'valid';
+    await picker.getByRole('searchbox', { name: 'Search project images', exact: true }).fill('设备 ?# /');
+    await picker.getByRole('button', { name: 'Search', exact: true }).click();
+    await expect(first).toBeVisible();
+    expect(queries.at(-1)).toEqual({ search: '设备 ?# /' });
+    await page.keyboard.press('Escape');
+    await expect(picker).toBeHidden();
+  } finally {
+    if (!page.isClosed()) await page.unrouteAll({ behavior: 'wait' });
+  }
+});

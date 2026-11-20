@@ -260,10 +260,16 @@ not close hardware or operator acceptance gates.
     history states, Unicode filters, pagination bounds, precise string-form IDs,
     JSON export and invalid requests rejected before service calls.
 
+13. Delivered image-library search/pagination query contracts and response checks.
+    The production helper is checked against the real registrar; actual SQLite
+    pages are checked by the browser validator. Invalid paging metadata retains
+    the last readable page with an error; access denial clears it. Browser
+    regressions cover paging, malformed response, retry and denial/recovery.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize the audit's remaining query/response contract gaps: image-library
-search/pagination first, then historian/trend read queries. Keep further module
-extraction tied to a concrete responsibility or compatibility gap.
+Prioritize the audit's remaining gaps: historian/trend read-window and export
+queries, then shared operator response contracts. Keep further module extraction
+tied to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

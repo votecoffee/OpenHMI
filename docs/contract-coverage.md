@@ -13,10 +13,11 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Value/actions, leases, project lifecycle and alarms | Actual browser helpers validated against strict request models; methods, headers, revisions and payload fields checked | Fake-fetch contract checks do not authenticate a real user or dispatch a controller write |
 | Trend recording, station ownership and image upload | Actual capture/claim/renew/release helpers plus binary File upload contract checks | Read-page query construction and response payloads are separate boundaries |
 | Command history queries and transaction export | `test_command_contract.py`: production builders to the real FastAPI registrar through an in-process client; every UI state matches the server enum, Unicode filters, bounds, integer IDs and export headers | History data and the security hook are stubbed; domain/browser tests cover behavior and permissions |
+| Image listing queries and pages | `test_image_contract.py`: production queries to the real registrar, Unicode search, cursor/page bounds, real SQLite pages to the actual JS validator and malformed-page rejection | Listing fixtures do not test image decoding; JSON paging cursors must be safe positive JS integers |
 | Schema ownership/import compatibility | `test_project_models.py`: direct family/domain imports, no service/HTTP/Pillow/SQLite dependency, shared canonical/legacy classes and project round trips | Import isolation is not a runtime performance or packaging benchmark |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
-## Closed in this increment
+## Delivered query contracts
 
 Command buttons and the transaction console now use `command-api.mjs`. Existing
 latest-status query ordering, console defaults, pagination filters and download
@@ -25,20 +26,26 @@ invalid limits, cursors, state values, names and transaction IDs must fail befor
 service calls. The query tests include string-form signed-64-bit limits without
 converting them through a JavaScript Number.
 
+The project image picker now uses `image-api.mjs`. Query contracts preserve the
+unfiltered URL, before/search ordering, Unicode search and server defaults, and
+exercise explicit page limits. Real SQLite listing pages pass the production
+browser validator. Missing/malformed/unsafe cursors, empty pages with a cursor,
+duplicate IDs and malformed image entries are rejected. Browser regressions cover
+forward/back paging, retaining the prior page on malformed replies, retry recovery
+and clearing rows on access denial. Closing/new requests retain the sequence guard.
+
 This does not make large numeric JSON response IDs lossless. Existing command
 status validators require safe JavaScript integers. A broader wire-format change
 for IDs needs a separate compatibility decision; do not silently round an ID or
-coerce it just to satisfy a test.
+coerce it just to satisfy a test. Image paging similarly rejects unsafe numeric
+response cursors rather than rounding them into a different query.
 
 ## Next bounded work
 
-1. Cover image-library search/pagination builders and actual router binding.
-   Uploads and picker browser behavior are covered, but GET query construction is
-   still embedded in `image-picker.jsx` and absent from the shared request harness.
-2. Add equivalent coverage for historian/trend read-window and export queries.
+1. Add equivalent coverage for historian/trend read-window and export queries.
    Existing Python and browser tests remain useful, but these queries are not
    exercised by the new command-query contract test.
-3. Prioritize response contracts for shared operator status pages using the
+2. Prioritize response contracts for shared operator status pages using the
    actual browser validators and representative server responses, including
    malformed/missing fields and permission loss. Review older nullable/history
    data before adding strict response filtering to a production endpoint.

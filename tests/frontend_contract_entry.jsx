@@ -5,6 +5,7 @@ import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
 import { api, uploadProjectImage } from '../frontend/api.mjs';
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
 import { commandStates } from '../frontend/command-status.mjs';
+import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
@@ -15,6 +16,7 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'image_pages') return request.pages.map(isProjectImagePage);
   if (request.operation === 'engineering') {
     const catalog = engineeringCatalog(request.catalog, request.project, request.template ?? null);
     const config = createConfig(catalog);
@@ -69,7 +71,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -82,6 +84,15 @@ export async function contract(request) {
       });
     };
     await api('/api/project');
+    if (request.operation === 'image_queries') {
+      await listProjectImages();
+      await listProjectImages({ before: 42 });
+      await listProjectImages({ search: '设备 / %.png?#' });
+      await listProjectImages({ before: '9223372036854775807', search: '设备 / %.png?#', limit: 32 });
+      await listProjectImages({ limit: 1 });
+      await listProjectImages({ search: 'x'.repeat(100) });
+      return requests.slice(1);
+    }
     if (request.operation === 'command_queries') {
       await readLatestCommand('设备 / Cycle?#');
       await api(commandHistoryPath());

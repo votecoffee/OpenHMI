@@ -363,8 +363,15 @@ Command query builders now live in `command-api.mjs`; buttons and transaction
 console share these production helpers. `test_command_contract.py` sends their
 actual generated URLs through the real registrar with stubbed service/security,
 covering history-state parity, filters, limits, IDs and JSON export headers.
-Next, cover image-library GET search/pagination, then historian/trend read queries;
-review shared response contracts separately. Preserve model/import
+`image-api.mjs` similarly owns picker queries and page validation.
+`test_image_contract.py` binds generated requests through the real registrar,
+rejects out-of-range queries before service calls and feeds real SQLite listing
+pages through the production browser validator. Invalid or unsafe cursors and
+malformed entries never replace the last readable page. Access denial clears
+retained metadata; newer requests and close keep their original sequence guard.
+Browser regressions cover paging, malformed-page recovery and denial/recovery.
+Next, cover historian/trend read queries and exports; review shared response
+contracts separately. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
