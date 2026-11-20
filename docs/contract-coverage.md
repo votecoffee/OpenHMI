@@ -28,7 +28,9 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Applied-project snapshots | `test_applied_project_contract.py`: real palette/Pydantic/SQLite save/apply and active HTTP responses through the production guard; all control kinds, screens, faceplates, freeform/flow layout metadata, legacy and malformed replies | Runtime callbacks are stubbed; schema/display compatibility does not prove PLC binding validity, asset availability or native station acceptance |
 | Tag-status snapshots | `test_tag_snapshot_contract.py`: real acquisition/cache responses with FakePLC through the production normalizer; held/pending, partial bad-tag faults, stale recovery, disabled and status-only metadata; GET cannot poll/subscribe or copy samples in status-only mode | Top-level validation retains per-tag fault isolation; control-specific quality/type handling remains separate; FakePLC is not controller acceptance |
 | Alarm-console queries and exports | `test_alarm_query_contract.py`: generated occurrence/event/detail/note/CSV URLs through real SQL-backed routes; UI enum parity, Unicode/UTC/cursors, limits, errors and CSV escaping | Read contracts do not validate detailed response DTO parity or exercise note-write authorization; source sampling is excluded and detail trigger values are omitted |
-| Detailed alarm responses | `test_alarm_response_contract.py`: real SQL occurrence/event/note pages and cached details through DOM-free production validators; legacy null attribution/metadata, shelving, wrong identities and malformed paging | Validators cover fields consumed by each view, not strict HTTP response filtering; CSV bulk pages and shelving-list DTOs are separate boundaries |
+| Detailed alarm responses | `test_alarm_response_contract.py`: real SQL occurrence/event/note pages and cached details through DOM-free production validators; legacy null attribution/metadata, shelving, wrong identities and malformed paging | Validators cover fields consumed by each view, not strict HTTP response filtering; CSV bulk pages are a separate boundary |
+| Alarm mutations | `test_alarm_mutation_contract.py`: actual browser note/shelve/restore payloads through strict models and secured SQL-backed routes; attribution, denials, stale restore guards and receipt/error propagation | No PLC source acquisition or writes; operating-system authentication and controller acceptance remain separate |
+| Shelving-list queries/responses | `test_alarm_shelf_contract.py`: actual browser URLs and DOM-free guard through SQL-backed routes; ordered pages, encoded cursors, strict bounds, row compatibility and restoration of a 100-character alarm ID | Guard covers consumed fields; no strict response DTO filtering or PLC acceptance; browser regression covers retained-data recovery |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -166,9 +168,20 @@ denials and stale restore conflicts precede mutation dispatch. Receipts, pending
 audit status and HTTP errors propagate without automatic replay. Tests use
 synthetic sources and never acquire or write PLC data.
 
+Shelving-list URL construction now shares `alarm-api.mjs`, preserving existing
+query encoding/order. The response guard in `alarm-responses.mjs` requires at
+most 200 ascending unique IDs and a cursor matching the final row. Existing
+row/message/date rules and legacy fields remain compatible. Real SQL-backed
+contracts cover defaults, bounds, encoded cursors and restoration. The API cursor
+and restore path limits now match the 100-character project alarm IDs, fixing
+paging/restoration for valid IDs above 60 characters. Browser regressions retain
+the last readable page and disable restore/next-page actions on incoherent replies,
+discard inaccessible data and recover when valid replies return.
+
 ## Next bounded work
 
-1. Cover shelving-list query/response contracts separately from occurrence pages.
+1. Extract recipe create/revise/transition/select request helpers and verify their
+   strict request-model contracts, keeping workflow/permission ownership intact.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

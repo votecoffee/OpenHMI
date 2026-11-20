@@ -367,8 +367,16 @@ not close hardware or operator acceptance gates.
     conversion, receipt/error propagation, UI feedback and non-replay behavior
     remain intact. Fixtures are offline; no controller acceptance is claimed.
 
+29. Delivered shelving-list URL and DOM-free response validation boundaries.
+    SQL-backed contracts cover encoding, bounds, ascending unique pages, cursors
+    and legacy row metadata. Cursor/restore routes now accept the project model's
+    full 100-character alarm IDs, fixing a 60-character mismatch. Browser faults
+    retain readable data, block restore/paging and recover on valid replies;
+    authorization failures still clear inaccessible data. No PLC access required.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize shelving-list query/response contracts next. Keep further module extraction tied
+Prioritize recipe create/revise/transition/select request helpers and strict
+request-model contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

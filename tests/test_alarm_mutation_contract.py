@@ -109,7 +109,7 @@ class AlarmMutationContractTests(unittest.TestCase):
         mutations += [dict(action='shelve', id='1', duration=value, reason='Reason') for value in ('59', '86401', '60.5', 'invalid')]
         mutations += [dict(action='restore', id='process_alarm', expected=value, reason='Reason') for value in ('', 'A' * 32, '0' * 31)]
         mutations += [dict(action='note', id=value, comment='Note') for value in ('0', '-1', '9223372036854775808')]
-        mutations += [dict(action='restore', id='x' * 61, expected='0' * 32, reason='Reason')]
+        mutations += [dict(action='restore', id='x' * 101, expected='0' * 32, reason='Reason')]
         for request in self.browser(mutations)['requests']:
             with self.subTest(request=request): self.assertEqual(self.send(request).status_code, 422)
         # Attribution is server-owned; fabricated fields are rejected by strict models.

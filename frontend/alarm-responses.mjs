@@ -46,3 +46,13 @@ function isAlarmPage(page, isItem, key, maximum) {
 export const isOccurrencePage = page => isAlarmPage(page, isOccurrence, 'occurrence_id', 200);
 export const isEventPage = page => isAlarmPage(page, isAlarmEvent, 'id', 200);
 export const isNotePage = page => isAlarmPage(page, isAlarmNote, 'id', 100);
+
+export function isShelfPage(page) {
+  return Array.isArray(page?.items) && page.items.length <= 200
+    && page.items.every((item, index) => hasAlarmMessage(item?.definition)
+      && ['alarm_id', 'actor', 'provider', 'reason', 'operation_id', 'expires_at'].every(key => typeof item[key] === 'string')
+      && !!item.alarm_id && !!item.operation_id && Number.isFinite(Date.parse(item.expires_at))
+      && (index === 0 || page.items[index - 1].alarm_id < item.alarm_id))
+    && typeof page.has_more === 'boolean'
+    && (page.has_more ? page.items.length > 0 && page.next_after_id === page.items.at(-1).alarm_id : page.next_after_id === null);
+}

@@ -626,6 +626,8 @@ Detailed alarm-response contracts share DOM-free validators and reject incoheren
 paging while preserving nullable and legacy metadata. Alarm note/shelve/restore
 mutation contracts cover production request helpers, strict models, attribution,
 permission denials, stale restore guards and audit receipt/error propagation.
+Shelving-list contracts cover ordered pages, exact cursors, row compatibility
+and the full 100-character alarm ID range for paging and restoration.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

@@ -460,8 +460,16 @@ through incoherent replies. Note/shelve/restore request helpers also live in
 timeouts and audit receipts/errors. Secured SQL-backed registrar contracts bind
 actual browser payloads through strict models, permissions and journal dispatch
 guards; anonymous/limited users and stale restore attempts cannot mutate state.
-These routes do not sample or write the source. Shelving-list query/response
-contracts are next. Preserve model/import
+These routes do not sample or write the source. The shelving-list URL builder
+also lives in `alarm-api.mjs`, with its DOM-free response guard in
+`alarm-responses.mjs`. Pages require ascending unique alarm IDs, at most 200 rows
+and a matching final-row cursor; existing row/message/date rules remain intact.
+SQL-backed contracts cover encoding, bounds, paging and restoration. Cursor and
+restore path limits now match the project model's 100-character alarm IDs rather
+than rejecting valid IDs above 60 characters. Browser faults retain the readable
+page and disable restore/next-page actions until valid replies recover. Next,
+extract recipe create/revise/transition/select request helpers and verify strict
+request models. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

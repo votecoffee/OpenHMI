@@ -57,6 +57,11 @@ export function alarmEventsPath(filters, before = null, event = '', { limit = nu
 export const alarmEventsCsvPath = (filters, event = '') => '/api/alarms/events.csv?' + alarmParameters(filters, null, true, event);
 export const alarmDetailPath = identifier => '/api/alarms/occurrences/' + encodeURIComponent(identifier);
 
+export function alarmShelvesPath(after = '', { limit = null } = {}) {
+  const path = '/api/alarms/shelves?after_id=' + encodeURIComponent(after);
+  return path + (limit === null ? '' : '&limit=' + encodeURIComponent(limit));
+}
+
 export function alarmNotesPath(identifier, before = null, { limit = null } = {}) {
   const query = new URLSearchParams();
   if (before) query.set('before_id', before);

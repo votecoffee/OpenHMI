@@ -1,4 +1,4 @@
-import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail } from '../frontend/alarm-responses.mjs';
+import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
@@ -17,12 +17,19 @@ import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription, requireTagSnapshot, tagSnapshotPath } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from '../frontend/project-api.mjs';
-import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents, saveAlarmNote, shelveAlarm, restoreAlarm } from '../frontend/alarm-api.mjs';
+import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents, saveAlarmNote, shelveAlarm, restoreAlarm, alarmShelvesPath } from '../frontend/alarm-api.mjs';
 import { engineeringCatalog } from '../frontend/engineering.jsx';
 import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'alarm_shelves') {
+    const before = JSON.stringify(request);
+    const result = { paths: request.queries.map(item => alarmShelvesPath(item.after, item.options)),
+      valid: request.pages.map(isShelfPage) };
+    if (JSON.stringify(request) !== before) throw new Error('Shelving contracts mutated input');
+    return result;
+  }
   if (request.operation === 'alarm_responses') {
     const before = JSON.stringify(request);
     const result = { occurrences: request.occurrences.map(isOccurrencePage), events: request.events.map(isEventPage),
