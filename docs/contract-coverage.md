@@ -13,6 +13,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Value/actions, leases, project lifecycle and alarms | Actual browser helpers validated against strict request models; methods, headers, revisions and payload fields checked | Fake-fetch contract checks do not authenticate a real user or dispatch a controller write |
 | Trend recording, station ownership and image upload | Actual capture/claim/renew/release helpers plus binary File upload contract checks | Read-page query construction and response payloads are separate boundaries |
 | Command history queries and transaction export | `test_command_contract.py`: production builders to the real FastAPI registrar through an in-process client; every UI state matches the server enum, Unicode filters, bounds, integer IDs and export headers | History data and the security hook are stubbed; domain/browser tests cover behavior and permissions |
+| Command transaction/history responses | `test_command_responses.py`: real SQL detail, filtered/cursor pages, exports and restart reconciliation across all eight states through production JS validators; malformed sequence/page browser recovery | Seeded offline lifecycle states do not prove PLC execution; nullable results/errors and empty event histories remain compatible |
 | Image listing queries and pages | `test_image_contract.py`: production queries to the real registrar, Unicode search, cursor/page bounds, real SQLite pages to the actual JS validator and malformed-page rejection | Listing fixtures do not test image decoding; JSON paging cursors must be safe positive JS integers |
 | Historian/trend reads and exports | `test_history_contract.py`: production paths through both real registrars; live/fixed windows, context, recorded tags, bounded/complete CSV, capture reads/CSV, invalid ranges and stale project guards | Data services are stubbed for query binding; existing domain/browser tests cover actual acquisition and export behavior |
 | Recorded-tag catalog responses | Real SQLite historian pages through `isRecordedTagPage`, malformed-page fixtures and browser no-crash/recovery regression | This is a bounded catalog response contract, not complete history/capture response parity |
@@ -55,11 +56,16 @@ pages pass the validator; missing items, invalid dates/cursors and duplicate tag
 are rejected while readable prior choices remain usable with an error. Browser
 checks require the editor to survive malformed success replies and recover.
 
+Command response contracts now compare actual SQL-backed detail, export, filtered
+and cursor pages, including restart reconciliation, with production validators.
+Positive signed-DINT sequences, descending unique IDs, the 200-row bound and
+last-row cursors are enforced. Malformed replies retain evidence with warnings;
+buttons remain blocked and older-page navigation is disabled until recovery.
+No strict HTTP response filtering or controller dispatch was added.
+
 ## Next bounded work
 
-1. Start shared operator response parity with command transaction/history pages,
-   comparing real service responses with the production browser validators.
-2. Extend to history/trend status and other shared operator pages, including
+1. Extend response parity to history/trend status and other shared operator pages, including
    malformed/missing fields and permission loss. Review older nullable/history
    data before adding strict response filtering to a production endpoint.
 

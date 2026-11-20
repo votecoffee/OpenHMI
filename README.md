@@ -182,6 +182,8 @@ page distinguish dispatch, acceptance, completion, failure and uncertainty.
 Command buttons link to the latest transaction for their contract.
 Filter command history by command ID, state or all unresolved transactions.
 Download a transaction and its event timeline as JSON from the detail view.
+Malformed status or paging replies retain the last readable evidence with a warning;
+command requests and older-page navigation stay blocked until valid replies return.
 Timeout/restart never replay a command. See the [contract and offline example](docs/command-transactions.md).
 Use **PLC recipes** for dedicated recipe transfer profiles and complete parameter
 mapping, then **Transfer revision to PLC** in the recipe viewer/editor. Reselect

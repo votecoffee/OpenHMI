@@ -272,9 +272,15 @@ not close hardware or operator acceptance gates.
     Recorded-tag replies are validated before entering the editor, with real SQL
     page and malformed-response recovery coverage.
 
+15. Delivered command transaction/history response parity with real SQL detail,
+    filtered/cursor pages, JSON exports and restart reconciliation across all eight
+    states. Browser validators reject invalid sequences and incoherent paging
+    metadata while preserving nullable results/errors and empty event histories.
+    Browser regressions cover blocked requests/navigation and valid-reply recovery.
+    These are offline fixtures and do not establish controller execution.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize shared operator response contracts, starting with command transaction
-and history pages, then history/trend status. Keep further module extraction tied
+Prioritize history/trend status response contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

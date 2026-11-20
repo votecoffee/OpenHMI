@@ -4,7 +4,7 @@ import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/mod
 import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
 import { api, uploadProjectImage } from '../frontend/api.mjs';
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
-import { commandStates } from '../frontend/command-status.mjs';
+import { commandStates, isCommandRecord, isCommandPage } from '../frontend/command-status.mjs';
 import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
 import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage } from '../frontend/history-api.mjs';
 import { captureCsvPath } from '../frontend/trend-api.mjs';
@@ -18,6 +18,7 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'command_responses') return { states: commandStates, records: request.records.map(isCommandRecord), pages: request.pages.map(isCommandPage) };
   if (request.operation === 'recorded_pages') return request.pages.map(isRecordedTagPage);
   if (request.operation === 'image_pages') return request.pages.map(isProjectImagePage);
   if (request.operation === 'engineering') {
