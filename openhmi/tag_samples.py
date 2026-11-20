@@ -6,7 +6,7 @@ coordinator. This cache never acquires a route lock or schedules controller I/O.
 
 from copy import deepcopy
 import math
-from .tag_values import freshness_seconds, member_value, type_ok
+from .tag_values import freshness_seconds, member_value, type_ok, overlapping_addresses
 
 
 class SampleCache:
@@ -27,6 +27,12 @@ class SampleCache:
             **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
             'failure_generation': generation,
         }
+
+    def invalidate_write(self, physical_address, scan_address, aliases, error):
+        for alias, _, scan_member in aliases:
+            alias_address = scan_address + ('.' + scan_member if scan_member else '')
+            if alias in self.samples and overlapping_addresses(physical_address, alias_address):
+                self.samples[alias].update(value=None, quality='bad', error=str(error))
 
     @staticmethod
     def decode(result, tag, member):

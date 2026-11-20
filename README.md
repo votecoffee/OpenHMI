@@ -598,7 +598,9 @@ when a candidate contains multiple invalid bindings. Driver regression checks
 cover subscription expiry/release, shared demand, independent caches, snapshot
 isolation and compatibility with existing sample/lease/deadline dictionary access.
 Scheduling and receipt publication have focused components; regression checks
-also cover changing requested UDT members during an in-flight scan.
+also cover changing requested UDT members during an in-flight scan, failed-write
+isolation across aliases/routes, and polling-owned display updates after verified
+writes. Logical write checks and readback comparison use shared pure rules.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

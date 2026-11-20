@@ -4,7 +4,6 @@ This layer owns session recovery and transport receipts. It does not select
 screen demand, schedule tags, publish sample quality or replay failed writes.
 """
 
-import math
 import re
 from threading import RLock
 import time
@@ -12,6 +11,8 @@ from uuid import uuid4
 
 from .alarms import utc_now
 from .scan_timings import ScanTimings
+from .tag_values import overlapping_addresses  # compatibility export
+from .tag_writes import readback_matches
 
 
 REAL_MAX = float.fromhex('0x1.fffffep+127')
@@ -21,12 +22,6 @@ PLC_INTEGER_LIMITS = {
     'DINT': (-2 ** 31, 2 ** 31 - 1), 'UDINT': (0, 2 ** 32 - 1),
     'LINT': (-2 ** 63, 2 ** 63 - 1), 'ULINT': (0, 2 ** 64 - 1),
 }
-
-
-def overlapping_addresses(first, second):
-    first, second = first.casefold(), second.casefold()
-    return (first == second or first.startswith((second + '.', second + '['))
-            or second.startswith((first + '.', first + '[')))
 
 
 def verify_result_address(address, result):
@@ -236,12 +231,7 @@ class LogixConnection:
                     raise TagWriteError(f'PLC rejected write: {result.error}')
                 actual = self.client.read(address)
                 verify_result_address(address, actual)
-                if type(value) is bool or type(actual.value) is bool:
-                    matches = actual.value is value
-                elif type(actual.value) is float and type(value) in (int, float):
-                    matches = math.isclose(actual.value, value, rel_tol=1e-6, abs_tol=1e-7)
-                else:
-                    matches = actual.value == value
+                matches = readback_matches(value, actual.value)
                 if actual.error or not matches:
                     raise TagWriteError('PLC write readback did not match; command was not retried')
                 return actual.value

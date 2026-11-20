@@ -6,6 +6,12 @@ import re
 MAX_SAFE_INTEGER = 2 ** 53 - 1
 
 
+def overlapping_addresses(first, second):
+    first, second = first.casefold(), second.casefold()
+    return (first == second or first.startswith((second + '.', second + '['))
+            or second.startswith((first + '.', first + '[')))
+
+
 def freshness_seconds(rate_ms):
     return max(1.0, 3 * rate_ms / 1000)
 

@@ -199,7 +199,12 @@ paths, authorization, revision guards and lock ownership.
   `tag_subscriptions.py`. Cached PLC samples, scalar/UDT decoding, good/stale/bad
   projection and usable-generation checks live in `tag_samples.py`. Pure value/type/freshness
   rules live in `tag_values.py`; bounded timing statistics live in
-  `scan_timings.py`. Existing imports from `openhmi.logix` remain compatible.
+  `scan_timings.py`. Logical write type checks, inverse scaling and readback
+  comparison live in `tag_writes.py`; transport retains physical metadata limits
+  and the single write/readback transaction. Failed-write deadline invalidation
+  belongs to the scheduler, and affected sample mutation belongs to the cache.
+  Existing imports from `openhmi.logix` remain compatible, including address
+  overlap checks now shared through `tag_values.py`.
 
 `tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
 and `toProject` functions through a DOM-free Node test entry. It compares every
@@ -270,11 +275,22 @@ function so it still detects an accidental deep copy of tag values.
 `tests/test_tag_state.py` checks shared consumer demand after expiry/release,
 sequence ordering, independent driver state, nested snapshot isolation, legacy
 dictionary replacement and cache cleanup. It also verifies external deadline-map
-access and changes to requested UDT members during an in-flight read. Existing blocked-route, freshness,
+access and changes to requested UDT members during an in-flight read. Failed
+member writes invalidate only overlapping aliases on the affected route;
+sibling paths and identical addresses on other routes retain their samples and
+deadlines. Successful readback clears the written root's deadline and bad-tag
+retry without publishing the readback as a displayed sample. Tests require the
+next normal poll to update that value. Existing blocked-route, freshness,
 bad-tag retry, reconnect and in-flight-write tests remain applicable.
 
-The next move is reviewing write preflight, verification and cache invalidation
-for a focused module boundary. Preserve project-instance identity, write
-non-replay behavior, apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures
-whenever a saved control field or editor serialization branch is added. These
+Write helpers and cache invalidation acquire no locks or workers. The driver
+retains the configuration/write `io_lock`, per-route write lock and nested state
+lock at their original boundaries. Transport does not retry or replay a write.
+Runtime-owned identity/command guards, local-tag edits and multi-step write
+scopes remain in the driver.
+
+Next, review driver configuration and route-status projection for focused module
+boundaries. Preserve project-instance identity, write non-replay behavior, apply
+rollback, command locks and journal ordering in further extractions. Extend the
+contract fixtures whenever a saved control field or editor serialization branch is added. These
 software checks do not establish controller or operator-station acceptance.

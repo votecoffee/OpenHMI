@@ -1,6 +1,8 @@
 """Runtime behavior across subscription and sample-cache ownership boundaries."""
 import unittest
 from threading import Event
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from openhmi.logix import RuntimeDriver
 from openhmi.projects import Project
@@ -111,6 +113,62 @@ class TagStateTests(unittest.TestCase):
         driver.poll(2)
         reads = driver.connections['plc'].client.reads
         self.assertEqual(sum('Motor' in batch for batch in reads), 2)
+
+
+    def test_failed_member_write_invalidates_only_overlapping_aliases_on_its_route(self):
+        class SiblingPLC(FakePLC):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.values['Motor']['SpeedLimit'] = 77.0
+
+        project = logix_project()
+        project['connections'].append({**project['connections'][0], 'id': 'other', 'path': 'other-offline/0'})
+        project['tags'].extend([
+            {'name': 'SpeedAlias', 'connection': 'plc', 'address': 'Motor.Speed', 'type': 'number'},
+            {'name': 'SpeedSibling', 'connection': 'plc', 'address': 'Motor.SpeedLimit', 'type': 'number'},
+            {'name': 'OtherSpeed', 'connection': 'other', 'address': 'Motor.Speed', 'type': 'number'},
+        ])
+        project['screens'][0]['controls'].extend(
+            {'id': alias, 'kind': 'numeric', 'label': alias, 'tag': alias}
+            for alias in ('SpeedAlias', 'SpeedSibling', 'OtherSpeed'))
+        driver = RuntimeDriver(SiblingPLC)
+        self.addCleanup(driver.close)
+        driver.configure(Project.model_validate(project).model_dump())
+        driver.lease('viewer', ['fast', 'slow'], 1)
+        driver.poll(1)
+        before = driver.sample_snapshot(1)
+        with patch.object(driver.connections['plc'].client, 'write',
+                          return_value=SimpleNamespace(error='Denied')) as write:
+            with self.assertRaisesRegex(ValueError, 'PLC rejected write: Denied'):
+                driver.write('MotorA.Speed', [50.0])
+            write.assert_called_once_with(('Motor.Speed', 50.0))
+        after = driver.sample_snapshot(1)
+        for alias in ('MotorA', 'MotorA.Speed', 'SpeedAlias'):
+            self.assertEqual(after[alias]['quality'], 'bad')
+            self.assertIsNone(after[alias]['value'])
+            self.assertEqual(after[alias]['timestamp'], before[alias]['timestamp'])
+        for alias in ('MotorA.Running', 'SpeedSibling', 'OtherSpeed', 'LevelA'):
+            self.assertEqual(after[alias], before[alias])
+        self.assertNotIn(('plc', 'Motor'), driver.deadlines)
+        self.assertNotIn(('plc', 'Motor.Speed'), driver.deadlines)
+        self.assertIn(('plc', 'Motor.SpeedLimit'), driver.deadlines)
+        self.assertIn(('other', 'Motor.Speed'), driver.deadlines)
+        self.assertTrue(driver.connections['plc'].connected)
+
+    def test_verified_write_waits_for_poll_before_replacing_displayed_sample(self):
+        driver = self.driver()
+        driver.lease('viewer', ['slow'], 1)
+        driver.poll(1)
+        before = driver.sample_snapshot(1)['LevelA']
+        driver._bad_tag_retry_at = {('plc', 'Level'): 100, ('plc', 'Motor'): 100}
+        driver.write('LevelA', [85.0])
+        self.assertEqual(driver.connections['plc'].client.writes, [('Level', 40.0)])
+        self.assertEqual(driver.sample_snapshot(1)['LevelA'], before)
+        self.assertNotIn(('plc', 'Level'), driver.deadlines)
+        self.assertNotIn(('plc', 'Level'), driver._bad_tag_retry_at)
+        self.assertEqual(driver._bad_tag_retry_at[('plc', 'Motor')], 100)
+        driver.poll(1.01)
+        self.assertEqual(driver.sample_snapshot(1.01)['LevelA']['value'], 85.0)
 
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ locks or workers. Freshness tightening is applied to the supplied sample cache
 inside the same caller-controlled state transaction.
 """
 from collections import defaultdict
-from .tag_values import freshness_seconds
+from .tag_values import freshness_seconds, overlapping_addresses
 
 BAD_TAG_RETRY_SECONDS = 30
 
@@ -86,6 +86,19 @@ class ScanSchedule:
         if pending_deadline is None or pending_deadline <= acquired:
             self.deadlines[key] = scan_finished + rate / 1000
         return rate
+
+    def write_failed(self, identifier, physical_address, error, address_aliases, sample_cache):
+        for key, aliases in address_aliases.items():
+            route, scan_address = key
+            if route != identifier or not overlapping_addresses(physical_address, scan_address):
+                continue
+            self.deadlines.pop(key, None)
+            sample_cache.invalidate_write(physical_address, scan_address, aliases, error)
+
+    def write_verified(self, key):
+        # Readback verifies the transaction; polling owns displayed samples.
+        self.deadlines.pop(key, None)
+        self.bad_retry_at.pop(key, None)
 
     def record_outcome(self, key, usable_address, scan_finished):
         if usable_address:

@@ -217,8 +217,13 @@ not close hardware or operator acceptance gates.
    Shared reads, long per-tag retry and project-generation fences retain their
    original atomic lock boundaries. Regression checks cover legacy deadline-map
    access and changing requested UDT members during an in-flight scan.
-   Next, review write preflight, verification and cache invalidation for a focused
-   extraction while preserving write non-replay behavior and command ordering.
+6. Delivered pure logical write preflight, inverse-scaling and readback rules,
+   with failed-write invalidation delegated to the scheduler/sample cache.
+   Driver/transport lock boundaries and single-attempt write/readback ordering
+   remain intact. Tests cover member/root aliases, sibling names, identical
+   addresses on another route and polling-owned display updates after a write.
+   Next, review driver configuration and route-status projection for focused
+   boundaries while preserving project identity, lock order and recovery state.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

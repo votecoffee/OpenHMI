@@ -4,7 +4,6 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
 import logging
-import math
 import re
 from threading import RLock
 import time
@@ -16,6 +15,7 @@ from .tag_subscriptions import (TagSubscriptions, build_screen_demands,
 from .tag_samples import SampleCache
 from .tag_scheduling import ScanSchedule, BAD_TAG_RETRY_SECONDS
 from .scan_publication import publish_scan_receipts
+from .tag_writes import validate_logical_write, prepare_physical_write
 from .alarms import utc_now
 
 
@@ -350,46 +350,24 @@ class RuntimeDriver(SimulatorDriver):
             if tag is None:
                 with self.lock:
                     return super().write(address, values)
-            kind = tag['members'][member] if member else tag['type']
-            write_kind = 'number' if kind == 'integer' and not member and (tag['scale'] != 1 or tag['offset'] != 0) else kind
-            if not tag['writable'] or len(values) != 1 or not type_ok(values[0], write_kind) or kind == 'struct':
-                raise ValueError('Tag is read-only or write type is incompatible')
-            value = values[0]
+            kind, value = validate_logical_write(tag, member, values)
             if tag['connection']:
                 connection = self.connections.get(tag['connection'])
                 if not connection:
                     raise ConnectionError('PLC connection is disabled')
                 with connection.lock:
-                    raw = value if member else (value - tag['offset']) / tag['scale'] if kind in ('number', 'integer') else value
-                    if kind in ('number', 'integer') and not math.isfinite(raw):
-                        raise ValueError('Inverse PLC scaling must produce a finite value')
-                    if kind == 'integer':
-                        if abs(raw) > MAX_SAFE_INTEGER:
-                            raise ValueError('Inverse PLC scaling exceeds the browser-safe integer range')
-                        if int(raw) != raw:
-                            raise ValueError('Scaled integer writes must resolve to an integer')
-                        raw = int(raw)
-                    physical_address = tag['address'] + ('.' + member if member else '')
+                    physical_address, raw = prepare_physical_write(tag, member, kind, value)
                     connection.validate_write(physical_address, raw)
                     try:
                         connection.write(physical_address, raw)
                     except TagWriteError as error:
                         with self.lock:
-                            for key, aliases in self.address_aliases.items():
-                                route, scan_address = key
-                                if route != tag['connection'] or not overlapping_addresses(physical_address, scan_address):
-                                    continue
-                                self.deadlines.pop(key, None)
-                                for alias, _, scan_member in aliases:
-                                    alias_address = scan_address + ('.' + scan_member if scan_member else '')
-                                    if alias in self.samples and overlapping_addresses(physical_address, alias_address):
-                                        self.samples[alias].update(value=None, quality='bad', error=str(error))
+                            self.schedule.write_failed(tag['connection'], physical_address, error,
+                                                       self.address_aliases, self.sample_cache)
                         raise
                     # A write readback verifies the transaction; normal polling owns displayed samples.
                     with self.lock:
-                        key = (tag['connection'], tag['address'])
-                        self.deadlines.pop(key, None)
-                        self._bad_tag_retry_at.pop(key, None)
+                        self.schedule.write_verified((tag['connection'], tag['address']))
             else:
                 with self.lock:
                     if member:
