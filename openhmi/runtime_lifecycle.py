@@ -4,6 +4,8 @@ import asyncio
 from contextlib import contextmanager, asynccontextmanager
 import logging
 
+from .async_cleanup import finish_cleanup
+
 
 class RuntimeLifecycle:
     def __init__(self):
@@ -36,9 +38,9 @@ class RuntimeLifecycle:
     async def lifespan(self, app):
         workers_started = False
         try:
-            await asyncio.to_thread(self.sample_alarms)
+            await finish_cleanup(asyncio.to_thread(self.sample_alarms))
             workers_started = True
             async with self.workers.running():
                 yield
         finally:
-            await asyncio.to_thread(self.cleanup, stop_identity=workers_started)
+            await finish_cleanup(asyncio.to_thread(self.cleanup, stop_identity=workers_started))

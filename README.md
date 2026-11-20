@@ -654,6 +654,10 @@ workers before stopping trends, clearing identity, closing acquisition and stora
 PLC shutdown logs client-close failures and isolates each route close attempt so
 one route cannot skip the others. Active scans drain before cleanup; close failures
 do not replay writes or automatically reconnect a route.
+Partial worker startup drains every task already created. Repeated cancellation
+waits for active callbacks, executor shutdown, initial alarm sampling and resource
+cleanup before propagating cancellation; it does not abandon work using the
+project database or PLC driver.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

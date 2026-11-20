@@ -612,6 +612,20 @@ schedule cleanup still runs afterward. Closes remain outside the state lock unde
 the I/O lock. Tests use fake clients, a bounded blocked read and explicit reopening;
 they issue no writes and do not establish physical socket-close success after a
 vendor close error. No automatic close retry or reconnect was added.
+Worker task creation now runs inside the scheduler cleanup scope. A rejected task
+creation closes its unscheduled coroutine and drains tasks already created, even
+if the first task could not be scheduled. `_run` records stopped health in a
+finally block. Drain collects/logs unexpected task failures while waiting for
+peers, then joins its executor off the event loop so a cancelled scheduler cannot
+hide a still-running synchronous callback. `async_cleanup.py` shields owned work
+from caller cancellation until completion, then propagates cancellation; repeated
+cancellation cannot detach worker draining or resource cleanup. The same helper
+protects initial alarm sampling before workers start. Tests use bounded event
+gates and real in-memory SQL to prove ordering, original startup failure retention,
+event-loop progress, no post-close access and no pre-worker identity publication.
+Public models, HTTP routes and complete OpenAPI remain unchanged. Forced process
+termination and indefinitely blocked vendor operations remain outside these
+bounded offline checks; no timeout closes resources underneath active work.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

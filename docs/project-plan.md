@@ -506,13 +506,23 @@ not close hardware or operator acceptance gates.
     reopen, with no writes. No automatic reconnect or close retry was added;
     physical socket release after a vendor exception remains unproven.
 
+46. Delivered partial worker startup and cancellation cleanup. Task creation is
+    inside the drain scope; rejected coroutines close and already-created tasks
+    finish before owned resources close. Unexpected task failures are collected
+    and logged while peers drain. Executor joining runs off the event loop, even
+    if a scheduler is cancelled while its synchronous callback remains active.
+    Repeated caller cancellation cannot detach initial sampling, worker draining
+    or resource cleanup; cancellation propagates afterward. Bounded event/SQL
+    checks preserve ordering, startup errors and pre-worker identity behavior.
+    Public models, routes and complete OpenAPI remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review partial worker
-scheduling failure and cancellation cleanup so startup cannot leave created tasks
-running against closed resources. Preserve scan/resource draining and transport
-ownership. Prioritize observable failure behavior and contract coverage over
-further file splitting. Controller, operator-station and endurance acceptance stay
-deferred.
+Recipe HTTP separation is complete for this scope. Next review project-switch
+cancellation and candidate startup failure recovery, retaining ownership of the
+current runtime and avoiding writes/replay. Preserve scan/resource draining and
+transport ownership. Prioritize observable failure behavior and contract coverage
+over further file splitting. Controller, operator-station and endurance acceptance
+stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
