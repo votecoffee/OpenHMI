@@ -434,8 +434,16 @@ validation, SQLite saves/applies and the actual active-read registrar to check a
 control kinds, secondary screens, faceplates, containers and locked backgrounds.
 Unapplied drafts do not replace the active response. Display-level legacy defaults
 remain accepted; full project/request validation and runtime binding checks stay
-on their existing boundaries. Next, extract tag-status snapshot validation and
-compare acquisition metadata with its production browser guard. Preserve model/import
+on their existing boundaries. Tag-status validation/default normalization and
+normal/status-only polling URLs now live in `runtime-api.mjs`. The previous guard
+rules are preserved; per-tag fault handling remains with quality-aware controls.
+`test_tag_snapshot_contract.py` compares real acquisition-route/cache responses
+using FakePLC: held/pending, one bad tag among good data, stale/recovered and
+disabled routes. GET reads cannot poll or subscribe, and status-only reads cannot
+copy tag samples or subscription groups. All five live app snapshot boundaries
+now use focused modules while polling/lifecycle ownership remains in the app.
+Next, extract alarm-console read-query builders and bind their URLs through the
+real registrar before expanding detailed alarm response parity. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

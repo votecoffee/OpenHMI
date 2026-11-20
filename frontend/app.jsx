@@ -15,7 +15,7 @@ import { DiagnosticsConsole } from './diagnostics-console.jsx';
 import { Live, ConnectionStatus } from './live-quality.jsx';
 import { createConfig } from './controls.jsx';
 import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from './project-api.mjs';
-import { renewSubscription } from './runtime-api.mjs';
+import { renewSubscription, requireTagSnapshot, tagSnapshotPath } from './runtime-api.mjs';
 import { ScreenControls, ScreenFrame } from './screen-frame.jsx';
 import { CanvasEditor, CanvasSurface, initialCanvas } from './canvas.jsx';
 import { toEditor, toProject, projectScreens, scopedScreen } from './model.mjs';
@@ -37,10 +37,6 @@ import { SecurityContext, SecurityBar, SecurityAdmin, allowed, canInspect } from
 import { Popup } from './touch-entry.jsx';
 
 const editorOverrides = { headerActions: () => null };
-
-function isRecord(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function ScreenView({ screen, config }) {
   const data = toEditor(screen);
@@ -367,14 +363,8 @@ function App({ initial, catalog }) {
       return () => { stopped = true; clearTimeout(timer); };
     }
 
-    const stopTags = poll(diagnostics ? '/api/tags?status_only=true' : '/api/tags', tags => {
-      const { values = diagnostics ? {} : null, samples = {},
-        connections = diagnostics ? null : [], plc_hold: plcHold = diagnostics ? null : false } = tags ?? {};
-      if (!isRecord(values) || !isRecord(samples) || typeof plcHold !== 'boolean'
-        || !Array.isArray(connections) || connections.some(route =>
-          typeof route?.id !== 'string' || typeof route.connected !== 'boolean')) {
-        throw new Error('Invalid tag status response');
-      }
+    const stopTags = poll(tagSnapshotPath(diagnostics), tags => {
+      const { values, samples, connections, plcHold } = requireTagSnapshot(tags, diagnostics);
       setLive(previous => ({ ...previous, values, samples, connections, plcHold, connected: true }));
     }, () => {
       setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false, connections: [], plcHold: false }));

@@ -339,8 +339,16 @@ not close hardware or operator acceptance gates.
     and malformed consumed fields are covered; runtime bindings/assets and
     controller/station acceptance stay separate.
 
-The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize tag-status snapshot validation and acquisition response parity next. Keep further module extraction tied
+25. Delivered tag-status validation/default normalization and polling URLs in the
+    runtime API module. Real acquisition/FakePLC cache contracts cover held/pending
+    states, partial tag faults, stale recovery, disabled routes and status-only
+    metadata. GET cannot poll/subscribe; status-only reads cannot copy samples.
+    Per-tag quality handling, legacy defaults and app polling ownership remain
+    intact. All five live app snapshot validation boundaries now have focused
+    modules; controller acceptance remains separate.
+
+The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
+Prioritize alarm-console read-query builders and detailed alarm contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

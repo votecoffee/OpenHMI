@@ -618,6 +618,8 @@ Alarm snapshot validation is shared with SQL lifecycle contracts covering
 acknowledgement, shelving, trigger quality, stale evaluation and retirement.
 Applied-project validation shares the real palette fixture and SQL active-response
 contracts for control families, secondary screens, faceplates and canvas metadata.
+Tag-status normalization shares acquisition-response contracts for held/pending
+state, partial faults, stale recovery and lightweight diagnostics polling.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

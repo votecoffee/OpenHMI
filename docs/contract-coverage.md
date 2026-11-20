@@ -26,6 +26,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Selected-recipe snapshots | `test_recipe_selection_contract.py`: actual SQL create/load/approve/revise/withdraw/clear/reopen responses into the production guard; images, Unicode, typed/safe-integer boundaries and malformed payloads | Security principal and local publication callback are stubbed; display guard covers consumed fields, while request models enforce full recipe limits; no PLC transfer or controller acceptance |
 | Live alarm snapshots | `test_alarm_snapshot_contract.py`: real SQL/HTTP monitor snapshots for priorities, acknowledgement, shelving, quality/staleness, retirement/reopen and legacy/malformed payloads; read endpoint does not acquire source data | Guard validates live-banner fields and legacy fallbacks, not complete occurrence/history DTOs; source values are synthetic and no controller acceptance is implied |
 | Applied-project snapshots | `test_applied_project_contract.py`: real palette/Pydantic/SQLite save/apply and active HTTP responses through the production guard; all control kinds, screens, faceplates, freeform/flow layout metadata, legacy and malformed replies | Runtime callbacks are stubbed; schema/display compatibility does not prove PLC binding validity, asset availability or native station acceptance |
+| Tag-status snapshots | `test_tag_snapshot_contract.py`: real acquisition/cache responses with FakePLC through the production normalizer; held/pending, partial bad-tag faults, stale recovery, disabled and status-only metadata; GET cannot poll/subscribe or copy samples in status-only mode | Top-level validation retains per-tag fault isolation; control-specific quality/type handling remains separate; FakePLC is not controller acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -130,10 +131,18 @@ freeform/flow layouts, scoped screens, faceplates, containers, groups and locked
 background metadata survive apply. Consumed malformed shapes are rejected without
 mutation, preserving legacy defaults. Runtime bindings/assets stay separate checks.
 
+Tag-status validation/default normalization and both polling URLs are shared
+through `runtime-api.mjs`. Existing rules preserve legacy normal-response defaults
+and require explicit connection/hold metadata for status-only replies. Per-tag
+null/stale/bad samples do not invalidate an otherwise readable payload; malformed
+top-level collections do. Contracts preserve zero/false/text/structured values
+without mutation, with cache-only reads and lightweight diagnostic polling.
+This completes extraction of the five live app snapshot validation boundaries.
+
 ## Next bounded work
 
-1. Extract tag-status snapshot validation and compare actual acquisition metadata
-   with the browser guard, including diagnostic status-only responses and faults.
+1. Extract alarm-console occurrence/event/note read-query builders and bind their
+   actual URLs through the registrar, then expand detailed alarm response parity.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

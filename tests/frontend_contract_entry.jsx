@@ -14,7 +14,7 @@ import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExpor
 import { isCaptureStatus, captureCsvPath } from '../frontend/trend-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
-import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
+import { writeControlValue, activateControl, renewSubscription, requireTagSnapshot, tagSnapshotPath } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from '../frontend/project-api.mjs';
 import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath } from '../frontend/alarm-api.mjs';
 import { engineeringCatalog } from '../frontend/engineering.jsx';
@@ -22,6 +22,16 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'tag_snapshots') {
+    const before = JSON.stringify(request.snapshots);
+    const results = request.snapshots.map(({ data, statusOnly = false }) => {
+      try { return { valid: true, normalized: requireTagSnapshot(data, statusOnly) }; }
+      catch (error) { return { valid: false, error: error.message }; }
+    });
+    if (JSON.stringify(request.snapshots) !== before) throw new Error('Tag validation mutated input');
+    return { paths: [tagSnapshotPath(), tagSnapshotPath(true)], results };
+  }
+
   if (request.operation === 'applied_projects') {
     const before = JSON.stringify(request.snapshots);
     const valid = request.snapshots.map(isAppliedProjectSnapshot);
