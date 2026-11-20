@@ -120,6 +120,15 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
     await expect(chart.locator('.trend-time')).toContainText('End');
     await expect(chart.locator('[data-trend-value="TankLevel"]')).toContainText('42.0');
 
+    fault = undefined;
+    await expect(warning).toBeHidden();
+    fault = { json: { start: 100, end: 110, truncated: false, samples: [
+      { tag: 'TankLevel', epoch: 109, value: 999, quality: 'good' },
+      { tag: 'TankLevel', epoch: 108, value: 20, quality: 'good' },
+    ] } };
+    await expect(warning).toContainText('Showing last received history ending');
+    await expect(traces.nth(0)).toHaveAttribute('points', retained);
+
     await chart.getByLabel('On-change trend history end').fill('2026-01-01T08:00');
     await expect(warning).toBeVisible();
     await expect(warning).not.toContainText('Showing last received history ending');
@@ -244,12 +253,20 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await run.click();
     const retained = chart.getByText(/10 \/ 10 samples retained.*rolled off/);
     await expect(retained).toBeVisible();
+    const savedStatus = await (await page.request.get('/api/trends/trend')).json();
     fault = { status: 503, json: { detail: 'Synthetic recording status outage' } };
     await page.route(endpoint, route => route.fulfill(fault));
     await expect(statusWarning).toContainText('Showing last received recording status');
     await expect(retained).toBeVisible();
     await expect(stop).toBeDisabled();
     await expect(run).toBeDisabled();
+    await page.unroute(endpoint);
+    await expect(statusWarning).toBeHidden();
+    fault = { json: { ...savedStatus, captures: [savedStatus.captures[0], savedStatus.captures[0]] } };
+    await page.route(endpoint, route => route.fulfill(fault));
+    await expect(statusWarning).toContainText('Showing last received recording status');
+    await expect(retained).toBeVisible();
+    await expect(stop).toBeDisabled();
     await page.unroute(endpoint);
     await stop.click();
     await expect(chart.getByText(/arrêt manuel/)).toBeVisible();
@@ -261,7 +278,10 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await expect(download).toHaveAttribute('href', href);
     await chart.getByRole('button', { name: 'Supprimer la capture' }).click();
     const confirmDelete = chart.getByRole('button', { name: 'Confirmer la suppression' });
-    fault = { json: { enabled: true, captures: [null] } };
+    const stoppedStatus = await (await page.request.get('/api/trends/trend')).json();
+    fault = { json: { ...stoppedStatus, captures: stoppedStatus.captures.map(item => ({
+      ...item, retained: item.max_samples + 1,
+    })) } };
     await page.route(endpoint, route => route.fulfill(fault));
     await expect(statusWarning).toBeVisible();
     await expect(confirmDelete).toBeDisabled();

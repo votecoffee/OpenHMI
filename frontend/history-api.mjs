@@ -51,3 +51,22 @@ export function isRecordedTagPage(page) {
     return true;
   });
 }
+
+export function isTrendHistory(history) {
+  const { start, end, truncated, samples, change_context: context = {} } = history ?? {};
+  const readableSample = row => Number.isFinite(row?.epoch)
+    && ['good', 'bad', 'pending', 'stale'].includes(row.quality) && Object.hasOwn(row, 'value');
+  const latest = new Map();
+  const chronological = row => {
+    if (latest.has(row.tag) && row.epoch < latest.get(row.tag)) return false;
+    latest.set(row.tag, row.epoch);
+    return true;
+  };
+  return Number.isFinite(start) && Number.isFinite(end) && end > start
+    && Number.isFinite(end - start) && Math.abs(end) <= 8.64e12 && Math.abs(start) <= 8.64e12
+    && typeof truncated === 'boolean' && Array.isArray(samples)
+    && samples.every(row => readableSample(row) && typeof row.tag === 'string' && row.epoch >= start && row.epoch <= end && chronological(row))
+    && context !== null && typeof context === 'object' && !Array.isArray(context)
+    && Object.values(context).every(item => Number.isFinite(item?.hold_seconds) && item.hold_seconds > 0
+      && (item.previous === null || (readableSample(item.previous) && item.previous.epoch < start)));
+}

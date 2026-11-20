@@ -16,6 +16,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Command transaction/history responses | `test_command_responses.py`: real SQL detail, filtered/cursor pages, exports and restart reconciliation across all eight states through production JS validators; malformed sequence/page browser recovery | Seeded offline lifecycle states do not prove PLC execution; nullable results/errors and empty event histories remain compatible |
 | Image listing queries and pages | `test_image_contract.py`: production queries to the real registrar, Unicode search, cursor/page bounds, real SQLite pages to the actual JS validator and malformed-page rejection | Listing fixtures do not test image decoding; JSON paging cursors must be safe positive JS integers |
 | Historian/trend reads and exports | `test_history_contract.py`: production paths through both real registrars; live/fixed windows, context, recorded tags, bounded/complete CSV, capture reads/CSV, invalid ranges and stale project guards | Data services are stubbed for query binding; existing domain/browser tests cover actual acquisition and export behavior |
+| History windows and recording status responses | `test_trend_responses.py`: actual SQL sampling/query/listing through real HTTP registrars into production JS validators; context, truncation, quality, rollover, stopped/restarted captures and malformed replies | Offline sample snapshots do not prove acquisition; history supports equal epochs and different ordering between tags; optional legacy pen metadata remains accepted |
 | Recorded-tag catalog responses | Real SQLite historian pages through `isRecordedTagPage`, malformed-page fixtures and browser no-crash/recovery regression | This is a bounded catalog response contract, not complete history/capture response parity |
 | Schema ownership/import compatibility | `test_project_models.py`: direct family/domain imports, no service/HTTP/Pillow/SQLite dependency, shared canonical/legacy classes and project round trips | Import isolation is not a runtime performance or packaging benchmark |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
@@ -63,9 +64,17 @@ last-row cursors are enforced. Malformed replies retain evidence with warnings;
 buttons remain blocked and older-page navigation is disabled until recovery.
 No strict HTTP response filtering or controller dispatch was added.
 
+History/capture response validators are exported from `history-api.mjs` and
+`trend-api.mjs`, shared by the production React controls and contract tests.
+History must be chronological within each tag; equal epochs and interleaved tags
+remain valid. Duplicate capture IDs and retained counts exceeding capacity are
+rejected. Browser regressions retain readable traces/status through these faults
+and restore normal controls after valid replies. Existing quality-gap handling,
+nullable fields and source-time metadata are preserved.
+
 ## Next bounded work
 
-1. Extend response parity to history/trend status and other shared operator pages, including
+1. Extend response parity to activity/diagnostics and other shared operator pages, including
    malformed/missing fields and permission loss. Review older nullable/history
    data before adding strict response filtering to a production endpoint.
 

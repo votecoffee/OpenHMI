@@ -381,7 +381,13 @@ SQL service detail, page, export and restart-reconciled responses with productio
 JS validators across every transaction state, without driver calls. Sequence bounds
 and coherent descending page cursors are validated before replacing readable
 evidence. Nullable results/errors and empty event histories remain compatible.
-Next, extend response parity to history/trend status. Preserve model/import
+History and capture validators now live in their focused API modules rather than
+React components. `test_trend_responses.py` feeds actual SQL-backed history and
+recording responses through those functions, including change context, truncation,
+quality gaps, rollover, stopping and restart reconciliation. Per-tag chronological
+order, unique capture IDs and coherent retention counts are checked before state
+is replaced; equal sample epochs and optional legacy pen fields remain compatible.
+Next, cover activity/diagnostics response parity. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

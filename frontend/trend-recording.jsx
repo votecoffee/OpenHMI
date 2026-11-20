@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
-import { trendCapturePath, sendCaptureCommand, captureCsvPath } from './trend-api.mjs';
+import { trendCapturePath, sendCaptureCommand, captureCsvPath, isCaptureStatus } from './trend-api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 
@@ -33,21 +33,6 @@ export function TrendRecordingFields({ value, onChange, catalog }) {
       <small>Trigger tags use sampled rising edges. Each run keeps its newest samples.</small>
     </>}
   </fieldset>;
-}
-
-function isCaptureStatus(status) {
-  const epoch = value => Number.isFinite(value) && Math.abs(value) <= 8.64e12;
-  const optionalEpoch = value => value === null || epoch(value);
-  const count = value => Number.isSafeInteger(value) && value >= 0;
-  return typeof status?.enabled === 'boolean' && (status.error == null || typeof status.error === 'string')
-    && Array.isArray(status.captures) && status.captures.every(item => count(item?.id) && item.id > 0
-      && epoch(item.started) && optionalEpoch(item.stopped) && optionalEpoch(item.first) && optionalEpoch(item.last)
-      && (item.reason == null || typeof item.reason === 'string')
-      && [item.retained, item.max_samples, item.rolled_off].every(count)
-      && Array.isArray(item.series) && item.series.every(pen => typeof pen?.tag === 'string'
-        && ['number', 'boolean'].includes(pen.type)
-        && (pen.decimals == null || (count(pen.decimals) && pen.decimals <= 8))
-        && (pen.minimum == null || Number.isFinite(pen.minimum)) && (pen.maximum == null || Number.isFinite(pen.maximum))));
 }
 
 export function useTrendCaptures(id, editing, recording) {

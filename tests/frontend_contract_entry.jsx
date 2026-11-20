@@ -6,8 +6,8 @@ import { api, uploadProjectImage } from '../frontend/api.mjs';
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
 import { commandStates, isCommandRecord, isCommandPage } from '../frontend/command-status.mjs';
 import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
-import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage } from '../frontend/history-api.mjs';
-import { captureCsvPath } from '../frontend/trend-api.mjs';
+import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage, isTrendHistory } from '../frontend/history-api.mjs';
+import { isCaptureStatus, captureCsvPath } from '../frontend/trend-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
@@ -18,6 +18,7 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'trend_responses') return { histories: request.histories.map(isTrendHistory), statuses: request.statuses.map(isCaptureStatus) };
   if (request.operation === 'command_responses') return { states: commandStates, records: request.records.map(isCommandRecord), pages: request.pages.map(isCommandPage) };
   if (request.operation === 'recorded_pages') return request.pages.map(isRecordedTagPage);
   if (request.operation === 'image_pages') return request.pages.map(isProjectImagePage);

@@ -279,8 +279,15 @@ not close hardware or operator acceptance gates.
     Browser regressions cover blocked requests/navigation and valid-reply recovery.
     These are offline fixtures and do not establish controller execution.
 
+16. Delivered shared history/capture response validators in focused API modules
+    and SQL-to-browser contracts for history quality/context/truncation and capture
+    lifecycle/rollover/restart. Out-of-order per-tag samples, duplicate capture IDs
+    and impossible retention counts are rejected with readable-data retention and
+    browser recovery coverage. Equal epochs and optional legacy fields remain
+    compatible. Acquisition/PLC acceptance stays separate.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize history/trend status response contracts next. Keep further module extraction tied
+Prioritize activity/diagnostics response contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

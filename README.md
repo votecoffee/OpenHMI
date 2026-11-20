@@ -234,6 +234,8 @@ keeps its running copy; test recipes carry production status false. See the
    to pin the cursor to a timestamp. Enable **Saved trend
    recording** for manual Run/Stop or optional Boolean triggers, independent
    rolling sample retention, saved capture review and full capture CSV export.
+   Malformed history or recording replies retain readable data with a warning;
+   invalid recording status blocks recording actions until valid status returns.
    Configure trend labels and capture controls in **Languages**.
 7. In the **Live charts** palette section, drop in a **Tank level indicator**
    for a live fill and normal band, a **Radial gauge** for a dial with a normal
