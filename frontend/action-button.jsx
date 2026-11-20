@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Live, tagValue, Quality } from './live-quality.jsx';
-import { api } from './api.mjs';
+import { readLatestCommand } from './command-api.mjs';
 import { activateControl } from './runtime-api.mjs';
 import { isCommandPage, isCommandRecord } from './command-status.mjs';
 import { SecurityContext, allowed, SecurityLock } from './security.jsx';
@@ -40,7 +40,7 @@ export function ActionButton({ id, label, action, mode = 'python', command = '',
     let stopped = false, timer;
     async function refresh() {
       try {
-        const data = await api(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`);
+        const data = await readLatestCommand(command);
         if (!isCommandPage(data) || data.items.length > 1 || data.items.some(item => item.command_id !== command)) {
           throw new Error('Invalid command status response');
         }

@@ -254,9 +254,16 @@ not close hardware or operator acceptance gates.
     complete project round trips with containers, locked backgrounds and
     privilege-bit mappings.
 
+12. Delivered a [control-extension workflow](extending-controls.md) and bounded
+    [contract audit](contract-coverage.md). Command buttons and transaction console
+    share production query builders. New browser-to-router checks cover all UI
+    history states, Unicode filters, pagination bounds, precise string-form IDs,
+    JSON export and invalid requests rejected before service calls.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Next, document the contributor workflow for extending controls and audit remaining
-schema/API contract gaps before choosing further extractions.
+Prioritize the audit's remaining query/response contract gaps: image-library
+search/pagination first, then historian/trend read queries. Keep further module
+extraction tied to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

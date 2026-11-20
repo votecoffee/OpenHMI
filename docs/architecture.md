@@ -356,8 +356,15 @@ legacy layout/publication models without applying anything to a controller.
 
 The current control-family, HTTP-registration, driver and schema/store separation
 baseline is delivered, including control families and independent domain models.
-Next, document the contributor workflow for adding a control and audit remaining
-schema/API contract gaps before choosing further extractions. Preserve model/import
+The [contributor workflow](extending-controls.md) traces schema, palette,
+serialization, binding, faceplate and runtime changes. The bounded
+[contract audit](contract-coverage.md) records covered and outstanding boundaries.
+Command query builders now live in `command-api.mjs`; buttons and transaction
+console share these production helpers. `test_command_contract.py` sends their
+actual generated URLs through the real registrar with stubbed service/security,
+covering history-state parity, filters, limits, IDs and JSON export headers.
+Next, cover image-library GET search/pagination, then historian/trend read queries;
+review shared response contracts separately. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

@@ -582,6 +582,9 @@ The integrated Python IDE remains deferred.
 Keep end-user workflows free of web implementation details. Prefer declarative
 bindings and common actions before requiring custom code. Keep drivers independent
 of editor controls and preserve active tag state during screen updates.
+See the [control-extension workflow](docs/extending-controls.md) and
+[contract coverage and remaining gaps](docs/contract-coverage.md) before adding
+controls, saved fields or API behavior.
 
 The Python suite includes frontend/backend contract tests, so install Node 20+
 and run `npm ci` before running it. These tests build the real palette configuration

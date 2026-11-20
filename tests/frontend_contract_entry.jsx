@@ -3,6 +3,8 @@ import { createConfig } from '../frontend/controls.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
 import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
 import { api, uploadProjectImage } from '../frontend/api.mjs';
+import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
+import { commandStates } from '../frontend/command-status.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
@@ -67,7 +69,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -80,6 +82,15 @@ export async function contract(request) {
       });
     };
     await api('/api/project');
+    if (request.operation === 'command_queries') {
+      await readLatestCommand('设备 / Cycle?#');
+      await api(commandHistoryPath());
+      await api(commandHistoryPath({ limit: 200, command: '设备 / Cycle?#', state: 'unresolved', before: '9223372036854775807' }));
+      for (const state of ['unresolved', ...commandStates]) await api(commandHistoryPath({ state }));
+      await api(commandTransactionPath(123));
+      await api(commandTransactionPath('9223372036854775807', true));
+      return { requests: requests.slice(1), states: ['', 'unresolved', ...commandStates] };
+    }
     if (request.operation === 'service_requests') {
       for (const [action, captureId] of [['start', 0], ['stop', 123], ['delete', 123]]) {
         await sendCaptureCommand('设备 / trend?#', action, captureId);
