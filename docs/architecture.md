@@ -397,8 +397,15 @@ and export query construction; `test_operations_contract.py` binds their actual
 requests through the real registrar. Tests preserve Unicode filters, UTC date
 conversion, exact string-form cursors, defaults, bounds, project headers and
 read/export authorization. UI polling, retention and permission-loss handling
-remain in React. Next, separate read-only diagnostics projection from HTTP
-registration while retaining the driver snapshot lock. Preserve model/import
+remain in React. `diagnostics.py` now owns read-only snapshot/filter/projection
+logic; the router retains permissions, query bounds and JSON download metadata.
+The driver snapshot keeps one shared-lock boundary and common monotonic time;
+worker health is read after release. Regression checks replace the catalog at
+snapshot release and require consistent old-generation tags/routes, preserving
+route-state precedence, filters, paging and value-free output. Synthetic bench
+comparisons patch both HTTP capture and projection clocks to match driver polls.
+Next, separate the
+command/activity/diagnostics views into focused modules with compatible exports. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

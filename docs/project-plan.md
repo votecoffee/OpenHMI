@@ -299,8 +299,14 @@ not close hardware or operator acceptance gates.
     headers. Export checks preserve scope, CSV quoting/formula escaping, value-free
     diagnostics and authorization before reads. UI polling and recovery stay intact.
 
+19. Delivered read-only diagnostics snapshot/filter/projection in `diagnostics.py`,
+    independent of HTTP registration. Permissions, query bounds and download
+    metadata stay in the router. Snapshot lock/time ownership and worker snapshot
+    ordering remain intact. Tests cover catalog replacement at lock release, route
+    fault precedence, paging/filtering and value-free metadata.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize separating diagnostics projection from HTTP registration next. Keep further module extraction tied
+Prioritize focused command/activity/diagnostics view modules with compatible exports next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

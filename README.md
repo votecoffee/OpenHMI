@@ -618,6 +618,9 @@ Scheduling and receipt publication have focused components; regression checks
 also cover changing requested UDT members during an in-flight scan, failed-write
 isolation across aliases/routes, and polling-owned display updates after verified
 writes. Logical write checks and readback comparison use shared pure rules.
+Read-only diagnostics projection is separate from HTTP registration; regression
+checks preserve a coherent catalog generation across snapshot release, route fault
+precedence and value-free output.
 Tag-catalog reconciliation and route-status projection have separate modules;
 tests cover local edits across applies, route replacement, held acquisition,
 legacy catalog access and independent diagnostic results. Project/control schemas

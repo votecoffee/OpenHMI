@@ -21,6 +21,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Schema ownership/import compatibility | `test_project_models.py`: direct family/domain imports, no service/HTTP/Pillow/SQLite dependency, shared canonical/legacy classes and project round trips | Import isolation is not a runtime performance or packaging benchmark |
 | Activity/diagnostics queries and exports | `test_operations_contract.py`: actual production read helpers/URLs through the registrar; Unicode filters, UTC conversion, precise cursors, limits/defaults, project headers, CSV quoting/formula escaping and export permissions | Journal is real SQLite; driver metadata/security hooks are controlled offline fixtures; no browser-local timezone or controller acceptance claim |
 | Activity/diagnostics responses | `test_operations_responses.py`: real SQL journal outcomes/pages/restart and actual driver/worker projections through the registrar into production JS validators; malformed paging and scan-age checks | Security is stubbed in contract fixtures; browser tests cover denial/recovery; fake transport does not establish PLC or station acceptance |
+| Read-only diagnostics projection | `test_diagnostics.py`: catalog replacement at snapshot release, common snapshot time, worker read outside the driver lock, route fault precedence, filter/paging and value omission | Controlled boundary regression, not a concurrency stress benchmark; HTTP and browser contracts remain separate checks |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -90,8 +91,8 @@ checks before list/export service calls. Download formats remain unchanged.
 
 ## Next bounded work
 
-1. Separate read-only diagnostics projection from HTTP registration, preserving
-   the atomic driver snapshot, filters, paging and export response contracts.
+1. Separate command/activity/diagnostics React views into focused modules while
+   preserving existing exports, polling, permissions and recovery regressions.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
