@@ -421,7 +421,13 @@ live in `recipe-selection.mjs`; the existing guard rules remain unchanged.
 that guard, covering null selections, typed values, images, self-approval, source
 revision changes, independent loaded copies and service reopen. Display validation
 remains separate from full recipe request-model limits and server permissions.
-Next, extract alarm snapshot validation and its state/annunciation contracts. Preserve model/import
+The live alarm snapshot guard and polling URL now live in `alarm-api.mjs`,
+with its previous legacy defaults and display-field rules preserved.
+`test_alarm_snapshot_contract.py` checks real SQL/HTTP monitor snapshots across
+priorities, acknowledgement, shelving/restoration, bad trigger quality, stale
+evaluation, retirement and reopen. Snapshot reads must not acquire fresh source
+data. Detailed occurrence/history validation remains a separate boundary.
+Next, extract applied-project snapshot validation and verify saved-project parity. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

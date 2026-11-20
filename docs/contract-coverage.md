@@ -24,6 +24,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Read-only diagnostics projection | `test_diagnostics.py`: catalog replacement at snapshot release, common snapshot time, worker read outside the driver lock, route fault precedence, filter/paging and value omission | Controlled boundary regression, not a concurrency stress benchmark; HTTP and browser contracts remain separate checks |
 | Identity-session snapshots | `test_security_session_contract.py`: real SQL security service/session route into the production guard; local/expired sessions, live permission changes, mocked Windows mappings/disable, public fields and malformed payloads; validated read-helper errors | Windows authentication is mocked, not OS/domain acceptance; UI retains generation fences and last-confirmed identity behavior |
 | Selected-recipe snapshots | `test_recipe_selection_contract.py`: actual SQL create/load/approve/revise/withdraw/clear/reopen responses into the production guard; images, Unicode, typed/safe-integer boundaries and malformed payloads | Security principal and local publication callback are stubbed; display guard covers consumed fields, while request models enforce full recipe limits; no PLC transfer or controller acceptance |
+| Live alarm snapshots | `test_alarm_snapshot_contract.py`: real SQL/HTTP monitor snapshots for priorities, acknowledgement, shelving, quality/staleness, retirement/reopen and legacy/malformed payloads; read endpoint does not acquire source data | Guard validates live-banner fields and legacy fallbacks, not complete occurrence/history DTOs; source values are synthetic and no controller acceptance is implied |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -112,10 +113,18 @@ zero/false values, Unicode text and exact integer limits; malformed shapes are
 rejected without mutation. These fixtures use a stubbed local publication callback
 and do not execute a PLC recipe transfer.
 
+The live alarm snapshot guard and polling path are shared through `alarm-api.mjs`.
+Guard rules remain unchanged, including fallback annunciation/count fields for
+legacy snapshots. Real monitor responses preserve outstanding conditions while
+shelving alters annunciation, bad quality does not invent a return, acknowledgement
+does not clear the condition, and project retirement remains explicit. The contract
+rejects malformed consumed shapes without mutation; detailed history/query payloads
+remain a separate contract.
+
 ## Next bounded work
 
-1. Extract alarm snapshot validation and verify state/annunciation responses,
-   followed by applied-project snapshot compatibility.
+1. Extract applied-project snapshot validation and verify real saved-project/
+   active-response compatibility, including layout and control families.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

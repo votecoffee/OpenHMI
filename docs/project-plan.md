@@ -324,8 +324,15 @@ not close hardware or operator acceptance gates.
     reopen results. Guard rules and app failure handling remain unchanged.
     Publication is stubbed; PLC recipe transfer acceptance stays separate.
 
+23. Delivered shared live alarm snapshot validation and polling URL in the alarm
+    API module, preserving legacy defaults and display-field rules. Real SQL/HTTP
+    contracts cover priorities, acknowledgement, shelving/restoration, bad trigger
+    quality, stale evaluation, retirement/reopen and malformed consumed fields.
+    Snapshot reads do not acquire source data. Detailed history and controller
+    acceptance remain separate.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize alarm snapshot validation and state/annunciation contracts next. Keep further module extraction tied
+Prioritize applied-project snapshot validation and saved-project parity next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

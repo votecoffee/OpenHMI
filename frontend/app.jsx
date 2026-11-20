@@ -27,6 +27,7 @@ import { WorkspacePage } from './workspace.jsx';
 import { api, json } from './api.mjs';
 import { requireIdentitySnapshot, readSecuritySession, securitySessionPath } from './security-session.mjs';
 import { isRecipeSelection, recipeSelectionPath } from './recipe-selection.mjs';
+import { isAlarmSnapshot, alarmSnapshotPath } from './alarm-api.mjs';
 import { Localization, useUi } from './localization.jsx';
 import { IdentitySettings } from './identity-settings.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
@@ -39,26 +40,6 @@ const editorOverrides = { headerActions: () => null };
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isAlarmSnapshot(alarms) {
-  if (!isRecord(alarms)) return false;
-  const { states, outstanding, annunciated_outstanding: annunciated = outstanding,
-    active_count, unacknowledged_count, annunciated_active_count = active_count,
-    annunciated_unacknowledged_count = unacknowledged_count, shelved_count = 0,
-    sampled_revision = null, evaluation_stale = false } = alarms;
-  const counts = [active_count, unacknowledged_count, annunciated_active_count,
-    annunciated_unacknowledged_count, shelved_count];
-  return counts.every(count => Number.isSafeInteger(count) && count >= 0)
-    && (sampled_revision === null || Number.isSafeInteger(sampled_revision))
-    && typeof evaluation_stale === 'boolean'
-    && isRecord(states) && Object.values(states).every(state => ['good', 'bad'].includes(state?.quality))
-    && Array.isArray(outstanding) && Array.isArray(annunciated)
-    && annunciated.every(alarm => isRecord(alarm) && [1, 2, 3, 4].includes(alarm.priority)
-      && typeof alarm.message === 'string'
-      && (alarm.occurrence_id === undefined || Number.isSafeInteger(alarm.occurrence_id))
-      && (alarm.messages === undefined || (isRecord(alarm.messages)
-        && Object.values(alarm.messages).every(message => typeof message === 'string'))));
 }
 
 function hasScreenControls(controls) {
@@ -427,7 +408,7 @@ function App({ initial, catalog }) {
     }, () => {
       setLive(previous => ({ ...previous, values: {}, samples: {}, connected: false, connections: [], plcHold: false }));
     });
-    const stopAlarms = diagnostics ? null : poll('/api/alarms', alarms => {
+    const stopAlarms = diagnostics ? null : poll(alarmSnapshotPath, alarms => {
       if (!isAlarmSnapshot(alarms)) throw new Error('Invalid alarm status response');
       setLive(previous => ({ ...previous, alarms, alarmConnected: true }));
     }, () => {
