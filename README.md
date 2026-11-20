@@ -651,6 +651,9 @@ scheduling. Partial assembly/startup failures close constructed resources, prese
 the original failure and continue past individual cleanup errors. Assembly and initial-sample
 cleanup do not invoke identity publication; normal shutdown still drains
 workers before stopping trends, clearing identity, closing acquisition and storage.
+PLC shutdown logs client-close failures and isolates each route close attempt so
+one route cannot skip the others. Active scans drain before cleanup; close failures
+do not replay writes or automatically reconnect a route.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

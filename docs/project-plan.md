@@ -497,12 +497,22 @@ not close hardware or operator acceptance gates.
     order. Worker scheduling and transport remain separate; public factory,
     models, route order and complete OpenAPI are preserved.
 
+45. Delivered PLC shutdown fault isolation. Client-close errors are logged with
+    route identity while transport detaches the client; a route-close exception
+    does not skip later route attempts. Scan draining still precedes every route
+    close, new scans/late sample publication remain blocked during shutdown, and
+    scan/cache/schedule state is cleared. Bounded fake-PLC tests cover multiple
+    failures, repeated close, lock ownership, active-read draining and explicit
+    reopen, with no writes. No automatic reconnect or close retry was added;
+    physical socket release after a vendor exception remains unproven.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review per-route transport
-shutdown isolation so one connection-close failure cannot skip other routes.
-Preserve scan draining and transport ownership. Prioritize observable failure
-behavior and contract coverage over further file splitting. Controller,
-operator-station and endurance acceptance stay deferred.
+Recipe HTTP separation is complete for this scope. Next review partial worker
+scheduling failure and cancellation cleanup so startup cannot leave created tasks
+running against closed resources. Preserve scan/resource draining and transport
+ownership. Prioritize observable failure behavior and contract coverage over
+further file splitting. Controller, operator-station and endurance acceptance stay
+deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

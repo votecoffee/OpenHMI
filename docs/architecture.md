@@ -603,6 +603,15 @@ cleanup time, preserving runtime instrumentation. Worker scheduling, transport
 ownership, HTTP models, route order and complete OpenAPI remain unchanged. Tests
 inject failures using real in-memory SQL resources and a forbidden PLC factory;
 no hardware acceptance is implied.
+PLC client close failures are now logged with the route ID rather than silently
+ignored; the transport still detaches its client and marks the route disconnected.
+Runtime driver shutdown isolates each route's close method, so a wrapper/route
+exception does not skip later routes. The scan pool still drains before any route
+close, `_closing` prevents new scans and late sample publication, and scan/cache/
+schedule cleanup still runs afterward. Closes remain outside the state lock under
+the I/O lock. Tests use fake clients, a bounded blocked read and explicit reopening;
+they issue no writes and do not establish physical socket-close success after a
+vendor close error. No automatic close retry or reconnect was added.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

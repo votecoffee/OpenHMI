@@ -421,8 +421,11 @@ class RuntimeDriver(SimulatorDriver):
             try:
                 if pool is not None:
                     pool.shutdown(wait=True, cancel_futures=True)
-                for connection in self.connections.values():
-                    connection.close()
+                for identifier, connection in self.connections.items():
+                    try:
+                        connection.close()
+                    except Exception:
+                        logging.exception('PLC route cleanup failed for route %s', identifier)
             finally:
                 with self.lock:
                     self._scans.clear()

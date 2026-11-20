@@ -4,6 +4,7 @@ This layer owns session recovery and transport receipts. It does not select
 screen demand, schedule tags, publish sample quality or replay failed writes.
 """
 
+import logging
 import re
 from threading import RLock
 import time
@@ -57,7 +58,7 @@ class LogixConnection:
                 try:
                     self.client.close()
                 except Exception:
-                    pass
+                    logging.exception('PLC client cleanup failed for route %s', self.config['id'])
                 self.client = None
             self.connected = False
 
