@@ -1,3 +1,4 @@
+import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
 import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
@@ -21,6 +22,13 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_selections') {
+    const before = JSON.stringify(request.selections);
+    const valid = request.selections.map(isRecipeSelection);
+    if (JSON.stringify(request.selections) !== before) throw new Error('Recipe validation mutated input');
+    return { path: recipeSelectionPath, valid };
+  }
+
   if (request.operation === 'security_sessions') {
     const before = JSON.stringify(request.sessions);
     const valid = request.sessions.map(value => {

@@ -26,6 +26,7 @@ import { readCandidate, retainCandidate, editorIdentity, recoveryPrefix } from '
 import { WorkspacePage } from './workspace.jsx';
 import { api, json } from './api.mjs';
 import { requireIdentitySnapshot, readSecuritySession, securitySessionPath } from './security-session.mjs';
+import { isRecipeSelection, recipeSelectionPath } from './recipe-selection.mjs';
 import { Localization, useUi } from './localization.jsx';
 import { IdentitySettings } from './identity-settings.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
@@ -38,33 +39,6 @@ const editorOverrides = { headerActions: () => null };
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isRecipeParameter(parameter) {
-  if (!isRecord(parameter) || typeof parameter.name !== 'string'
-    || typeof parameter.label !== 'string' || typeof parameter.unit !== 'string') return false;
-  const { type, value } = parameter;
-  switch (type) {
-    case 'number': return Number.isFinite(value);
-    case 'integer': return Number.isSafeInteger(value);
-    case 'boolean': return typeof value === 'boolean';
-    case 'text': return typeof value === 'string';
-    default: return false;
-  }
-}
-
-function isRecipeSelection(selection) {
-  if (!isRecord(selection) || !Number.isSafeInteger(selection.version) || selection.version < 1) return false;
-  const { snapshot } = selection;
-  if (snapshot === null) return true;
-  if (!isRecord(snapshot)) return false;
-  const { content, code, number, production_approved, loaded_by, loaded_at, approved_by } = snapshot;
-  return typeof code === 'string' && Number.isSafeInteger(number) && number > 0
-    && typeof production_approved === 'boolean' && typeof loaded_by === 'string' && typeof loaded_at === 'string'
-    && (approved_by === null || typeof approved_by === 'string')
-    && isRecord(content) && typeof content.title === 'string'
-    && (content.image_id === null || (typeof content.image_id === 'string' && /^[a-f0-9]{64}$/.test(content.image_id)))
-    && Array.isArray(content.parameters) && content.parameters.every(isRecipeParameter);
 }
 
 function isAlarmSnapshot(alarms) {
@@ -459,7 +433,7 @@ function App({ initial, catalog }) {
     }, () => {
       setLive(previous => ({ ...previous, alarmConnected: false }));
     });
-    const stopRecipe = diagnostics ? null : poll('/api/recipes/selected', recipeSelection => {
+    const stopRecipe = diagnostics ? null : poll(recipeSelectionPath, recipeSelection => {
       if (!isRecipeSelection(recipeSelection)) throw new Error('Invalid recipe selection response');
       setLive(previous => ({ ...previous, recipeSelection, recipeConnected: true }));
     }, () => {

@@ -318,8 +318,14 @@ not close hardware or operator acceptance gates.
     fences and last-confirmed identity handling remain intact; Windows/domain
     acceptance is separate.
 
+22. Delivered selected-recipe validation and polling path in a focused module.
+    Real SQL/HTTP contracts cover typed values, safe integer boundaries, images,
+    approval metadata, independent loaded copies, later source changes and clear/
+    reopen results. Guard rules and app failure handling remain unchanged.
+    Publication is stubbed; PLC recipe transfer acceptance stays separate.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize selected-recipe snapshot validation and SQL response parity next. Keep further module extraction tied
+Prioritize alarm snapshot validation and state/annunciation contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

@@ -23,6 +23,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Activity/diagnostics responses | `test_operations_responses.py`: real SQL journal outcomes/pages/restart and actual driver/worker projections through the registrar into production JS validators; malformed paging and scan-age checks | Security is stubbed in contract fixtures; browser tests cover denial/recovery; fake transport does not establish PLC or station acceptance |
 | Read-only diagnostics projection | `test_diagnostics.py`: catalog replacement at snapshot release, common snapshot time, worker read outside the driver lock, route fault precedence, filter/paging and value omission | Controlled boundary regression, not a concurrency stress benchmark; HTTP and browser contracts remain separate checks |
 | Identity-session snapshots | `test_security_session_contract.py`: real SQL security service/session route into the production guard; local/expired sessions, live permission changes, mocked Windows mappings/disable, public fields and malformed payloads; validated read-helper errors | Windows authentication is mocked, not OS/domain acceptance; UI retains generation fences and last-confirmed identity behavior |
+| Selected-recipe snapshots | `test_recipe_selection_contract.py`: actual SQL create/load/approve/revise/withdraw/clear/reopen responses into the production guard; images, Unicode, typed/safe-integer boundaries and malformed payloads | Security principal and local publication callback are stubbed; display guard covers consumed fields, while request models enforce full recipe limits; no PLC transfer or controller acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -103,10 +104,18 @@ previous rules and returns the original object; contract tests reject malformed
 identity/group/permission structures without coercion or mutation. Real service
 responses exercise local and mock-Windows lifecycles without OS account changes.
 
+Selected-recipe validation and its polling path now live in `recipe-selection.mjs`.
+The app retains its prior failure/clear behavior, with guard rules unchanged. Real
+SQL contracts preserve loaded copies across later approval, revision edits and
+withdrawal, then validate clear/reopen results. Typed boundary fixtures include
+zero/false values, Unicode text and exact integer limits; malformed shapes are
+rejected without mutation. These fixtures use a stubbed local publication callback
+and do not execute a PLC recipe transfer.
+
 ## Next bounded work
 
-1. Extract selected-recipe snapshot validation and verify typed SQL revision/
-   selection responses, followed by alarm and applied-project snapshot boundaries.
+1. Extract alarm snapshot validation and verify state/annunciation responses,
+   followed by applied-project snapshot compatibility.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

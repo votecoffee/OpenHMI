@@ -415,8 +415,13 @@ production guard while retaining generation fences and last-confirmed identity
 handling. `test_security_session_contract.py` compares real SQL-backed local and
 mock-Windows responses with that guard, including expiry, permission changes,
 logout/disable and public-field exposure. Malformed payloads remain rejected
-without mutation or coercion. Next, extract selected-recipe snapshot validation
-and verify its typed SQL revision/selection responses. Preserve model/import
+without mutation or coercion. Selected-recipe validation and its polling URL now
+live in `recipe-selection.mjs`; the existing guard rules remain unchanged.
+`test_recipe_selection_contract.py` feeds real SQL lifecycle responses through
+that guard, covering null selections, typed values, images, self-approval, source
+revision changes, independent loaded copies and service reopen. Display validation
+remains separate from full recipe request-model limits and server permissions.
+Next, extract alarm snapshot validation and its state/annunciation contracts. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
