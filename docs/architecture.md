@@ -567,7 +567,17 @@ HTTP tests with an in-memory journal cover bounded queries, role checks, export
 headers, recipe-local/HMI identity attribution, conditional group authorization,
 and journal-before-dispatch ordering. Validation, denied identity and unavailable
 journal cases prevent dispatch. Focused imports do not load recipe services,
-pycomm3 or the server. Preserve model/import
+pycomm3 or the server. Recipe library snapshot/selected reads and protected
+create/revise/transition/select/policy/simulator-permit adapters now live in
+`recipe_library_routes.py`. Public read and protected mutation registrars preserve
+the existing route order around transfer registration. `recipe_routes.py` now
+owns assembly, stable legacy model aliases and shared authorization/error
+translation; SQL, approval, loaded-copy and permit rules remain in `RecipeService`.
+Standalone HTTP tests cover all six typed mutation adapters, public reads,
+identity forwarding, validation before authorization, denied users and translated
+HTTP failures. Focused imports do not load recipe services, Pillow, pycomm3 or
+the server. Complete OpenAPI and route registration order are unchanged.
+Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

@@ -470,10 +470,20 @@ not close hardware or operator acceptance gates.
     unavailable journal do not dispatch. Existing domain, SQL and browser contracts
     continue to protect transfer behavior without controller access.
 
+42. Delivered focused recipe library HTTP adapters for public snapshots and
+    protected revision, selection, policy and simulator-permit changes. Assembly
+    retains service construction, shared authorization/error translation and
+    legacy model imports. Read and mutation registrars preserve route order;
+    canonical models and complete OpenAPI are unchanged. Standalone HTTP checks
+    cover all six typed mutations, identity/identifier forwarding, validation
+    before authorization, denied identity and error propagation. SQL policy,
+    self-approval, loaded-copy and transfer semantics remain in their services.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Next review the remaining recipe CRUD, selection and policy adapters as one cohesive
-recipe-library responsibility. Extract only if it improves an actual ownership or
-compatibility boundary; keep service orchestration and transfer execution intact.
+Recipe HTTP separation is complete for this scope. Next audit the application
+assembly and request middleware for concrete compatibility gaps, particularly
+project-instance guards and operation receipt headers. Prioritize observable
+failure behavior and contract coverage over further file splitting.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

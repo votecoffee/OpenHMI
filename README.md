@@ -638,6 +638,10 @@ Recipe transfer history, exports and dispatch now have a focused HTTP registrar.
 Standalone tests use an in-memory activity journal to check identity attribution,
 authorization and journal failures before dispatch, alongside existing SQL,
 simulator and browser transfer contracts. Complete OpenAPI output is unchanged.
+Recipe library reads and protected revision/selection/policy adapters also have
+an independent registrar module. Assembly retains service ownership and legacy
+model imports; standalone HTTP tests protect typed payloads, identity forwarding,
+validation and error boundaries without constructing a recipe service or driver.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable
