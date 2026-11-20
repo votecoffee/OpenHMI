@@ -2,6 +2,7 @@ import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage }
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe } from '../frontend/recipe-auth.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
+import { isRecipeTransferPage, isRecipeTransferRecord } from '../frontend/recipe-transfer-responses.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
@@ -26,6 +27,12 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_transfer_responses') {
+    const before = JSON.stringify(request);
+    const result = { pages: request.pages.map(isRecipeTransferPage), records: request.records.map(isRecipeTransferRecord) };
+    if (JSON.stringify(request) !== before) throw new Error('Transfer validation mutated input');
+    return result;
+  }
   if (request.operation === 'alarm_shelves') {
     const before = JSON.stringify(request);
     const result = { paths: request.queries.map(item => alarmShelvesPath(item.after, item.options)),

@@ -498,8 +498,17 @@ of the verified target; polling, selection revision, refresh fences, permissions
 and receipt ownership stay in the panel. Actual browser requests bind through
 SQL-backed routes with simulator-only staging, checking bounds, filters, exact
 cursors, request models, version rejection, audit receipts and JSON export.
-The transport factory is forbidden in these fixtures. Transfer response parity
-and historical metadata compatibility are next. Preserve model/import
+The transport factory is forbidden in these fixtures. DOM-free transfer record/
+page guards now live in `recipe-transfer-responses.mjs`, reusing command-record
+validation and checking consumed snapshot/profile fields, safe IDs, matching
+transaction identity, bounded descending pages and final-row cursors. Optional
+attribution/image metadata and empty event lists remain readable; retired targets
+and verified records outside the history page are supported. Invalid replies
+retain readable history and block dispatch/paging; 401/403 clears inaccessible
+data. SQL-backed response fixtures model all eight command states and exercise
+renamed/retired profiles without controller observations. Browser faults cover
+malformed nested data, retained rows, denial discard and valid-reply recovery.
+Dispatch receipt response contracts are next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

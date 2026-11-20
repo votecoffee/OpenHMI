@@ -12,19 +12,23 @@ from tests.test_recipe_transfers import transfer_project, content
 from tests.test_recipes import USERS, PASSWORD
 
 
+def recipe_transfer_fixture(test_case):
+    app = create_app(recipe_users=USERS)
+    test_case.addCleanup(app.state.store.close)
+    test_case.addCleanup(app.state.driver.close)
+    app.state.driver.factory = Mock(side_effect=AssertionError('Contract cannot open a PLC connection'))
+    client = TestClient(app)  # Explicit simulator polls; no background workers.
+    test_case.addCleanup(client.close)
+    install(client, transfer_project(client.get('/api/project').json()['draft']))
+    client.post('/api/recipe-auth/login', json={'name': 'engineer', 'password': PASSWORD}).raise_for_status()
+    revision = client.post('/api/recipes', json={'code': 'FIXTURE', 'content': content(), 'reason': 'Offline fixture'}).json()
+    test_case.instance = app.state.project_instance
+    return app, client, revision
+
+
 class RecipeTransferContractTests(unittest.TestCase):
     def fixture(self):
-        app = create_app(recipe_users=USERS)
-        self.addCleanup(app.state.store.close)
-        self.addCleanup(app.state.driver.close)
-        app.state.driver.factory = Mock(side_effect=AssertionError('Contract cannot open a PLC connection'))
-        client = TestClient(app)  # Explicit simulator polls; no background workers.
-        self.addCleanup(client.close)
-        install(client, transfer_project(client.get('/api/project').json()['draft']))
-        client.post('/api/recipe-auth/login', json={'name': 'engineer', 'password': PASSWORD}).raise_for_status()
-        revision = client.post('/api/recipes', json={'code': 'FIXTURE', 'content': content(), 'reason': 'Offline fixture'}).json()
-        self.instance = app.state.project_instance
-        return app, client, revision
+        return recipe_transfer_fixture(self)
 
     def browser(self, **kwargs):
         return frontend('recipe_transfers', projectInstance=getattr(self, 'instance', 'a' * 32), **kwargs)

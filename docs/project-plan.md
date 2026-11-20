@@ -405,8 +405,17 @@ not close hardware or operator acceptance gates.
     identity and non-replay behavior remain intact. Transport creation is
     forbidden in the contract fixture; controller acceptance remains separate.
 
+34. Delivered DOM-free recipe transfer record/page guards and SQL response
+    contracts. Consumed fields, safe/matching IDs, command records and bounded
+    descending paging are checked; optional history metadata remains compatible.
+    Fixtures model all eight states and retained history after target retirement,
+    while renamed signatures clear current verification. Malformed replies retain
+    readable data and block dispatch/paging; authentication denial clears rows.
+    Browser regressions cover failure/recovery. No controller outcome is inferred
+    from seeded states; hash/integrity checks remain server-owned.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe transfer response parity and historical metadata review next. Keep further module extraction tied
+Prioritize recipe transfer dispatch receipt response contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

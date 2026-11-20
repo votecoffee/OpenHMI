@@ -35,6 +35,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe policy/image uploads | `test_recipe_settings_contract.py`: actual policy PUT and raw File POST through strict models and SQL-backed routes; version conflicts, Boolean permit fixtures, reason encoding, binary fidelity, PNG/JPEG normalization, denials and upload bounds | Identity hooks and permit values are mocked; HTTP streaming size limit is tested using generated URL/headers with a bounded synthetic payload; no PLC acceptance |
 | Recipe authentication/session requests | `test_recipe_session_contract.py`: production read/login/logout helpers through real RecipeAuth and SQL-backed HMI Security; strict models, cookie rotation/expiry, origin rejection, account delegation and group permission changes | Windows identity provider is mocked; browser tests cover local form/logout errors and HMI UI delegation; no new session-response guard or OS/domain acceptance |
 | Recipe transfer requests/queries | `test_recipe_transfer_contract.py`: actual browser helpers through SQL-backed routes with simulator-only staging; filter/status query separation, precise cursors, strict bounds/models, stale guards, receipts and JSON export | Transport factory is forbidden; domain/browser regressions cover completion and running-copy verification; no live controller acceptance or full response guard contract |
+| Recipe transfer responses | `test_recipe_transfer_responses.py`: real SQL/HTTP history/detail/verified responses through production record/page guards; all eight modeled command states, verified records outside the page, retired targets, nullable metadata and malformed paging | States are seeded offline; browser guards validate consumed fields, while server checks enforce hashes/integrity; no controller acceptance or strict response DTO filtering |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -223,10 +224,22 @@ JSON detail/export parity. Optional synthetic receipt/error propagation verifies
 non-replay. Panel polling, selection/revision fences, permission checks and
 retained history ownership remain unchanged.
 
+Transfer record/page guards now share `recipe-transfer-responses.mjs` and reuse
+the existing command-record validator. They validate consumed fields, matching
+record/transaction IDs, safe integers, at most 100 descending unique rows and a
+matching final-row cursor. Optional attribution/image metadata, null errors/results
+and empty events remain compatible; unused parameter/envelope fields are not
+newly constrained. SQL fixtures cover all eight modeled command states, verified
+records outside the page, retained history after target rename/removal and cleared
+verification when target signatures change. Invalid replies retain readable data
+and disable dispatch/paging; 401/403 responses discard inaccessible data. Browser
+faults cover malformed nested records and valid-reply recovery. Hash integrity
+and actual PLC completion remain server/domain responsibilities.
+
 ## Next bounded work
 
-1. Cover recipe transfer response parity, reviewing historical/nullable metadata
-   before introducing view-level guards.
+1. Cover recipe transfer dispatch receipt responses and uncertain/error feedback,
+   preserving non-replay and durable-operation identity.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

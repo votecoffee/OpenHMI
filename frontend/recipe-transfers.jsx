@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from './recipe-transfer-api.mjs';
+import { isRecipeTransferPage } from './recipe-transfer-responses.mjs';
 import { SecurityContext, allowed as hasPermission } from './security.jsx';
 
 export function RecipeTransferPanel({ source, session, reason, dirty, busy, setBusy, loadingAllowed, setMessage }) {
@@ -23,6 +24,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
     async function refresh() {
       try {
         const result = await api(endpoint);
+        if (!isRecipeTransferPage(result)) throw new Error('Invalid recipe transfer status response');
         if (!stopped) {
           setData({ ...result, historyQuery });
           if (result.profiles.length) setSelection(previous => previous ?? { id: result.profiles[0].id, revision: result.active_revision });
@@ -30,7 +32,10 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
           setError('');
         }
       }
-      catch (problem) { if (!stopped) setError(problem.message); }
+      catch (problem) { if (!stopped) {
+        if ([401, 403].includes(problem.status)) setData(null);
+        setError(problem.message);
+      } }
       if (!stopped) timer = setTimeout(refresh, 1000);
     }
     refresh(); return () => { stopped = true; clearTimeout(timer); };
@@ -105,6 +110,6 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
         <a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
     </tr>)}</tbody></table>
     {history?.length === 0 && <p>{applied.profile || applied.production ? 'No recipe transfers match these filters.' : 'No recipe transfers on this page.'}</p>}
-    <button onClick={() => setBefore(null)}>Newest transfers</button> <button disabled={!history || !data.has_more} onClick={() => setBefore(data.next_before_id)}>Older transfers</button>
+    <button onClick={() => setBefore(null)}>Newest transfers</button> <button disabled={!!error || !history || !data.has_more} onClick={() => setBefore(data.next_before_id)}>Older transfers</button>
   </section>;
 }
