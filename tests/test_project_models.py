@@ -17,19 +17,59 @@ class ProjectModelTests(unittest.TestCase):
     def test_schema_validation_in_a_fresh_process_does_not_load_the_store(self):
         result = subprocess.run([sys.executable, '-c', """
 import json, sys, importlib
+from openhmi.canvas_models import CanvasLayout
+from openhmi.identity_models import IdentityPublication
 for family in ('readouts', 'images', 'inputs', 'process', 'machine', 'base'):
     importlib.import_module('openhmi.control_models_' + family)
 family_loaded_project = 'openhmi.project_models' in sys.modules
 from openhmi.project_models import Project, default_project
 project = Project.model_validate(default_project().model_dump())
 print(json.dumps({'title': project.title, 'store_loaded': 'openhmi.projects' in sys.modules,
-                  'sqlite_loaded': 'sqlite3' in sys.modules, 'family_loaded_project': family_loaded_project}))
+                  'sqlite_loaded': 'sqlite3' in sys.modules, 'family_loaded_project': family_loaded_project,
+                  'service_dependencies': [name for name in ('openhmi.canvas', 'openhmi.identity_publish',
+                      'openhmi.canvas_routes', 'openhmi.identity_routes', 'PIL', 'fastapi', 'starlette') if name in sys.modules]}))
 """], cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True, timeout=30, check=True)
         state = json.loads(result.stdout)
         self.assertEqual(state['title'], models.default_project().title)
         self.assertFalse(state['store_loaded'])
         self.assertFalse(state['sqlite_loaded'])
         self.assertFalse(state['family_loaded_project'])
+        self.assertEqual(state['service_dependencies'], [])
+
+    def test_layout_and_identity_models_keep_legacy_identity_and_project_roundtrips(self):
+        from openhmi import canvas_models, canvas, identity_models, identity_publish
+        for name in ('CanvasBox', 'CanvasContainer', 'CanvasDecoration', 'CanvasLayout'):
+            self.assertIs(getattr(canvas, name), getattr(canvas_models, name))
+        for name in ('PrivilegeBit', 'IdentityPublication'):
+            self.assertIs(getattr(identity_publish, name), getattr(identity_models, name))
+        self.assertIs(models.CanvasLayout, canvas_models.CanvasLayout)
+        self.assertIs(legacy.CanvasLayout, canvas_models.CanvasLayout)
+        self.assertIs(models.IdentityPublication, identity_models.IdentityPublication)
+        self.assertIs(legacy.IdentityPublication, identity_models.IdentityPublication)
+        candidate = models.default_project().model_dump()
+        ids = [control['id'] for control in candidate['controls']]
+        candidate['layout'] = {
+            'boxes': {identifier: {'x': 8, 'y': 8 + index * 40, 'width': 120, 'height': 32}
+                      for index, identifier in enumerate(ids)},
+            'containers': {'grid_panel': {'x': 0, 'y': 0, 'width': 400, 'height': 400,
+                                          'mode': 'grid', 'members': [ids[0]]}},
+            'decorations': {'machine': {'x': 0, 'y': 0, 'width': 400, 'height': 400,
+                                         'kind': 'rectangle', 'label': '机器', 'locked': True}},
+        }
+        candidate['identity_publication'] = {
+            'enabled': True, 'username_tag': 'LoginName', 'privileges_tag': 'LoginBits',
+            'bits': [{'bit': 0, 'source': 'group', 'name': 'Operators'},
+                     {'bit': 31, 'source': 'permission', 'name': 'project.edit'}],
+        }
+        project = models.Project.model_validate(candidate)
+        serialized = project.model_dump()
+        self.assertEqual(legacy.Project.model_validate(serialized).model_dump(), serialized)
+        self.assertEqual(canvas.CanvasLayout.model_validate(serialized['layout']), project.layout)
+        self.assertEqual(identity_publish.IdentityPublication.model_validate(serialized['identity_publication']),
+                         project.identity_publication)
+        self.assertTrue(serialized['layout']['decorations']['machine']['locked'])
+        self.assertEqual(serialized['layout']['containers']['grid_panel']['members'], [ids[0]])
+        self.assertEqual(serialized['identity_publication']['bits'][1]['bit'], 31)
 
     def test_control_family_exports_share_the_canonical_union(self):
         family_models = set()

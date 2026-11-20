@@ -7,8 +7,8 @@ from typing import Annotated, Literal
 from pydantic import Field, model_validator
 from .runtime_models import MAX_PLC_CONNECTIONS, Connection, TagDefinition, HistorianSettings
 from .runtime_models import CommandDefinition, RecipeTransferDefinition
-from .identity_publish import IdentityPublication
-from .canvas import CanvasLayout
+from .identity_models import IdentityPublication
+from .canvas_models import CanvasLayout
 from .edit_limits import MAX_UTC_EPOCH  # compatibility export
 from .control_models_base import (
     StrictModel, ControlBase, StateCode, MachineState, StateControl, NumericControl,

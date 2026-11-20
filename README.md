@@ -611,7 +611,9 @@ persistence; legacy imports from `openhmi.projects` remain supported. Schema-onl
 validation is tested in a fresh process without loading the store or SQLite.
 Control schemas have input, image, process/chart, machine/action and readout
 families over shared bases. Compatibility tests cover family exports, the
-canonical control union and legacy imports.
+canonical control union and legacy imports. Canvas layouts and PLC identity
+configuration have standalone model modules; schema-only validation is checked
+without importing their services, HTTP frameworks or Pillow.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

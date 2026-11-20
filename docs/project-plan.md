@@ -247,9 +247,16 @@ not close hardware or operator acceptance gates.
     their original contracts. Tests cover independent family imports, ownership
     and canonical/legacy class identity, alongside the full palette contract.
 
+11. Delivered independent canvas-layout and identity-publication configuration
+    models, retaining legacy service exports and unchanged class definitions.
+    Schema validation no longer imports either service, their HTTP registrars,
+    FastAPI/Starlette or Pillow. Expanded checks cover domain model identity and
+    complete project round trips with containers, locked backgrounds and
+    privilege-bit mappings.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Next, separate canvas-layout and identity-publication configuration schemas from
-their service implementations, preserving canonical and legacy model identity.
+Next, document the contributor workflow for extending controls and audit remaining
+schema/API contract gaps before choosing further extractions.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

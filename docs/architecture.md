@@ -237,6 +237,12 @@ paths, authorization, revision guards and lock ownership.
   Family modules import shared bases without importing the project schema or
   revision store. `project_models.py` explicitly reexports these models and
   retains the original discriminated union, member order and project validators.
+  `canvas_models.py` owns boxes, containers, decorations and layout consistency;
+  `identity_models.py` owns publication settings and privilege-bit mappings.
+  Project schemas import these directly. Their former service modules explicitly
+  reexport the same class objects, while image processing and station publication
+  retain their service boundaries. Schema-only use does not load these services,
+  their routers, FastAPI/Starlette or Pillow.
 
 `tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
 and `toProject` functions through a DOM-free Node test entry. It compares every
@@ -344,11 +350,14 @@ unique class objects and ensure every union member is a canonical family model;
 legacy identity checks include every imported OpenHMI model, not only classes
 still defined in the project composition module. Frontend compatibility checks now
 use the canonical schemas while existing persistence tests retain legacy imports.
+A domain round-trip check combines positioned controls, a grid container, locked
+background decoration and privilege mappings, validating both canonical and
+legacy layout/publication models without applying anything to a controller.
 
 The current control-family, HTTP-registration, driver and schema/store separation
-baseline is delivered, including the backend control families. Next, separate
-canvas-layout and identity-publication configuration schemas from their service
-implementations so schema consumers avoid those service dependencies. Preserve model/import
+baseline is delivered, including control families and independent domain models.
+Next, document the contributor workflow for adding a control and audit remaining
+schema/API contract gaps before choosing further extractions. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
