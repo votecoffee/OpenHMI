@@ -18,6 +18,7 @@ from .http_context import require_project_instance, set_response_context
 from .async_cleanup import finish_cleanup
 from .project_models import Project, default_project
 from .projects import ProjectStore
+from .workspace_publication import PublicationError, ensure_available, publish_project
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -91,6 +92,7 @@ class ProjectWorkspace:
         if target.exists():
             raise HTTPException(409, 'Project already exists; import uses a new project ID')
         try:
+            ensure_available(target)
             with zipfile.ZipFile(BytesIO(data)) as archive:
                 entries = archive.infolist()
                 names = [item.filename for item in entries]
@@ -134,14 +136,12 @@ class ProjectWorkspace:
                     extras[target.with_suffix('.handlers.py')] = files['handlers.py']
                 if 'recipe-users.json' in files:
                     extras[target.with_suffix('.recipe-users.json')] = files['recipe-users.json']
-                if any(path.exists() for path in extras):
-                    raise HTTPException(409, 'Import support files already exist; choose a new project ID')
-                for path, content in extras.items():
-                    with path.open('xb') as stream:
-                        stream.write(content)
-                # Publish only under a new filename after all validation succeeds.
-                with target.open('xb') as stream:
-                    stream.write(temporary.read_bytes())
+                publish_project(temporary, target, extras)
+        except PublicationError as error:
+            raise HTTPException(error.status, str(error)) from error
+        except OSError as error:
+            logging.exception('Project import could not finish')
+            raise HTTPException(503, 'Project import could not finish. Review the project library before retrying.') from error
         except HTTPException:
             raise
         except (ValueError, KeyError, TypeError, sqlite3.Error, zipfile.BadZipFile, RuntimeError) as error:
@@ -154,25 +154,35 @@ class ProjectWorkspace:
             raise HTTPException(409, 'Project already exists')
         if not isinstance(title, str) or not title.strip() or len(title) > 120:
             raise HTTPException(422, 'Provide a project title of 1–120 characters')
-        with target.open('xb'):
-            pass
-        initial = default_project()
-        initial.title = title
-        store = ProjectStore(target, initial_project=initial)
         try:
-            from .security import Security
-            Security(store)
-            with self.current.state.store._lock:
-                source = self.current.state.store._db
-                security = {table: source.execute(f'SELECT * FROM {table}').fetchall() for table in ('security_settings', 'security_group', 'security_user', 'security_windows', 'security_group_style')}
-            with store.transaction() as db:
-                for table, rows in security.items():
-                    db.execute(f'DELETE FROM {table}')
-                    if rows:
-                        placeholders = ','.join('?' for _ in rows[0])
-                        db.executemany(f'INSERT INTO {table} VALUES({placeholders})', rows)
-        finally:
-            store.close()
+            ensure_available(target)
+            with tempfile.TemporaryDirectory(dir=self.root) as directory:
+                temporary = Path(directory) / 'project.sqlite3'
+                initial = default_project()
+                initial.title = title
+                store = ProjectStore(temporary, initial_project=initial)
+                try:
+                    from .security import Security
+                    Security(store)
+                    with self.current.state.store._lock:
+                        source = self.current.state.store._db
+                        security = {table: source.execute(f'SELECT * FROM {table}').fetchall() for table in ('security_settings', 'security_group', 'security_user', 'security_windows', 'security_group_style')}
+                    with store.transaction() as db:
+                        for table, rows in security.items():
+                            db.execute(f'DELETE FROM {table}')
+                            if rows:
+                                placeholders = ','.join('?' for _ in rows[0])
+                                db.executemany(f'INSERT INTO {table} VALUES({placeholders})', rows)
+                finally:
+                    store.close()
+                publish_project(temporary, target, {})
+        except PublicationError as error:
+            raise HTTPException(error.status, str(error)) from error
+        except HTTPException:
+            raise
+        except Exception as error:
+            logging.exception('Project creation could not finish')
+            raise HTTPException(503, 'Project creation could not finish. Review the project library before retrying.') from error
         return {'file': target.name}
 
     async def open(self, filename):

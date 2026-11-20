@@ -537,13 +537,24 @@ not close hardware or operator acceptance gates.
     export source consistency, store-close ordering and no replay. Completed
     files are not rolled back by cancellation. Complete OpenAPI is unchanged.
 
+49. Delivered focused project file publication. Create initializes a closed,
+    staged database; import stages all companions and publishes its completed
+    database last, without replacing existing files. Orphan support and SQLite
+    recovery files block name reuse. Failed attempts roll back only unchanged
+    artifacts they own; changed/unremovable files and companions beside any
+    visible database remain for review, preserving imported holds and uncertain
+    completed records. Filesystem errors return sanitized 503 guidance. Synthetic
+    SQL/ZIP fault checks cover initialization, short writes, publication/rollback
+    failure, destination races and uncertain completion. Complete OpenAPI is
+    unchanged; process-crash/power-loss durability is not claimed.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review atomic create/import
-publication and partial filesystem failure recovery, preserving existing files,
-completed records and imported connection holds. Preserve scan/resource draining
-and transport ownership. Prioritize observable failure behavior and contract
-coverage over further file splitting. Controller, operator-station and endurance
-acceptance stay deferred.
+Recipe HTTP separation is complete for this scope. Next review project-library
+diagnostics for retained support and recovery artifacts, preserving every file
+and avoiding automatic cleanup or repair. Preserve scan/resource draining and
+transport ownership. Prioritize observable failure behavior and contract coverage
+over further file splitting. Controller, operator-station and endurance acceptance
+stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

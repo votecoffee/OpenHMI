@@ -667,6 +667,11 @@ Background project create/import/export operations retain the workspace lock
 through cancellation until their thread finishes. Completed files are not undone
 or automatically retried; review the project library after an interrupted request.
 Failures while cancellation is pending are logged without hiding cancellation.
+New projects and imports are staged before publication. Support files are ready
+before the completed database becomes visible; existing files are never replaced.
+Orphan support/SQLite recovery files block name reuse. Failed attempts roll back
+only unchanged files they own; changed artifacts or companions beside a visible
+database are retained for review, including imported PLC connection holds.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

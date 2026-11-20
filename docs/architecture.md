@@ -648,9 +648,26 @@ retain their existing status/detail and project headers. Cancellation during an
 incomplete upload still releases the lock without starting import. Event-gated
 SQL/ZIP tests verify completed create/import files, imported connection hold,
 export source identity, no replay, store-close ordering and error handling. This
-change does not roll back completed operations or change file publication rules;
-partial filesystem failure recovery is the next separate boundary. Complete
-OpenAPI remains unchanged.
+cancellation boundary does not roll back completed operations. Complete OpenAPI
+remains unchanged.
+Project file publication now lives in `workspace_publication.py`, separate from
+HTTP operations and SQL initialization. Create builds and closes its database in
+a same-filesystem temporary directory before publication. Import validates/forks
+its database and stages all companions before publishing. Windows exclusive
+rename (POSIX exclusive hard link) exposes complete files without replacement;
+the database is published last, after the hold and any review-only Python/accounts.
+Existing databases, support files, dangling companion links and SQLite journal/
+WAL/SHM artifacts block reuse. Ordinary filesystem errors return sanitized 503
+guidance; collisions remain 409 and invalid backups remain 422. Failed pre-database
+publication removes only artifacts whose identity, mode, size and modification
+time still match this attempt. Changed or unremovable artifacts remain for review.
+If a database is already visible after an error, its companions are retained,
+particularly the PLC hold, rather than guessing whether publication completed.
+Tests inject initialization, short write, mid-publication, collision, changed-file,
+rollback and uncertain post-commit failures. These are process-level complete-file
+checks, not multi-file crash/power-loss durability or adversarial external-writer
+acceptance. Original files and uncertain outcomes are preserved. Complete OpenAPI
+is unchanged.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
