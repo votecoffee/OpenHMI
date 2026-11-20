@@ -190,8 +190,11 @@ paths, authorization, revision guards and lock ownership.
   consume the same current project/tag context and perform no controller I/O.
 - `openhmi/logix_transport.py` owns the pycomm3 connection, metadata, batching,
   response receipts, reconnect backoff and write readback. It has no screen,
-  lease, historian or sample-cache dependency. `logix.py` coordinates physical
-  scan deadlines, route workers, writes and sample publication. Viewer leases,
+  lease, historian or sample-cache dependency. `logix.py` retains route workers,
+  locks, project-generation fences and writes. `tag_scheduling.py` owns physical
+  rates, deadlines, renewed-demand fences and bad-tag retry policy;
+  `scan_publication.py` publishes accepted receipts and updates route recovery
+  using the currently requested aliases. Viewer leases,
   sequence retention, screen-rate demand and trend demand live in
   `tag_subscriptions.py`. Cached PLC samples, scalar/UDT decoding, good/stale/bad
   projection and usable-generation checks live in `tag_samples.py`. Pure value/type/freshness
@@ -244,7 +247,7 @@ project/control failures and confirms that rejection preserves both the draft
 and its revision. Correcting the failures in sequence must allow the same
 candidate to save without an apply.
 
-The subscription and sample components deliberately own no locks or worker
+The subscription, sample and scheduling components deliberately own no locks or worker
 pools. The driver retains its state `RLock`, configuration/write `io_lock` and
 per-route locks. Lease mutation and sample projection use the existing state
 lock; a route lock is never acquired while projecting samples. Transport work
@@ -255,16 +258,23 @@ lock.
 
 Legacy `samples`, `leases`, `trend_demands`, `_screen_demands` and
 `_lease_sequences` attributes forward to live component-owned dictionaries,
-including replacement assignments. No detached compatibility copies are kept.
+including replacement assignments. Scheduling attributes `deadlines`,
+`last_rates`, `_refresh_after`, `_bad_tag_retry_at` and `_demanded_aliases`
+similarly forward to the scheduler. No detached compatibility copies are kept.
+The sample cache owns timing access, freshness tightening and receipt storage.
+Reconciliation and publication execute within the original state-lock boundary;
+publication also retains the route lock. Bad tags retain the 30-second retry
+when the route has usable requested data, and retry promptly when it does not.
 The metadata-only diagnostics regression now guards the cache owner's copy
 function so it still detects an accidental deep copy of tag values.
 `tests/test_tag_state.py` checks shared consumer demand after expiry/release,
 sequence ordering, independent driver state, nested snapshot isolation, legacy
-dictionary replacement and cache cleanup. Existing blocked-route, freshness,
+dictionary replacement and cache cleanup. It also verifies external deadline-map
+access and changes to requested UDT members during an in-flight read. Existing blocked-route, freshness,
 bad-tag retry, reconnect and in-flight-write tests remain applicable.
 
-The next move is separating physical deadline policy and receipt publication
-while retaining the same atomic state-lock boundary. Preserve project-instance
-identity, apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures
+The next move is reviewing write preflight, verification and cache invalidation
+for a focused module boundary. Preserve project-instance identity, write
+non-replay behavior, apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures
 whenever a saved control field or editor serialization branch is added. These
 software checks do not establish controller or operator-station acceptance.

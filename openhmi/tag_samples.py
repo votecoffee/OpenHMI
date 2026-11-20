@@ -13,6 +13,21 @@ class SampleCache:
     def __init__(self):
         self.samples = {}
 
+    def timing(self, alias):
+        sample = self.samples.get(alias)
+        return None if sample is None else (sample['rate_ms'], sample['monotonic'])
+
+    def tighten_rate(self, alias, rate):
+        sample = self.samples.get(alias)
+        if sample is not None:
+            sample['rate_ms'] = min(sample['rate_ms'], rate)
+
+    def publish(self, alias, sample, timestamp, acquired, rate, generation):
+        self.samples[alias] = {
+            **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
+            'failure_generation': generation,
+        }
+
     @staticmethod
     def decode(result, tag, member):
         try:

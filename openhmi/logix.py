@@ -1,6 +1,5 @@
 """Coordinate subscriptions, route scan workers, writes and sample publication."""
 
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack, contextmanager
 from copy import deepcopy
@@ -15,6 +14,8 @@ from .runtime_models import MAX_PLC_CONNECTIONS
 from .tag_subscriptions import (TagSubscriptions, build_screen_demands,
                                  MAX_VIEWER_LEASES, MAX_SUBSCRIPTION_SEQUENCES)
 from .tag_samples import SampleCache
+from .tag_scheduling import ScanSchedule, BAD_TAG_RETRY_SECONDS
+from .scan_publication import publish_scan_receipts
 from .alarms import utc_now
 
 
@@ -23,9 +24,6 @@ from .tag_values import MAX_SAFE_INTEGER, freshness_seconds, member_value, brows
 from .scan_timings import ScanTimings
 from .logix_transport import (LogixConnection, TagWriteError, REAL_MAX, PLC_INTEGER_LIMITS,
                               overlapping_addresses, verify_result_address)
-
-BAD_TAG_RETRY_SECONDS = 30
-
 
 class RuntimeDriver(SimulatorDriver):
     def __init__(self, factory=None):
@@ -40,12 +38,9 @@ class RuntimeDriver(SimulatorDriver):
         self.connections, self.definitions, self.sources = {}, {}, {}
         self.subscriptions = TagSubscriptions()
         self.sample_cache = SampleCache()
+        self.schedule = ScanSchedule()
         self.address_aliases = {}
         self.project = None
-        self.deadlines, self.last_rates = {}, {}
-        self._refresh_after = {}
-        self._bad_tag_retry_at = {}
-        self._demanded_aliases = {}
         self.local_names = set()
         self.plc_hold = False
 
@@ -89,6 +84,46 @@ class RuntimeDriver(SimulatorDriver):
     @_lease_sequences.setter
     def _lease_sequences(self, value):
         self.subscriptions.sequences = value
+
+    @property
+    def deadlines(self):
+        return self.schedule.deadlines
+
+    @deadlines.setter
+    def deadlines(self, value):
+        self.schedule.deadlines = value
+
+    @property
+    def last_rates(self):
+        return self.schedule.rates
+
+    @last_rates.setter
+    def last_rates(self, value):
+        self.schedule.rates = value
+
+    @property
+    def _refresh_after(self):
+        return self.schedule.refresh_after
+
+    @_refresh_after.setter
+    def _refresh_after(self, value):
+        self.schedule.refresh_after = value
+
+    @property
+    def _bad_tag_retry_at(self):
+        return self.schedule.bad_retry_at
+
+    @_bad_tag_retry_at.setter
+    def _bad_tag_retry_at(self, value):
+        self.schedule.bad_retry_at = value
+
+    @property
+    def _demanded_aliases(self):
+        return self.schedule.demanded_aliases
+
+    @_demanded_aliases.setter
+    def _demanded_aliases(self, value):
+        self.schedule.demanded_aliases = value
 
     def configure(self, project):
         with self.io_lock:
@@ -149,16 +184,8 @@ class RuntimeDriver(SimulatorDriver):
         return self.subscriptions.demands(now, self.project)
 
     def _due_addresses(self, identifier, now):
-        due = {address: self.deadlines.get((route, address), 0) for route, address in self.last_rates
-               if route == identifier and now >= self.deadlines.get((route, address), 0)}
-        if not self._bad_tag_retry_at or not any((identifier, address) in self._bad_tag_retry_at for address in due):
-            return due
-        connection = self.connections[identifier]
-        if not self._has_usable_data(identifier, connection.failure_generation, now):
-            return due
-        effective = {address: max(deadline, self._bad_tag_retry_at.get((identifier, address), 0))
-                     for address, deadline in due.items()}
-        return {address: deadline for address, deadline in effective.items() if now >= deadline}
+        return self.schedule.due_addresses(identifier, now, lambda: self._has_usable_data(
+            identifier, self.connections[identifier].failure_generation, now))
 
     def poll(self, now=None, *, wait=True):
         """Schedule at most one scan per route. Explicit callers can wait for completion."""
@@ -176,41 +203,8 @@ class RuntimeDriver(SimulatorDriver):
                     except Exception:
                         logging.exception('PLC scan failed for route %s', identifier)
 
-            grouped = {}
-            demanded_aliases = defaultdict(dict)
-            for alias, rate in self.demands(now).items():
-                root, _ = self.sources.get(alias, (None, ''))
-                tag = self.definitions.get(root)
-                if tag and tag['connection']:
-                    key = (tag['connection'], tag['address'])
-                    grouped[key] = min(rate, grouped.get(key, rate))
-                    demanded_aliases[tag['connection']][alias] = key
-                    if alias not in self._demanded_aliases.get(tag['connection'], {}):
-                        self._bad_tag_retry_at.pop(key, None)
-            for key, previous_rate in self.last_rates.items():
-                rate = grouped.get(key)
-                if rate is None:
-                    self.deadlines.pop(key, None)
-                    self._refresh_after.pop(key, None)
-                    self._bad_tag_retry_at.pop(key, None)
-                elif rate < previous_rate:
-                    self.deadlines[key] = now
-                    # Tighten the existing samples without letting slower demand revive them.
-                    for alias, _, _ in self.address_aliases[key]:
-                        sample = self.samples.get(alias)
-                        if sample is not None:
-                            sample['rate_ms'] = min(sample['rate_ms'], rate)
-                elif rate > previous_rate and self.deadlines.get(key, now) > now:
-                    # Only defer a scheduled read. Leave already-due refreshes intact.
-                    alias = self.address_aliases[key][0][0]
-                    sample = self.samples.get(alias)
-                    if sample is not None:
-                        interval = min(rate / 1000, freshness_seconds(sample['rate_ms']))
-                        self.deadlines[key] = max(self.deadlines[key], sample['monotonic'] + interval)
-            for key in grouped.keys() - self.last_rates.keys():
-                self._refresh_after[key] = now
-            self.last_rates = grouped
-            self._demanded_aliases = demanded_aliases
+            self.schedule.reconcile(self.demands(now), now, self.sources, self.definitions,
+                                    self.address_aliases, self.sample_cache)
 
             for identifier, connection in self.connections.items():
                 if identifier in self._scans:
@@ -247,10 +241,7 @@ class RuntimeDriver(SimulatorDriver):
                     return
                 if not connection.connected or connection.scan_generation != connection.failure_generation:
                     # A disconnect may occur while queued, and an explicit read may reopen the route.
-                    for schedule in (self.deadlines, self._bad_tag_retry_at):
-                        for key in list(schedule):
-                            if key[0] == identifier:
-                                del schedule[key]
+                    self.schedule.reset_route(identifier)
                     connection.scan_generation = connection.failure_generation
                 # Demand can change while this scan waits for a writer or a worker slot.
                 due = self._due_addresses(identifier, scan_start)
@@ -281,43 +272,8 @@ class RuntimeDriver(SimulatorDriver):
             with self.lock:
                 if self._closing or self.project is not project:
                     return
-                awaiting_usable = not connection.has_usable_sample or connection.outage_started is not None
-                demanded_aliases = self._demanded_aliases.get(identifier, {})
-                for address, (result, acquired, timestamp) in zip(due, results):
-                    key = (identifier, address)
-                    rate = self.last_rates.get(key)
-                    if rate is None:
-                        continue
-                    refresh_after = self._refresh_after.get(key)
-                    if refresh_after is not None:
-                        # Discard a reply received before this address came back into demand.
-                        if acquired < refresh_after:
-                            continue
-                        del self._refresh_after[key]
-                    pending_deadline = self.deadlines.get(key)
-                    # A sample received before a faster demand arrived cannot satisfy its refresh.
-                    if pending_deadline is None or pending_deadline <= acquired:
-                        self.deadlines[key] = scan_finished + rate / 1000
-                    usable_address = False
-                    for alias, tag, member in self.address_aliases[key]:
-                        sample = self.sample_cache.decode(result, tag, member)
-                        self.samples[alias] = {
-                            **sample, 'timestamp': timestamp, 'monotonic': acquired, 'rate_ms': rate,
-                            'failure_generation': connection.failure_generation,
-                        }
-                        # One physical UDT read can populate aliases no consumer requested.
-                        if alias in demanded_aliases and sample['quality'] == 'good':
-                            usable_address = True
-                            if awaiting_usable and scan_finished - acquired <= freshness_seconds(rate):
-                                connection.has_usable_sample = True
-                                awaiting_usable = False
-                                if connection.outage_started is not None:
-                                    connection.timings.record('recovery', scan_finished - connection.outage_started)
-                                    connection.outage_started = None
-                    if usable_address:
-                        self._bad_tag_retry_at.pop(key, None)
-                    else:
-                        self._bad_tag_retry_at[key] = scan_finished + BAD_TAG_RETRY_SECONDS
+                publish_scan_receipts(identifier, connection, due, results, scan_finished,
+                    schedule=self.schedule, sample_cache=self.sample_cache, address_aliases=self.address_aliases)
 
     def sample_snapshot(self, now=None, *, include_values=True):
         now = time.monotonic() if now is None else now

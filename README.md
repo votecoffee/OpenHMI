@@ -596,7 +596,9 @@ feed the real draft catalog through browser pickers and backend validation.
 API regression checks also preserve validation precedence and the saved draft
 when a candidate contains multiple invalid bindings. Driver regression checks
 cover subscription expiry/release, shared demand, independent caches, snapshot
-isolation and compatibility with existing sample/lease dictionary access.
+isolation and compatibility with existing sample/lease/deadline dictionary access.
+Scheduling and receipt publication have focused components; regression checks
+also cover changing requested UDT members during an in-flight scan.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

@@ -213,9 +213,12 @@ not close hardware or operator acceptance gates.
 4. Delivered separate viewer-subscription/demand and sample-cache components,
    retaining the existing locks and live dictionary compatibility. Fake-PLC
    comparisons cover demand changes, reconnect, bad tags and write/readback.
-   Physical scan deadlines, retries and receipt publication remain coordinated
-   in the driver. Separate those policies next while preserving shared reads,
-   long per-tag retry, project-generation fences and write non-replay behavior.
+5. Delivered separate physical scheduling and receipt-publication components.
+   Shared reads, long per-tag retry and project-generation fences retain their
+   original atomic lock boundaries. Regression checks cover legacy deadline-map
+   access and changing requested UDT members during an in-flight scan.
+   Next, review write preflight, verification and cache invalidation for a focused
+   extraction while preserving write non-replay behavior and command ordering.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
