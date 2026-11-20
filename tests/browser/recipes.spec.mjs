@@ -1,6 +1,46 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
+test('recipe policy reports stale updates and recovers after refresh', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/recipe-editor');
+  await page.getByLabel('Recipe user', { exact: true }).fill('manager');
+  await page.getByLabel('Password', { exact: true }).fill('RecipeTestOnly-2026!');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click({ timeout: 5000 });
+  const original = (await (await page.request.get('/api/recipes')).json()).change_policy.policy;
+  const policy = page.locator('.recipe-policy');
+  const reason = page.locator('.recipe-reason textarea');
+  const status = page.getByRole('status', { name: 'Recipe operation' });
+  try {
+    await policy.locator('summary').click({ timeout: 5000 });
+    await policy.getByLabel('editing enabled', { exact: true }).uncheck({ timeout: 5000 });
+    await reason.fill('Offline editing freeze');
+    await policy.getByRole('button', { name: 'Save change policy', exact: true }).click({ timeout: 5000 });
+    await expect(page.locator('.recipe-gates')).toContainText('editing: blocked');
+    await expect(policy).toContainText('Offline editing freeze');
+    const current = (await (await page.request.get('/api/recipes')).json()).change_policy;
+    expect((await page.request.put('/api/recipes/policy', { data: {
+      policy: original, expected_version: current.version, reason: 'Concurrent fixture editor' },
+    })).ok()).toBe(true);
+    await policy.getByLabel('editing enabled', { exact: true }).check({ timeout: 5000 });
+    await reason.fill('Stale fixture save');
+    await policy.getByRole('button', { name: 'Save change policy', exact: true }).click({ timeout: 5000 });
+    await expect(status).toContainText('Recipe policy changed; reload before updating');
+    await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click({ timeout: 5000 });
+    await expect(page.locator('.recipe-gates')).toContainText('editing: allowed');
+    await policy.getByLabel('loading enabled', { exact: true }).uncheck({ timeout: 5000 });
+    await expect(reason).toHaveAccessibleName('Change / approval / load reason');
+    await reason.fill('Refreshed fixture save', { timeout: 5000 });
+    await policy.getByRole('button', { name: 'Save change policy', exact: true }).click({ timeout: 5000 });
+    await expect(page.locator('.recipe-gates')).toContainText('loading: blocked');
+  } finally {
+    const current = (await (await page.request.get('/api/recipes', { timeout: 5000 })).json()).change_policy;
+    expect((await page.request.put('/api/recipes/policy', { data: {
+      policy: original, expected_version: current.version, reason: 'Restore offline fixture policy' }, timeout: 5000,
+    })).ok()).toBe(true);
+  }
+});
+
 test('recipe image, same-user approval and independent production copy', async ({ page, context }) => {
   test.setTimeout(60000);
   const errors = [];

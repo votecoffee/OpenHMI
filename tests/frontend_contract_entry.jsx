@@ -1,6 +1,6 @@
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
-import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision } from '../frontend/recipe-api.mjs';
+import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
 import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
@@ -178,7 +178,9 @@ export async function contract(request) {
       const results = [];
       for (const item of request.mutations) {
         try {
-          results.push(item.action === 'create' ? await createRecipe(item.code, validatedRecipeContent(item.content), item.reason)
+          results.push(item.action === 'policy' ? await saveRecipePolicy(item.policy, item.version, item.reason)
+            : item.action === 'image' ? await uploadRecipeImage(new File([Uint8Array.from(item.bytes)], item.name, { type: item.type }), item.reason)
+            : item.action === 'create' ? await createRecipe(item.code, validatedRecipeContent(item.content), item.reason)
             : item.action === 'revise' ? await saveRecipeRevision(item.recipe, item.latest, item.parent, validatedRecipeContent(item.content), item.reason)
             : item.action === 'transition' ? await transitionRecipeRevision(item.id, item.transition, item.version, item.reason)
             : await selectRecipeRevision(item.id, item.version, item.selection, item.reason));

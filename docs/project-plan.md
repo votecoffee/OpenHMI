@@ -382,8 +382,15 @@ not close hardware or operator acceptance gates.
     and existing audit behavior remain intact. Identity/publication hooks are
     stubbed in contracts; local authentication is covered by domain/browser tests.
 
+31. Delivered shared recipe policy and raw image-upload helpers. Strict models
+    and SQL-backed contracts cover versions/defaults, Boolean permit fixtures,
+    reason encoding, raw bytes/MIME type, PNG/JPEG normalization, upload bounds
+    and permission/gate denials. Browser coverage includes stale policy feedback
+    and refresh recovery. Workspace state/input/feedback ownership and existing
+    audit semantics remain intact; fixture permit reads are synthetic.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe policy/image-upload request helpers and contracts next. Keep further module extraction tied
+Prioritize recipe authentication/session UI and request contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

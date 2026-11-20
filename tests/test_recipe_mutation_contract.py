@@ -23,24 +23,28 @@ def editor_content():
     ])
 
 
+def recipe_route_fixture(test_case):
+    store = ProjectStore()
+    test_case.addCleanup(store.close)
+    driver = Mock(spec=['load_recipe', 'read'])
+    driver.read.side_effect = AssertionError('Contract cannot read controller tags')
+    application = SimpleNamespace(lock=RLock(), driver=driver)
+    user = RecipeUser('Fixture Engineer Δ', frozenset({'engineer', 'approver', 'operator'}))
+    security = SimpleNamespace(configured=lambda: True, user=Mock(return_value=user))
+    app = FastAPI()
+    add_recipe_routes(app, store, application, security=security, commands=SimpleNamespace())
+    client = TestClient(app)
+    test_case.addCleanup(client.close)
+    driver.reset_mock()
+    service = app.state.recipes
+    for name in ('create', 'save', 'transition', 'select'):
+        setattr(service, name, Mock(wraps=getattr(service, name)))
+    return client, service, security, driver
+
+
 class RecipeMutationContractTests(unittest.TestCase):
     def fixture(self):
-        store = ProjectStore()
-        self.addCleanup(store.close)
-        driver = Mock(spec=['load_recipe', 'read'])
-        driver.read.side_effect = AssertionError('Contract cannot read controller tags')
-        application = SimpleNamespace(lock=RLock(), driver=driver)
-        user = RecipeUser('Fixture Engineer Δ', frozenset({'engineer', 'approver', 'operator'}))
-        security = SimpleNamespace(configured=lambda: True, user=Mock(return_value=user))
-        app = FastAPI()
-        add_recipe_routes(app, store, application, security=security, commands=SimpleNamespace())
-        client = TestClient(app)
-        self.addCleanup(client.close)
-        driver.reset_mock()
-        service = app.state.recipes
-        for name in ('create', 'save', 'transition', 'select'):
-            setattr(service, name, Mock(wraps=getattr(service, name)))
-        return client, service, security, driver
+        return recipe_route_fixture(self)
 
     def browser(self, mutations, **kwargs):
         return frontend('recipe_mutations', mutations=[{**item, 'reason': item.get('reason', ' Offline review Δ ')}

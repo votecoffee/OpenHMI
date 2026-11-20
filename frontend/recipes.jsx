@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
-import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision } from './recipe-api.mjs';
+import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from './recipe-api.mjs';
 import { Live } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext } from './security.jsx';
@@ -148,7 +148,7 @@ export function RecipeWorkspace({ edit, catalog }) {
     setBusy(true);
     try {
       if (!reason.trim()) throw new Error('Enter an image change reason first');
-      const result = await api(`/api/recipe-images?reason=${encodeURIComponent(reason)}`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+      const result = await uploadRecipeImage(file, reason);
       update({ ...content, image_id: result.image_id }); setMessage('Image uploaded. Save a draft to attach it to the recipe revision.');
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); event.target.value = ''; }
@@ -205,7 +205,7 @@ export function RecipeWorkspace({ edit, catalog }) {
         <label>{operation} permit tag<select value={policy[`${operation}_permit_tag`] || ''} onChange={event => setPolicy({ ...policy, [`${operation}_permit_tag`]: event.target.value || null })}>
           <option value="">No application permit</option>{catalog.tags.filter(tag => tag.type === 'boolean').map(tag => <option key={tag.name}>{tag.name}</option>)}</select></label></div>)}
       <button disabled={busy} onClick={() => perform(async () => {
-        const result = await api('/api/recipes/policy', json('PUT', { policy, expected_version: state.change_policy.version, reason })); setPolicy(result.policy); return result;
+        const result = await saveRecipePolicy(policy, state.change_policy.version, reason); setPolicy(result.policy); return result;
       })}>Save change policy</button>
       <button disabled={busy} onClick={() => perform(() => api('/api/recipes/simulator-permit', json('POST', { allowed: true, reason })))}>Set simulator recipe permit true</button>
       <button disabled={busy} onClick={() => perform(() => api('/api/recipes/simulator-permit', json('POST', { allowed: false, reason })))}>Set simulator recipe permit false</button>

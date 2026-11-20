@@ -32,6 +32,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Alarm mutations | `test_alarm_mutation_contract.py`: actual browser note/shelve/restore payloads through strict models and secured SQL-backed routes; attribution, denials, stale restore guards and receipt/error propagation | No PLC source acquisition or writes; operating-system authentication and controller acceptance remain separate |
 | Shelving-list queries/responses | `test_alarm_shelf_contract.py`: actual browser URLs and DOM-free guard through SQL-backed routes; ordered pages, encoded cursors, strict bounds, row compatibility and restoration of a 100-character alarm ID | Guard covers consumed fields; no strict response DTO filtering or PLC acceptance; browser regression covers retained-data recovery |
 | Recipe write requests | `test_recipe_mutation_contract.py`: production create/revise/transition/select helpers and content normalization through strict models and SQL-backed lifecycle routes; same-user approval, stale conflicts, loaded-copy independence, denials and HTTP error propagation | Identity and publication hooks are stubbed; browser/domain tests cover local authentication and workflow; synthetic receipt headers do not add journal semantics to recipe routes |
+| Recipe policy/image uploads | `test_recipe_settings_contract.py`: actual policy PUT and raw File POST through strict models and SQL-backed routes; version conflicts, Boolean permit fixtures, reason encoding, binary fidelity, PNG/JPEG normalization, denials and upload bounds | Identity hooks and permit values are mocked; HTTP streaming size limit is tested using generated URL/headers with a bounded synthetic payload; no PLC acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -190,10 +191,19 @@ contracts offline; existing browser/domain workflows cover local authentication.
 HTTP errors and optional audit receipts propagate without automatic replay;
 recipe-audit behavior is unchanged.
 
+Recipe policy saves and image uploads now use shared request helpers. Contract
+fixtures verify strict policy defaults/versions, Boolean permit values, Unicode
+query-reason encoding, raw File bytes/MIME types, API timeout wiring and normalized
+PNG/JPEG retrieval. Invalid models fail before service calls; role/gate checks,
+HTTP upload bounds and malformed images preserve existing statuses. Synthetic
+receipt/error propagation does not change recipe-audit behavior. Identity and
+permit reads are stubbed; no live acquisition occurs. Browser tests cover stale
+policy feedback, refresh recovery and the existing image-backed recipe workflow.
+
 ## Next bounded work
 
-1. Extract recipe policy/image-upload request helpers and verify their model,
-   binary upload and error contracts, preserving workflow/permission ownership.
+1. Separate recipe authentication/session UI and requests with model/permission
+   contracts, preserving HMI-account delegation and legacy recipe-local behavior.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

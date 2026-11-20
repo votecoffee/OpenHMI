@@ -630,6 +630,8 @@ Shelving-list contracts cover ordered pages, exact cursors, row compatibility
 and the full 100-character alarm ID range for paging and restoration. Recipe
 create/revise/transition/select helpers share tested content normalization and
 strict request contracts, preserving review/selection versions and loaded copies.
+Recipe policy and raw image-upload helpers also have version, permission, binary
+payload, image normalization and failure-recovery contracts.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

@@ -28,3 +28,13 @@ export function selectRecipeRevision(revisionId, expectedRevisionVersion, expect
   return api('/api/recipes/select', json('POST', { revision_id: revisionId, expected_revision_version: expectedRevisionVersion,
     expected_selection_version: expectedSelectionVersion, reason }));
 }
+
+export function saveRecipePolicy(policy, expectedVersion, reason) {
+  return api('/api/recipes/policy', json('PUT', { policy, expected_version: expectedVersion, reason }));
+}
+
+export function uploadRecipeImage(file, reason) {
+  return api('/api/recipe-images?reason=' + encodeURIComponent(reason), {
+    method: 'POST', headers: { 'Content-Type': file.type }, body: file,
+  });
+}

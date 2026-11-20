@@ -476,8 +476,14 @@ for same-user approval, independent loaded copies, stale conflicts and denied
 operations. Receipt/error propagation is tested with synthetic headers; the
 recipe routes keep their existing recipe-audit behavior. Identity/publication
 hooks are stubbed in contract tests; existing browser/domain tests cover local
-authentication and UI workflows. Recipe policy/image-upload request contracts
-are next. Preserve model/import
+authentication and UI workflows. Policy saves and raw image uploads also share
+`recipe-api.mjs`, preserving expected versions, query-reason encoding, MIME type,
+file bytes and the existing API timeout. SQL-backed contracts cover policy
+conflicts, defaults, Boolean permit checks, role/gate denials and normalized
+PNG/JPEG retrieval. HTTP size/type/reason failures retain their existing status
+codes. The workspace keeps input reset, image attachment, dirty state and policy
+refresh sequencing; browser tests cover stale policy feedback and refresh recovery.
+Recipe authentication/session extraction is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
