@@ -374,9 +374,16 @@ not close hardware or operator acceptance gates.
     retain readable data, block restore/paging and recover on valid replies;
     authorization failures still clear inaccessible data. No PLC access required.
 
+30. Delivered recipe create/revise/transition/select helpers and content
+    normalization in a focused API module. Actual browser requests pass strict
+    models and SQL-backed lifecycle checks, covering all review actions, same-user
+    approval, independent loaded copies, stale versions and denials. Numeric
+    conversion, blank-value errors, explicit clear fields, UI workflow ownership
+    and existing audit behavior remain intact. Identity/publication hooks are
+    stubbed in contracts; local authentication is covered by domain/browser tests.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe create/revise/transition/select request helpers and strict
-request-model contracts next. Keep further module extraction tied
+Prioritize recipe policy/image-upload request helpers and contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

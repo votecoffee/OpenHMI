@@ -467,9 +467,17 @@ and a matching final-row cursor; existing row/message/date rules remain intact.
 SQL-backed contracts cover encoding, bounds, paging and restoration. Cursor and
 restore path limits now match the project model's 100-character alarm IDs rather
 than rejecting valid IDs above 60 characters. Browser faults retain the readable
-page and disable restore/next-page actions until valid replies recover. Next,
-extract recipe create/revise/transition/select request helpers and verify strict
-request models. Preserve model/import
+page and disable restore/next-page actions until valid replies recover.
+Recipe create/revise/transition/select requests and numeric content normalization
+live in `recipe-api.mjs`. The workspace retains reason checks, permission gates,
+selection-version capture, dirty state, refresh sequencing and feedback. Actual
+browser requests pass strict Pydantic models and SQL-backed lifecycle contracts
+for same-user approval, independent loaded copies, stale conflicts and denied
+operations. Receipt/error propagation is tested with synthetic headers; the
+recipe routes keep their existing recipe-audit behavior. Identity/publication
+hooks are stubbed in contract tests; existing browser/domain tests cover local
+authentication and UI workflows. Recipe policy/image-upload request contracts
+are next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

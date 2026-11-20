@@ -31,6 +31,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Detailed alarm responses | `test_alarm_response_contract.py`: real SQL occurrence/event/note pages and cached details through DOM-free production validators; legacy null attribution/metadata, shelving, wrong identities and malformed paging | Validators cover fields consumed by each view, not strict HTTP response filtering; CSV bulk pages are a separate boundary |
 | Alarm mutations | `test_alarm_mutation_contract.py`: actual browser note/shelve/restore payloads through strict models and secured SQL-backed routes; attribution, denials, stale restore guards and receipt/error propagation | No PLC source acquisition or writes; operating-system authentication and controller acceptance remain separate |
 | Shelving-list queries/responses | `test_alarm_shelf_contract.py`: actual browser URLs and DOM-free guard through SQL-backed routes; ordered pages, encoded cursors, strict bounds, row compatibility and restoration of a 100-character alarm ID | Guard covers consumed fields; no strict response DTO filtering or PLC acceptance; browser regression covers retained-data recovery |
+| Recipe write requests | `test_recipe_mutation_contract.py`: production create/revise/transition/select helpers and content normalization through strict models and SQL-backed lifecycle routes; same-user approval, stale conflicts, loaded-copy independence, denials and HTTP error propagation | Identity and publication hooks are stubbed; browser/domain tests cover local authentication and workflow; synthetic receipt headers do not add journal semantics to recipe routes |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -178,10 +179,21 @@ paging/restoration for valid IDs above 60 characters. Browser regressions retain
 the last readable page and disable restore/next-page actions on incoherent replies,
 discard inaccessible data and recover when valid replies return.
 
+Recipe create/revise/transition/select helpers and numeric content normalization
+now share `recipe-api.mjs`. Actual browser payloads retain numeric/limit conversion,
+blank-numeric errors before fetch, zero/false/text values, explicit null clear
+fields and exact version guards. Strict models and SQL-backed routes exercise
+all review actions, same-user approval, independent test/production loaded copies,
+server-attributed audit records, stale conflicts and denied operations. Invalid
+models fail before service calls. Mock identity/publication hooks keep these
+contracts offline; existing browser/domain workflows cover local authentication.
+HTTP errors and optional audit receipts propagate without automatic replay;
+recipe-audit behavior is unchanged.
+
 ## Next bounded work
 
-1. Extract recipe create/revise/transition/select request helpers and verify their
-   strict request-model contracts, keeping workflow/permission ownership intact.
+1. Extract recipe policy/image-upload request helpers and verify their model,
+   binary upload and error contracts, preserving workflow/permission ownership.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

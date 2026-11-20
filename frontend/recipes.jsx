@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
+import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision } from './recipe-api.mjs';
 import { Live } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
 import { SecurityContext } from './security.jsx';
@@ -87,16 +88,6 @@ function ParameterEditor({ content, update, disabled }) {
   </fieldset>;
 }
 
-function validatedContent(content) {
-  return { ...content, parameters: content.parameters.map(parameter => {
-    const numeric = ['number', 'integer'].includes(parameter.type);
-    if (numeric && !String(parameter.value).trim()) throw new Error(`Enter a value for ${parameter.label}`);
-    return { ...parameter, value: numeric ? Number(parameter.value) : parameter.value,
-      minimum: parameter.minimum == null || parameter.minimum === '' ? null : Number(parameter.minimum),
-      maximum: parameter.maximum == null || parameter.maximum === '' ? null : Number(parameter.maximum) };
-  }) };
-}
-
 export function RecipeWorkspace({ edit, catalog }) {
   const live = useContext(Live);
   const hmiSecurity = useContext(SecurityContext);
@@ -139,17 +130,17 @@ export function RecipeWorkspace({ edit, catalog }) {
   }
   async function save() {
     await perform(() => {
-      const payload = validatedContent(content);
-      if (!source) return api('/api/recipes', json('POST', { code, content: payload, reason }));
+      const payload = validatedRecipeContent(content);
+      if (!source) return createRecipe(code, payload, reason);
       const latest = state.revisions.find(revision => revision.recipe_id === source.recipe_id);
-      return api(`/api/recipes/${source.recipe_id}/revisions`, json('POST', { expected_latest_revision: latest.id, parent_revision: source.id, content: payload, reason }));
+      return saveRecipeRevision(source.recipe_id, latest.id, source.id, payload, reason);
     }, true);
   }
-  function transition(action) { return perform(() => api(`/api/recipe-revisions/${source.id}/transition`, json('POST', { action, expected_version: source.version, reason })), true); }
+  function transition(action) { return perform(() => transitionRecipeRevision(source.id, action, source.version, reason), true); }
   async function load(clear = false) {
     if (!live.recipeConnected) return;
-    await perform(() => api('/api/recipes/select', json('POST', { revision_id: clear ? null : source.id, expected_revision_version: clear ? null : source.version,
-      expected_selection_version: live.recipeSelection.version, reason })));
+    await perform(() => selectRecipeRevision(clear ? null : source.id, clear ? null : source.version,
+      live.recipeSelection.version, reason));
   }
   async function upload(event) {
     const file = event.target.files?.[0];

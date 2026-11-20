@@ -1,5 +1,6 @@
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
+import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision } from '../frontend/recipe-api.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
 import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
@@ -156,7 +157,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries' || request.operation === 'alarm_mutations') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries' || request.operation === 'alarm_mutations' || request.operation === 'recipe_mutations') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -164,7 +165,7 @@ export async function contract(request) {
         keepalive: options.keepalive, timed: options.signal instanceof AbortSignal, body: upload ? null : options.body && JSON.parse(options.body),
         ...(upload ? { upload: { name: options.body.name, type: options.body.type, bytes: Array.from(new Uint8Array(await options.body.arrayBuffer())) },
           timeout: options.signal instanceof AbortSignal } : {}) });
-      const mutation = request.operation === 'alarm_mutations' && path !== '/api/project';
+      const mutation = ['alarm_mutations', 'recipe_mutations'].includes(request.operation) && path !== '/api/project';
       const status = mutation ? request.status ?? 200 : 200;
       return new Response(JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: 'a'.repeat(32) }), {
         status, headers: { 'Content-Type': 'application/json', ...(mutation ? {
@@ -172,6 +173,20 @@ export async function contract(request) {
       });
     };
     await api('/api/project');
+    if (request.operation === 'recipe_mutations') {
+      const before = JSON.stringify(request);
+      const results = [];
+      for (const item of request.mutations) {
+        try {
+          results.push(item.action === 'create' ? await createRecipe(item.code, validatedRecipeContent(item.content), item.reason)
+            : item.action === 'revise' ? await saveRecipeRevision(item.recipe, item.latest, item.parent, validatedRecipeContent(item.content), item.reason)
+            : item.action === 'transition' ? await transitionRecipeRevision(item.id, item.transition, item.version, item.reason)
+            : await selectRecipeRevision(item.id, item.version, item.selection, item.reason));
+        } catch (error) { results.push({ error: error.message, status: error.status, operation_id: error.operation_id, audit_status: error.audit_status }); }
+      }
+      if (JSON.stringify(request) !== before) throw new Error('Recipe serialization mutated input');
+      return { requests: requests.slice(1), results };
+    }
     if (request.operation === 'alarm_mutations') {
       const results = [];
       for (const item of request.mutations) {
