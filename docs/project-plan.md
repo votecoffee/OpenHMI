@@ -305,8 +305,14 @@ not close hardware or operator acceptance gates.
     ordering remain intact. Tests cover catalog replacement at lock release, route
     fault precedence, paging/filtering and value-free metadata.
 
+20. Delivered focused command/activity/diagnostics console modules. The app uses
+    direct imports; `operations.jsx` retains the same component exports and
+    identities. View bodies, hooks, permissions, query helpers and retained-data
+    recovery remain unchanged. Existing command and operations browser workflows
+    validate the moved components without changing saved schemas or API contracts.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize focused command/activity/diagnostics view modules with compatible exports next. Keep further module extraction tied
+Prioritize auditing and extracting shared app-level snapshot validation next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

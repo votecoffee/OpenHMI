@@ -404,8 +404,13 @@ worker health is read after release. Regression checks replace the catalog at
 snapshot release and require consistent old-generation tags/routes, preserving
 route-state precedence, filters, paging and value-free output. Synthetic bench
 comparisons patch both HTTP capture and projection clocks to match driver polls.
-Next, separate the
-command/activity/diagnostics views into focused modules with compatible exports. Preserve model/import
+The command, activity and diagnostics views now live in `command-console.jsx`,
+`activity-console.jsx` and `diagnostics-console.jsx`. The app imports these modules
+directly; `operations.jsx` retains compatible exports with identical component
+identity. Polling effects, retained responses, permissions, filters and render
+bodies remain unchanged. Diagnostic timing/worker presentation stays with its
+console. Next, audit shared app-level snapshot validation and extract a cohesive
+response-contract boundary. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

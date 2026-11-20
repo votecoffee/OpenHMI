@@ -89,10 +89,16 @@ Contract tests bind those requests through the real registrar, verify explicit
 limits and defaults, reject invalid bounds before reads, and require permission
 checks before list/export service calls. Download formats remain unchanged.
 
+The command/activity/diagnostics views now have focused modules. The app imports
+them directly, with compatible component exports retained in `operations.jsx`.
+View bodies and hook logic are preserved; existing browser regressions exercise
+command feedback, stale actions, retained pages, access denial and recovery.
+No saved-project schema, HTTP response shape or permission model changed.
+
 ## Next bounded work
 
-1. Separate command/activity/diagnostics React views into focused modules while
-   preserving existing exports, polling, permissions and recovery regressions.
+1. Audit app-level project/identity/recipe/alarm snapshot validation, extract the
+   first cohesive shared boundary and verify real backend/browser compatibility.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
