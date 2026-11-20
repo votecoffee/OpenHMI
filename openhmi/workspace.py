@@ -13,6 +13,7 @@ import zipfile
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from .http_context import require_project_instance, set_response_context
 from .project_models import Project, default_project
 from .projects import ProjectStore
 
@@ -248,13 +249,11 @@ class ProjectWorkspace:
                 try:
                     request = Request(scope, receive)
                     identifier = self.current.state.project_instance
-                    expected = request.headers.get('x-openhmi-project')
-                    if request.method not in ('GET', 'HEAD', 'OPTIONS') and expected and expected != identifier:
-                        raise HTTPException(409, 'A different project was opened. Reload before making changes.')
+                    require_project_instance(request, identifier)
                     response = await self.handle(request)
-                    response.headers['X-OpenHMI-Project'] = identifier
                 except HTTPException as error:
                     response = JSONResponse({'detail': error.detail}, status_code=error.status_code)
+                set_response_context(request, response, identifier)
                 await response(scope, receive, send)
             else:
                 await self.current(scope, receive, send)

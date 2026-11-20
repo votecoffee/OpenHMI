@@ -642,6 +642,10 @@ Recipe library reads and protected revision/selection/policy adapters also have
 an independent registrar module. Assembly retains service ownership and legacy
 model imports; standalone HTTP tests protect typed payloads, identity forwarding,
 validation and error boundaries without constructing a recipe service or driver.
+Runtime and workspace requests share project-instance guards and response context
+headers. Stale-project rejections and generated workspace HTTP errors include the
+request project identity. Cross-language checks preserve operation receipts and
+confirm that a new identity header cannot rebind a stale browser or replay writes.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

@@ -577,6 +577,18 @@ Standalone HTTP tests cover all six typed mutation adapters, public reads,
 identity forwarding, validation before authorization, denied users and translated
 HTTP failures. Focused imports do not load recipe services, Pillow, pycomm3 or
 the server. Complete OpenAPI and route registration order are unchanged.
+Project-instance guards and response context now live in `http_context.py`, shared
+by runtime middleware and the workspace boundary. Stale mutation guards still run
+before handler/authentication/body validation, and GET/HEAD/OPTIONS plus legacy
+headerless callers retain their existing behavior. Stale 409 responses and caught
+workspace HTTP errors now include `X-OpenHMI-Project`; successful workspace open
+responses retain the identity captured before the switch. Receipt operation IDs
+and audit status remain attached only when the request owns an activity operation.
+Real HTTP/SQL responses passed through the production JS API cover succeeded,
+denied, rejected, uncertain and pending outcomes. The browser retains its initial
+project identity after refresh/conflict and does not replay writes. Complete
+OpenAPI is unchanged. This does not add a generic unhandled-exception response
+policy or alter application initialization/shutdown ownership.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

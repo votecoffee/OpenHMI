@@ -479,11 +479,20 @@ not close hardware or operator acceptance gates.
     before authorization, denied identity and error propagation. SQL policy,
     self-approval, loaded-copy and transfer semantics remain in their services.
 
+43. Delivered shared project-instance guards and HTTP response context for the
+    runtime and workspace. Stale mutation rejections and caught workspace HTTP
+    errors now include the request project identity. Existing guard precedence,
+    read/headerless compatibility and workspace switch identity remain intact.
+    SQL-backed journal outcomes pass through the actual JavaScript API with their
+    receipt metadata; browser identity stays pinned and writes are not replayed.
+    Complete OpenAPI is unchanged. This scope does not add a generic unhandled
+    exception response policy or change lifecycle ownership.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next audit the application
-assembly and request middleware for concrete compatibility gaps, particularly
-project-instance guards and operation receipt headers. Prioritize observable
-failure behavior and contract coverage over further file splitting.
+Recipe HTTP separation is complete for this scope. Next audit initialization and
+lifespan cleanup, including partial startup failures and independent shutdown
+cleanup. Prioritize observable failure behavior and contract coverage over further
+file splitting. Controller, operator-station and endurance acceptance stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

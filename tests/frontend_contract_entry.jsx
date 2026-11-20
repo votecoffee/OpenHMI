@@ -31,6 +31,22 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'http_context') {
+    const calls = [], results = [];
+    let index = 0;
+    globalThis.fetch = async (path, options) => {
+      const reply = request.replies[index++];
+      if (!reply) throw new Error('Unexpected automatic request');
+      calls.push({ path, method: options.method ?? 'GET', headers: options.headers });
+      return new Response(reply.body, { status: reply.status, headers: reply.headers });
+    };
+    for (const item of request.requests) {
+      try { results.push({ data: await api(item.path, item.options) }); }
+      catch (error) { results.push({ error: error.message, status: error.status,
+        conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status }); }
+    }
+    return { calls, results };
+  }
   if (request.operation === 'recipe_component_exports') {
     const palette = createReadoutsPalette(request.catalog, createPaletteFields(request.catalog));
     return { picture: legacyRecipes.RecipePicture === RecipePicture, loaded: legacyRecipes.LoadedRecipe === LoadedRecipe,

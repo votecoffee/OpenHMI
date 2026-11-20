@@ -6,10 +6,10 @@ import logging
 import asyncio
 import uuid
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .http_context import add_project_context_middleware
 from .application import Application
 from .activity import ActivityJournal
 from .commands import CommandService
@@ -98,17 +98,7 @@ def create_app(project_path: Path | None = None, handlers: Path | None = None, r
     app = FastAPI(title="OpenHMI live builder prototype", lifespan=lifespan)
     instance = app.state.project_instance = uuid.uuid4().hex
 
-    @app.middleware('http')
-    async def project_identity(request, call_next):
-        expected = request.headers.get('x-openhmi-project')
-        if request.method not in ('GET', 'HEAD', 'OPTIONS') and expected and expected != instance:
-            return JSONResponse({'detail': 'A different project was opened. Reload before making changes.'}, status_code=409)
-        response = await call_next(request)
-        response.headers['X-OpenHMI-Project'] = instance
-        if hasattr(request.state, 'activity_operation'):
-            response.headers['X-OpenHMI-Operation-ID'] = request.state.activity_operation
-            response.headers['X-OpenHMI-Audit-Status'] = getattr(request.state, 'activity_status', 'pending')
-        return response
+    add_project_context_middleware(app, instance)
     app.state.driver = application.driver
     app.state.application = application
     app.state.store = store
