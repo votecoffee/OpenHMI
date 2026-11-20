@@ -1,5 +1,5 @@
-import { activityOutcomes, isActivityPage } from '../frontend/activity-api.mjs';
-import { isDiagnosticsSnapshot } from '../frontend/diagnostics-api.mjs';
+import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
+import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
 // Exercise production palette defaults and serializers without a DOM or PLC.
 import { createConfig } from '../frontend/controls.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
@@ -79,7 +79,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -92,6 +92,12 @@ export async function contract(request) {
       });
     };
     await api('/api/project');
+    if (request.operation === 'operations_queries') {
+      for (const item of request.activity) await readActivity(item.filters, item.before, item.options);
+      for (const item of request.diagnostics) await readDiagnostics(item.criteria, item.offset, item.options);
+      return { requests: requests.slice(1), csv: request.activity.map(item => activityCsvPath(item.filters)),
+        exports: request.diagnostics.map(item => diagnosticsExportPath(item.criteria)), outcomes: activityOutcomes };
+    }
     if (request.operation === 'history_queries') {
       const tags = '设备 A,Motor.Speed,设备 A';
       await api(sparklineHistoryPath('设备 A', 10));

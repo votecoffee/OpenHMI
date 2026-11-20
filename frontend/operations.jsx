@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
-import { activityOutcomes, isActivityPage } from './activity-api.mjs';
-import { isDiagnosticsSnapshot } from './diagnostics-api.mjs';
+import { activityOutcomes, isActivityPage, activityHistoryPath, activityCsvPath, readActivity } from './activity-api.mjs';
+import { isDiagnosticsSnapshot, diagnosticsExportPath, readDiagnostics } from './diagnostics-api.mjs';
 import { commandHistoryPath, commandTransactionPath } from './command-api.mjs';
 import { commandStates, isCommandPage, isCommandRecord } from './command-status.mjs';
 import { SecurityContext, allowed, canInspect } from './security.jsx';
@@ -67,14 +67,6 @@ export function CommandConsole() {
   </section>;
 }
 
-function activityParams(filters, before) {
-  const query = new URLSearchParams();
-  for (const key of ['actor', 'status', 'search']) if (filters[key]) query.set(key, filters[key]);
-  for (const key of ['start', 'end']) if (filters[key]) query.set(key, new Date(filters[key]).toISOString());
-  if (before) query.set('before_id', before);
-  return query;
-}
-
 export function ActivityConsole() {
   const { session } = useContext(SecurityContext);
   const permitted = canInspect(session, 'activity.view');
@@ -83,7 +75,7 @@ export function ActivityConsole() {
   const [before, setBefore] = useState(null);
   const [response, setResponse] = useState(null);
   const [refresh, setRefresh] = useState(0);
-  const endpoint = `/api/activity?${activityParams(applied, before)}`;
+  const endpoint = activityHistoryPath(applied, before);
   const current = response?.endpoint === endpoint ? response : null;
   const { data, message, receivedAt } = current ?? {};
   useEffect(() => {
@@ -92,7 +84,7 @@ export function ActivityConsole() {
     async function tick() {
       let retry = !before;
       try {
-        const result = await api(endpoint);
+        const result = await readActivity(applied, before);
         if (!isActivityPage(result)) throw new Error('Invalid activity response');
         if (!stopped) setResponse({ endpoint, data: result, receivedAt: new Date() });
       } catch (error) {
@@ -120,7 +112,7 @@ export function ActivityConsole() {
       <button>Apply activity filters</button>
     </form>
     <div className="operations-actions"><button onClick={() => { setBefore(null); setRefresh(value => value + 1); }}>Newest activity</button><button disabled={!!message || !data?.has_more} onClick={() => setBefore(data.next_before_id)}>Older activity</button>
-      <a href={`/api/activity.csv?${activityParams(applied)}`}>Export activity CSV</a></div>
+      <a href={activityCsvPath(applied)}>Export activity CSV</a></div>
     {message && <p role="alert">Activity unavailable. {message}
       {data && <> Showing last received activity from {receivedAt.toLocaleTimeString()}.</>}</p>}
     {!current && <p role="status">Waiting for operator activity.</p>}
@@ -214,8 +206,7 @@ export function DiagnosticsConsole() {
     let stopped = false, timer;
     async function tick() {
       try {
-        const query = new URLSearchParams({ ...criteria, offset });
-        const snapshot = await api(`/api/diagnostics?${query}`);
+        const snapshot = await readDiagnostics(criteria, offset);
         if (!isDiagnosticsSnapshot(snapshot, offset)) throw new Error('Invalid diagnostics response');
         if (!stopped) setResult({ criteria, offset, data: snapshot, receivedAt: new Date() });
       } catch (error) {
@@ -251,7 +242,7 @@ export function DiagnosticsConsole() {
           && <option value={connection}>{connection}</option>}
       </select></label><button>Filter diagnostic tags</button>
     </form>
-    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={`/api/diagnostics.json?${new URLSearchParams(criteria)}`}>Export diagnostics JSON</a></div>
+    <div className="operations-actions"><button disabled={!offset} onClick={() => setOffset(0)}>First tags</button><button disabled={!!message || data?.next_offset == null} onClick={() => setOffset(data.next_offset)}>More tags</button><a href={diagnosticsExportPath(criteria)}>Export diagnostics JSON</a></div>
     {data && <p>{data.total_tags} matching logical tags. Values are omitted from this diagnostic export.</p>}
     <table className="diagnostics-tags"><thead><tr><th>Tag / source</th><th>Type</th><th>Quality</th><th>Age (s)</th><th>Acquisition time / error</th></tr></thead><tbody>{data?.tags.map(tag => <tr key={tag.name}><td>{tag.name}<br /><small>{tag.connection || 'Local'} · {tag.address}</small></td><td>{tag.type}</td><td><strong>{tag.quality}</strong></td><td>{tag.age_seconds == null ? '—' : tag.age_seconds.toFixed(2)}</td><td>{tag.timestamp ? new Date(tag.timestamp).toLocaleString() : 'No sample'}<br />{tag.error}</td></tr>)}</tbody></table>
   </section>;

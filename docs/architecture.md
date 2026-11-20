@@ -392,8 +392,13 @@ Activity and diagnostics validators now live in `activity-api.mjs` and
 through those production validators in `test_operations_responses.py`. Activity
 IDs/order/cursors and diagnostic offset/row/truncation metadata are checked
 before state replacement; optional legacy metadata remains compatible. Scan-age
-values are checked before the UI formats them. Next, extract the remaining
-activity/diagnostics query builders and verify their router contracts. Preserve model/import
+values are checked before the UI formats them. These modules also own list/read
+and export query construction; `test_operations_contract.py` binds their actual
+requests through the real registrar. Tests preserve Unicode filters, UTC date
+conversion, exact string-form cursors, defaults, bounds, project headers and
+read/export authorization. UI polling, retention and permission-loss handling
+remain in React. Next, separate read-only diagnostics projection from HTTP
+registration while retaining the driver snapshot lock. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

@@ -1,3 +1,22 @@
+import { api } from './api.mjs';
+
+function activityParams(filters, before) {
+  const query = new URLSearchParams();
+  for (const key of ['actor', 'status', 'search']) if (filters[key]) query.set(key, filters[key]);
+  for (const key of ['start', 'end']) if (filters[key]) query.set(key, new Date(filters[key]).toISOString());
+  if (before) query.set('before_id', before);
+  return query;
+}
+
+export function activityHistoryPath(filters = {}, before = null, { limit = null } = {}) {
+  const params = activityParams(filters, before);
+  if (limit !== null) params.set('limit', limit);
+  return '/api/activity?' + params;
+}
+
+export const activityCsvPath = (filters = {}) => '/api/activity.csv?' + activityParams(filters);
+export const readActivity = (filters, before, options) => api(activityHistoryPath(filters, before, options));
+
 export const activityOutcomes = ['pending', 'succeeded', 'denied', 'rejected', 'uncertain', 'interrupted'];
 
 export function isActivityRecord(item) {

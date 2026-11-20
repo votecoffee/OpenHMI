@@ -293,8 +293,14 @@ not close hardware or operator acceptance gates.
     replacing readable data. Browser regressions verify paging lockout, denial
     clearing and valid-reply recovery. Controller/station acceptance stays open.
 
+18. Delivered activity/diagnostics query builders and read helpers in focused API
+    modules. Actual generated requests bind through the registrar with Unicode
+    filters, UTC dates, precise string-form cursors, bounds/defaults and project
+    headers. Export checks preserve scope, CSV quoting/formula escaping, value-free
+    diagnostics and authorization before reads. UI polling and recovery stay intact.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize activity/diagnostics query builders and router contracts next. Keep further module extraction tied
+Prioritize separating diagnostics projection from HTTP registration next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

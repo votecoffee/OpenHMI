@@ -608,6 +608,8 @@ the actual browser helpers, including project headers and encoded Unicode paths.
 tag-option freshness and numeric versus text choices. Family/category coverage
 checks reject missing or duplicated controls, and engineering integration tests
 feed the real draft catalog through browser pickers and backend validation.
+Activity/diagnostics query contracts send actual browser-generated URLs through
+the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft
 when a candidate contains multiple invalid bindings. Driver regression checks
 cover subscription expiry/release, shared demand, independent caches, snapshot

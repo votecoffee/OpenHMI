@@ -1,3 +1,14 @@
+import { api } from './api.mjs';
+
+export function diagnosticsPath(criteria = {}, offset = 0, { limit = null } = {}) {
+  const params = new URLSearchParams({ ...criteria, offset });
+  if (limit !== null) params.set('limit', limit);
+  return '/api/diagnostics?' + params;
+}
+
+export const diagnosticsExportPath = (criteria = {}) => '/api/diagnostics.json?' + new URLSearchParams(criteria);
+export const readDiagnostics = (criteria, offset, options) => api(diagnosticsPath(criteria, offset, options));
+
 export function isDiagnosticsSnapshot(data, offset) {
   if (!Number.isSafeInteger(offset) || offset < 0 || data?.offset !== offset || !Number.isSafeInteger(data.total_tags) || data.total_tags < 0
     || typeof data.plc_hold !== 'boolean' || (data.next_offset !== null
