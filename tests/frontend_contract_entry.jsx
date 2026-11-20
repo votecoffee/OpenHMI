@@ -16,12 +16,21 @@ import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription, requireTagSnapshot, tagSnapshotPath } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from '../frontend/project-api.mjs';
-import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath } from '../frontend/alarm-api.mjs';
+import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents } from '../frontend/alarm-api.mjs';
 import { engineeringCatalog } from '../frontend/engineering.jsx';
 import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'alarm_queries') return {
+    states: alarmStates, shelving: alarmShelvingFilters, events: alarmEvents,
+    occurrences: request.occurrences.map(item => alarmOccurrencesPath(item.filters, item.before, item.options)),
+    history: request.history.map(item => alarmEventsPath(item.filters, item.before, item.event, item.options)),
+    csv: request.history.map(item => alarmEventsCsvPath(item.filters, item.event)),
+    details: request.details.map(alarmDetailPath),
+    notes: request.notes.map(item => alarmNotesPath(item.identifier, item.before, item.options)),
+  };
+
   if (request.operation === 'tag_snapshots') {
     const before = JSON.stringify(request.snapshots);
     const results = request.snapshots.map(({ data, statusOnly = false }) => {

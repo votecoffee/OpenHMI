@@ -347,8 +347,14 @@ not close hardware or operator acceptance gates.
     intact. All five live app snapshot validation boundaries now have focused
     modules; controller acceptance remains separate.
 
+26. Delivered alarm-console read-query builders, CSV links and shared UI filter
+    lists in the alarm API module. Generated URLs bind through SQL-backed routes
+    with Unicode/UTC/cursor/default/bound checks, metadata-only detail reads and
+    CSV quoting/formula escaping. History/export scope, note POST paths and UI
+    polling/recovery remain unchanged. Detailed response DTO parity is next.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize alarm-console read-query builders and detailed alarm contracts next. Keep further module extraction tied
+Prioritize detailed alarm response validators and real query-service parity next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

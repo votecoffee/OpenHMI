@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './alarm-controls.jsx';
-import { acknowledgeAlarms } from './alarm-api.mjs';
+import { acknowledgeAlarms, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents } from './alarm-api.mjs';
 import { Live, Quality, sampleQualityProblem, tagQuality, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
 import { api, json } from './api.mjs';
@@ -15,15 +15,6 @@ function linkedOccurrence() {
   const id = Number(value);
   return /^[1-9]\d*$/.test(value ?? '') && Number.isSafeInteger(id) ? id : null;
 }
-function parameters(filters, before, history = false, event = '') {
-  const query = new URLSearchParams({ priority: filters.priority, search: filters.search, state: history ? 'all' : filters.state });
-  if (!history) query.set('shelving', filters.shelving);
-  for (const field of ['start', 'end']) if (filters[field]) query.set(field, new Date(filters[field]).toISOString());
-  if (before) query.set('before_id', before);
-  if (event) query.set('event', event);
-  return query;
-}
-
 const positiveId = value => Number.isSafeInteger(value) && value > 0;
 const optionalText = value => value == null || typeof value === 'string';
 
@@ -87,14 +78,14 @@ export function AlarmConsole() {
   const unavailable = monitorAvailable ? unavailableAlarmTriggers(live) : [];
   const waiting = monitorAvailable && alarmEvaluationPending(live);
   const { data: rows, error, receivedAt: rowsReceivedAt } = useAlarmRead(
-    `/api/alarms/occurrences?${parameters(applied, before)}`, isOccurrencePage, generation);
+    alarmOccurrencesPath(applied, before), isOccurrencePage, generation);
   const { data: history, error: historyError, receivedAt: historyReceivedAt } = useAlarmRead(
-    `/api/alarms/events?${parameters(applied, eventBefore, true, eventFilter)}`, isEventPage, generation);
-  const detailUrl = identifier ? `/api/alarms/occurrences/${identifier}` : null;
+    alarmEventsPath(applied, eventBefore, eventFilter), isEventPage, generation);
+  const detailUrl = identifier ? alarmDetailPath(identifier) : null;
   const { data: detail, error: detailError, receivedAt: detailReceivedAt } = useAlarmRead(
     detailUrl, isAlarmDetail, generation, identifier);
   const { data: notes, error: notesError, receivedAt: notesReceivedAt } = useAlarmRead(
-    detailUrl && `${detailUrl}/notes${notesBefore ? `?before_id=${notesBefore}` : ''}`, isNotePage, generation);
+    detailUrl && alarmNotesPath(identifier, notesBefore), isNotePage, generation);
   const detailReady = Boolean(detail || detailError);
   const triggerProblem = detail && sampleQualityProblem(detail.trigger);
   const noteBlocked = !canComment || busy || !!detailError || !!notesError || !notes;
@@ -116,7 +107,7 @@ export function AlarmConsole() {
   }
   async function saveNote(event) {
     event.preventDefault(); setBusy(true);
-    try { const result = await api(`/api/alarms/occurrences/${identifier}/notes`, json('POST', { comment: note })); setNote(''); setNotesBefore(null); setGeneration(value => value + 1); setFeedback(result.audit_status === 'pending' ? ui('alarmNotePending', { id: result.operation_id }) : ui('noteSaved')); }
+    try { const result = await api(alarmNotesPath(identifier), json('POST', { comment: note })); setNote(''); setNotesBefore(null); setGeneration(value => value + 1); setFeedback(result.audit_status === 'pending' ? ui('alarmNotePending', { id: result.operation_id }) : ui('noteSaved')); }
     catch (problem) { setFeedback(problem.message); }
     finally { setBusy(false); }
   }
@@ -157,8 +148,8 @@ export function AlarmConsole() {
     <form className="alarm-filters" onSubmit={event => { event.preventDefault(); setApplied({ ...filters }); setBefore(null); setEventBefore(null); setSelected([]); }}>
       <label>{ui('alarmSearch')}<input aria-label={ui('alarmSearch')} value={filters.search} maxLength={200} onChange={event => setFilters({ ...filters, search: event.target.value })} /></label>
       <label>{ui('priority')}<select aria-label={ui('priority')} value={filters.priority} onChange={event => setFilters({ ...filters, priority: event.target.value })}><option value="0">{ui('allPriorities')}</option>{[1, 2, 3, 4].map(value => <option key={value} value={value}>P{value}</option>)}</select></label>
-      <label>{ui('alarmStateFilter')}<select aria-label={ui('alarmStateFilter')} value={filters.state} onChange={event => setFilters({ ...filters, state: event.target.value })}>{['outstanding', 'active', 'unacknowledged', 'returned', 'acknowledged', 'retired', 'all'].map(value => <option key={value} value={value}>{value === 'all' ? ui('allStates') : ui(value)}</option>)}</select></label>
-      <label>{ui('shelfFilter')}<select aria-label={ui('shelfFilter')} value={filters.shelving} onChange={event => setFilters({ ...filters, shelving: event.target.value })}>{['unshelved', 'shelved', 'all'].map(value => <option key={value} value={value}>{ui(value === 'all' ? 'allShelving' : value)}</option>)}</select></label>
+      <label>{ui('alarmStateFilter')}<select aria-label={ui('alarmStateFilter')} value={filters.state} onChange={event => setFilters({ ...filters, state: event.target.value })}>{alarmStates.map(value => <option key={value} value={value}>{value === 'all' ? ui('allStates') : ui(value)}</option>)}</select></label>
+      <label>{ui('shelfFilter')}<select aria-label={ui('shelfFilter')} value={filters.shelving} onChange={event => setFilters({ ...filters, shelving: event.target.value })}>{alarmShelvingFilters.map(value => <option key={value} value={value}>{ui(value === 'all' ? 'allShelving' : value)}</option>)}</select></label>
       {['start', 'end'].map(field => <label key={field}>{ui(field === 'start' ? 'alarmStart' : 'alarmEnd')}<input aria-label={ui(field === 'start' ? 'alarmStart' : 'alarmEnd')} type="datetime-local" value={filters[field]} onChange={event => setFilters({ ...filters, [field]: event.target.value })} /></label>)}
       <button>{ui('filterAlarms')}</button>
     </form>
@@ -195,7 +186,7 @@ export function AlarmConsole() {
         <button onClick={() => setNotesBefore(null)}>{ui('newestNotes')}</button><button disabled={!!notesError || !notes?.has_more} onClick={() => setNotesBefore(notes.next_before_id)}>{ui('olderNotes')}</button>
       </>}
     </section>}
-    <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{['active', 'returned', 'acknowledged', 'quality_bad', 'quality_recovered', 'configuration_changed', 'operator_note', 'shelved', 'shelf_restored', 'shelf_expired', 'shelf_invalidated'].map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={`/api/alarms/events.csv?${parameters(applied, null, true, eventFilter)}`}>{ui('exportAlarmCsv')}</a></div>
+    <h2>{ui('alarmHistory')}</h2><p>{ui('alarmHistoryHint')}</p><div className="alarm-actions"><label>{ui('alarmEventFilter')}<select aria-label={ui('alarmEventFilter')} value={eventFilter} onChange={event => { setEventFilter(event.target.value); setEventBefore(null); }}><option value="">{ui('allEvents')}</option>{alarmEvents.map(value => <option key={value} value={value}>{ui(value)}</option>)}</select></label><a href={alarmEventsCsvPath(applied, eventFilter)}>{ui('exportAlarmCsv')}</a></div>
     {historyError && <p role="alert">{ui('alarmEventsUnavailable')} {historyError}
       {history && <> {ui('alarmLastPage', { time: timestamp(historyReceivedAt) })}</>}</p>}
     <table className="alarm-events"><thead><tr><th>{ui('time')}</th><th>{ui('event')}</th><th>{ui('message')}</th><th>{ui('recordedUser')}</th></tr></thead><tbody>{history?.items.map(item => <tr key={item.id}>

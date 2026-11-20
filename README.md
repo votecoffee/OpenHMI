@@ -620,6 +620,8 @@ Applied-project validation shares the real palette fixture and SQL active-respon
 contracts for control families, secondary screens, faceplates and canvas metadata.
 Tag-status normalization shares acquisition-response contracts for held/pending
 state, partial faults, stale recovery and lightweight diagnostics polling.
+Alarm-console query contracts bind actual filter, paging, detail, note and CSV
+URLs through SQL-backed routes, including UTC conversion and exact cursor strings.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

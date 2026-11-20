@@ -442,8 +442,14 @@ using FakePLC: held/pending, one bad tag among good data, stale/recovered and
 disabled routes. GET reads cannot poll or subscribe, and status-only reads cannot
 copy tag samples or subscription groups. All five live app snapshot boundaries
 now use focused modules while polling/lifecycle ownership remains in the app.
-Next, extract alarm-console read-query builders and bind their URLs through the
-real registrar before expanding detailed alarm response parity. Preserve model/import
+Alarm-console occurrence/event/detail/note query builders and CSV links now live
+in `alarm-api.mjs`, along with the UI state/shelving/event filter lists. Existing
+URL order, local-date conversion, history/export scope and note POST paths remain
+intact. `test_alarm_query_contract.py` binds generated URLs through the real
+SQL-backed registrar, covering defaults, bounds, precise cursors, Unicode,
+metadata-only detail reads and CSV quoting/formula escaping. UI validation,
+polling and recovery remain in the console/read hook. Next, extract detailed
+alarm response validators and compare real query-service payloads with them. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

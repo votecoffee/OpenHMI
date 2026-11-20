@@ -27,6 +27,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Live alarm snapshots | `test_alarm_snapshot_contract.py`: real SQL/HTTP monitor snapshots for priorities, acknowledgement, shelving, quality/staleness, retirement/reopen and legacy/malformed payloads; read endpoint does not acquire source data | Guard validates live-banner fields and legacy fallbacks, not complete occurrence/history DTOs; source values are synthetic and no controller acceptance is implied |
 | Applied-project snapshots | `test_applied_project_contract.py`: real palette/Pydantic/SQLite save/apply and active HTTP responses through the production guard; all control kinds, screens, faceplates, freeform/flow layout metadata, legacy and malformed replies | Runtime callbacks are stubbed; schema/display compatibility does not prove PLC binding validity, asset availability or native station acceptance |
 | Tag-status snapshots | `test_tag_snapshot_contract.py`: real acquisition/cache responses with FakePLC through the production normalizer; held/pending, partial bad-tag faults, stale recovery, disabled and status-only metadata; GET cannot poll/subscribe or copy samples in status-only mode | Top-level validation retains per-tag fault isolation; control-specific quality/type handling remains separate; FakePLC is not controller acceptance |
+| Alarm-console queries and exports | `test_alarm_query_contract.py`: generated occurrence/event/detail/note/CSV URLs through real SQL-backed routes; UI enum parity, Unicode/UTC/cursors, limits, errors and CSV escaping | Read contracts do not validate detailed response DTO parity or exercise note-write authorization; source sampling is excluded and detail trigger values are omitted |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -139,10 +140,18 @@ top-level collections do. Contracts preserve zero/false/text/structured values
 without mutation, with cache-only reads and lightweight diagnostic polling.
 This completes extraction of the five live app snapshot validation boundaries.
 
+Alarm-console query construction now shares `alarm-api.mjs` helpers and filter
+lists. Contracts bind generated URLs through SQL-backed routes, preserving empty
+filters, UTC dates, signed-64-bit string cursors, history state/export scope and
+notes URL ordering. Invalid HTTP bounds fail before query/cache calls; domain
+filter/date errors and missing IDs retain their existing status codes. CSV export
+retains quoting, formula escaping, full matching scope and truncation headers.
+Console polling, generation guards and read-error retention are unchanged.
+
 ## Next bounded work
 
-1. Extract alarm-console occurrence/event/note read-query builders and bind their
-   actual URLs through the registrar, then expand detailed alarm response parity.
+1. Extract alarm occurrence/event/note/detail response validators and compare real
+   query-service payloads with them, retaining nullable/legacy metadata rules.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
