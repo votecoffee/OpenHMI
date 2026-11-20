@@ -230,6 +230,13 @@ paths, authorization, revision guards and lock ownership.
   type-alias, domain-schema and default-factory imports from `projects.py` are
   explicit compatibility exports of the same objects. No model rules, defaults,
   storage SQL, version or transaction boundaries change in this separation.
+  `control_models_base.py` holds shared strict, state, numeric and range bases.
+  Focused `control_models_inputs.py`, `control_models_images.py`,
+  `control_models_process.py`, `control_models_machine.py` and
+  `control_models_readouts.py` own their control schemas and nested helper models.
+  Family modules import shared bases without importing the project schema or
+  revision store. `project_models.py` explicitly reexports these models and
+  retains the original discriminated union, member order and project validators.
 
 `tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
 and `toProject` functions through a DOM-free Node test entry. It compares every
@@ -331,12 +338,17 @@ Existing blocked-read/project-switch tests continue to check obsolete receipts.
 
 `tests/test_project_models.py` checks schema-only validation in a fresh process,
 legacy/canonical model identity and canonical requests passing through the
-existing store's save/apply/history contract. Frontend compatibility checks now
+existing store's save/apply/history contract. Direct family imports must not load
+`project_models`, the revision store or SQLite. Family ownership checks require
+unique class objects and ensure every union member is a canonical family model;
+legacy identity checks include every imported OpenHMI model, not only classes
+still defined in the project composition module. Frontend compatibility checks now
 use the canonical schemas while existing persistence tests retain legacy imports.
 
 The current control-family, HTTP-registration, driver and schema/store separation
-baseline is delivered. Next, split control schemas by family while retaining the
-canonical discriminated union and validation order. Preserve model/import
+baseline is delivered, including the backend control families. Next, separate
+canvas-layout and identity-publication configuration schemas from their service
+implementations so schema consumers avoid those service dependencies. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

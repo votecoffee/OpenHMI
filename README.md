@@ -609,6 +609,9 @@ legacy catalog access and independent diagnostic results. Project/control schema
 and defaults live in `openhmi.project_models`, separately from SQLite revision
 persistence; legacy imports from `openhmi.projects` remain supported. Schema-only
 validation is tested in a fresh process without loading the store or SQLite.
+Control schemas have input, image, process/chart, machine/action and readout
+families over shared bases. Compatibility tests cover family exports, the
+canonical control union and legacy imports.
 No browser or PLC is needed for the contract tests.
 
 Run local checks (browser checks require installed Google Chrome):

@@ -241,9 +241,15 @@ not close hardware or operator acceptance gates.
    `projects.py`. Tests cover persistence-free schema import/validation and
    canonical requests passing through the existing revision store.
 
+10. Delivered backend control-schema families for inputs, images, process/charts,
+    machine/actions and readouts, with shared strict/state/numeric/range bases.
+    The canonical union, class definitions, validators and legacy exports retain
+    their original contracts. Tests cover independent family imports, ownership
+    and canonical/legacy class identity, alongside the full palette contract.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Next, split control schemas by family while retaining the canonical discriminated
-union, model/import compatibility and validation order.
+Next, separate canvas-layout and identity-publication configuration schemas from
+their service implementations, preserving canonical and legacy model identity.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
