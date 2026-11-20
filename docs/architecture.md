@@ -686,6 +686,21 @@ the BMP; browser faults cover preservation, denial and refresh. This is neither 
 database-integrity check nor a verdict that WAL/SHM/journals are abnormal. Existing
 FastAPI OpenAPI is unchanged; the manual workspace route has direct Pydantic/JS
 contract coverage.
+`workspace_contracts.py` now defines canonical library listings and create/import/
+open acknowledgements. A listing has unique filenames and exactly one current
+row matching its current filename; the active database can retain a legacy or
+Unicode filename. Create/import filenames follow the existing project ID rules,
+imported PLC holds must be true, and open must acknowledge success. Existing wire
+fields and FastAPI OpenAPI remain unchanged. `workspace-api.mjs` validates these
+responses, correlates operation filenames to requests and sends each operation
+once. Malformed/transport/5xx results show completion-review guidance without
+retry. `workspace.jsx` retains confirmed listings and user drafts on read faults,
+clears denied listings and disables operations while data is unavailable. Field
+reset and explicit open navigation require a valid operation acknowledgement;
+confirmed messages remain after listing refresh. Import is now an explicit button
+action and retains its selected File until confirmation. Real SQL/HTTP contracts
+feed production JS guards and serializers; browser cases cover listing/receipt
+faults, denial/recovery, retained fields/backups and absence of replay/redirect.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

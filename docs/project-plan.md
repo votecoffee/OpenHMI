@@ -559,13 +559,23 @@ not close hardware or operator acceptance gates.
     recovery files are not labeled corrupt. Existing FastAPI OpenAPI is unchanged;
     the manual workspace route is covered directly by schema/HTTP/browser checks.
 
+51. Delivered main project-library response contracts. Canonical Pydantic and
+    production JS guards validate unique/current listings and request-correlated
+    create/import/open acknowledgements, preserving legacy/Unicode active names.
+    Bad listings retain confirmed data/drafts and disable operations; denied data
+    clears. Ambiguous operation replies require refresh and never replay. Field
+    reset/open navigation require confirmation, and success messages survive
+    listing refresh. Import now uses an explicit button and keeps the selected
+    backup until confirmation. SQL/HTTP/JS and browser faults cover these paths;
+    existing wire fields and FastAPI OpenAPI remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next harden the main project-
-library listing and operation response contracts, retaining unsaved fields and
-rejecting malformed replies without replay. Preserve scan/resource draining and
-transport ownership. Prioritize observable failure behavior and contract coverage
-over further file splitting. Controller, operator-station and endurance acceptance
-stay deferred.
+Recipe HTTP separation is complete for this scope. Next review complete-backup
+download HTTP contracts and permission/failure feedback, preserving private binary
+archives and avoiding automatic operation replay. Preserve scan/resource draining
+and transport ownership. Prioritize observable failure behavior and contract
+coverage over further file splitting. Controller, operator-station and endurance
+acceptance stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

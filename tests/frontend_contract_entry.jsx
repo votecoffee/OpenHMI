@@ -1,3 +1,4 @@
+import { isWorkspaceLibrary, isWorkspaceResult, createWorkspaceProject, openWorkspaceProject, importWorkspaceProject } from '../frontend/workspace-api.mjs';
 import { workspaceArtifactPath, isWorkspaceArtifactPage, readWorkspaceArtifacts } from '../frontend/workspace-api.mjs';
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
@@ -32,6 +33,31 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'workspace_library') {
+    return { libraries: (request.libraries ?? []).map(isWorkspaceLibrary),
+      results: (request.results ?? []).map(item => isWorkspaceResult(item.data, item.kind, item.expected)) };
+  }
+  if (request.operation === 'workspace_operations') {
+    const calls = [], results = [];
+    let index = 0;
+    globalThis.fetch = async (path, options) => {
+      const reply = request.replies[index++];
+      if (!reply) throw new Error('Unexpected automatic request');
+      calls.push({ path, method: options.method, headers: options.headers, timed: options.signal instanceof AbortSignal,
+        body: options.body instanceof Blob ? null : JSON.parse(options.body),
+        bytes: options.body instanceof Blob ? Array.from(new Uint8Array(await options.body.arrayBuffer())) : null });
+      return new Response(reply.raw ?? JSON.stringify(reply.data), { status: reply.status ?? 200, headers: reply.headers });
+    };
+    for (const item of request.requests) {
+      try {
+        const data = item.kind === 'create' ? await createWorkspaceProject(item.name, item.title)
+          : item.kind === 'open' ? await openWorkspaceProject(item.file)
+          : await importWorkspaceProject(item.name, new Blob([new Uint8Array(item.bytes)], { type: 'application/zip' }));
+        results.push({ data });
+      } catch (error) { results.push({ error: error.message, status: error.status, requiresReview: error.requiresReview === true }); }
+    }
+    return { calls, results };
+  }
   if (request.operation === 'workspace_artifacts') {
     return { paths: (request.queries ?? []).map(workspaceArtifactPath),
       valid: (request.pages ?? []).map(item => isWorkspaceArtifactPage(item.data, item.after ?? '')) };

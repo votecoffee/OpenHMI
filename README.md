@@ -356,7 +356,9 @@ write/readback behavior, supported types and current limits.
 
 Start through `openhmi`, then open **Projects**. Create/open projects in the local
 library beside the selected database, export a complete backup ZIP or import one
-under a new project ID. New projects inherit the current HMI security configuration.
+under a new project ID. To import, choose a ZIP and click **Import complete backup**;
+selection alone does not upload it. The selected backup and form values remain
+available if the result is uncertain. New projects inherit the current HMI security configuration.
 Project administration and complete backups require security administration rights
 when security is configured.
 
@@ -677,6 +679,11 @@ recovery files. It shows database association and entry type without reading
 contents or following links, with bounded paging and incomplete-scan indications.
 Project-management permissions apply. The panel retains confirmed results on bad
 replies, clears denied data, and supports manual refresh without changing files.
+The main library listing and create/import/open acknowledgements are validated
+before display, field reset or navigation. Unavailable listings and uncertain
+operation results require a successful manual refresh before further operations;
+requests are never automatically replayed. Confirmed success messages survive
+listing refresh, and denied library data is cleared.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

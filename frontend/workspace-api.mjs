@@ -1,4 +1,4 @@
-import { api } from './api.mjs';
+import { api, json } from './api.mjs';
 
 const rules = [
   ['.openhmi.hold', 'connection_hold'], ['.openhmi.handlers.py', 'python_review'],
@@ -46,4 +46,62 @@ export async function readWorkspaceArtifacts(options = {}) {
   const page = await api(workspaceArtifactPath(options));
   if (!isWorkspaceArtifactPage(page, options.after ?? '')) throw new Error('Project file inventory response is invalid');
   return page;
+}
+
+
+export function isWorkspaceLibrary(data) {
+  if (!record(data) || !filename(data.current) || !Array.isArray(data.projects) || !data.projects.length
+    || typeof data.handlers !== 'boolean' || typeof data.plc_hold !== 'boolean') return false;
+  const names = new Set(), active = [];
+  for (const project of data.projects) {
+    if (!record(project) || !filename(project.file) || names.has(project.file) || typeof project.current !== 'boolean') return false;
+    names.add(project.file);
+    if (project.current) active.push(project.file);
+  }
+  return active.length === 1 && active[0] === data.current;
+}
+
+export function isWorkspaceResult(data, kind, expectedFile) {
+  if (!record(data)) return false;
+  if (kind === 'open') return data.ok === true && filename(data.current) && data.current === expectedFile;
+  if (!['create', 'import'].includes(kind) || !filename(data.file)
+    || !/^[A-Za-z][A-Za-z0-9_-]{0,59}\.openhmi\.sqlite3$/.test(data.file) || data.file !== expectedFile) return false;
+  return kind === 'create' || (data.plc_hold === true && typeof data.handlers_saved_for_review === 'boolean');
+}
+
+export async function readWorkspaceLibrary() {
+  const data = await api('/api/workspace');
+  if (!isWorkspaceLibrary(data)) throw new Error('Project library response is invalid');
+  return data;
+}
+
+async function workspaceOperation(kind, expectedFile, path, options) {
+  let data;
+  try { data = await api(path, options); }
+  catch (error) {
+    if (!Number.isInteger(error.status) || error.status >= 500) {
+      error.requiresReview = true;
+      error.message += '. The operation may have completed. Refresh the project library before trying again.';
+    }
+    throw error;
+  }
+  if (!isWorkspaceResult(data, kind, expectedFile)) {
+    const error = new Error('Project operation response is invalid. The operation may have completed. Refresh the project library before trying again.');
+    error.requiresReview = true;
+    throw error;
+  }
+  return data;
+}
+
+export function createWorkspaceProject(name, title) {
+  return workspaceOperation('create', name + '.openhmi.sqlite3', '/api/workspace/create', json('POST', { name, title }));
+}
+
+export function openWorkspaceProject(file) {
+  return workspaceOperation('open', file, '/api/workspace/open', json('POST', { file }));
+}
+
+export function importWorkspaceProject(name, file) {
+  return workspaceOperation('import', name + '.openhmi.sqlite3', '/api/workspace/import?' + new URLSearchParams({ name }),
+    { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file });
 }

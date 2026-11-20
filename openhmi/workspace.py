@@ -21,6 +21,7 @@ from .project_models import Project, default_project
 from .projects import ProjectStore
 from .workspace_publication import PublicationError, ensure_available, publish_project
 from .workspace_inventory import ArtifactQuery, InventoryUnavailable, inventory
+from .workspace_contracts import LibrarySnapshot, CreatedProject, ImportedProject, OpenedProject
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -59,8 +60,8 @@ class ProjectWorkspace:
         files = [path for path in self.root.glob('*.openhmi.sqlite3') if not path.is_symlink()]
         if self.path not in files:
             files.insert(0, self.path)
-        return {'current': self.path.name, 'projects': [{'file': path.name, 'current': path == self.path} for path in files],
-                'handlers': bool(self.handlers), 'plc_hold': self.current.state.driver.plc_hold}
+        return LibrarySnapshot(current=self.path.name, projects=[{'file': path.name, 'current': path == self.path} for path in files],
+                               handlers=bool(self.handlers), plc_hold=self.current.state.driver.plc_hold).model_dump()
 
     def export(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -148,7 +149,7 @@ class ProjectWorkspace:
             raise
         except (ValueError, KeyError, TypeError, sqlite3.Error, zipfile.BadZipFile, RuntimeError) as error:
             raise HTTPException(422, f'Invalid OpenHMI backup: {error}') from error
-        return {'file': target.name, 'handlers_saved_for_review': 'handlers.py' in files, 'plc_hold': True}
+        return ImportedProject(file=target.name, handlers_saved_for_review='handlers.py' in files, plc_hold=True).model_dump()
 
     def create(self, name, title):
         target = self.target(name)
@@ -185,7 +186,7 @@ class ProjectWorkspace:
         except Exception as error:
             logging.exception('Project creation could not finish')
             raise HTTPException(503, 'Project creation could not finish. Review the project library before retrying.') from error
-        return {'file': target.name}
+        return CreatedProject(file=target.name).model_dump()
 
     async def open(self, filename):
         allowed = {item['file'] for item in self.listing()['projects']}
@@ -262,7 +263,7 @@ class ProjectWorkspace:
             if path.endswith('/create'):
                 return JSONResponse(await finish_cleanup(asyncio.to_thread(self.create, body.get('name', ''), body.get('title', ''))))
             await self.open(body.get('file', ''))
-            return JSONResponse({'ok': True, 'current': self.path.name})
+            return JSONResponse(OpenedProject(ok=True, current=self.path.name).model_dump())
         raise HTTPException(404, 'Workspace operation not found')
 
     async def __call__(self, scope, receive, send):
