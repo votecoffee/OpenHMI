@@ -409,8 +409,14 @@ The command, activity and diagnostics views now live in `command-console.jsx`,
 directly; `operations.jsx` retains compatible exports with identical component
 identity. Polling effects, retained responses, permissions, filters and render
 bodies remain unchanged. Diagnostic timing/worker presentation stays with its
-console. Next, audit shared app-level snapshot validation and extract a cohesive
-response-contract boundary. Preserve model/import
+console. Identity-session validation, its URL and the validated read helper now
+live in `security-session.mjs`. App polling and login-refresh paths share the
+production guard while retaining generation fences and last-confirmed identity
+handling. `test_security_session_contract.py` compares real SQL-backed local and
+mock-Windows responses with that guard, including expiry, permission changes,
+logout/disable and public-field exposure. Malformed payloads remain rejected
+without mutation or coercion. Next, extract selected-recipe snapshot validation
+and verify its typed SQL revision/selection responses. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

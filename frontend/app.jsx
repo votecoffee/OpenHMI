@@ -25,6 +25,7 @@ import { ProjectHistory, MergeReview, exportCandidate } from './project-history.
 import { readCandidate, retainCandidate, editorIdentity, recoveryPrefix } from './recovery-cache.mjs';
 import { WorkspacePage } from './workspace.jsx';
 import { api, json } from './api.mjs';
+import { requireIdentitySnapshot, readSecuritySession, securitySessionPath } from './security-session.mjs';
 import { Localization, useUi } from './localization.jsx';
 import { IdentitySettings } from './identity-settings.jsx';
 import { ProjectSettings, getSettings } from './project-settings.jsx';
@@ -37,22 +38,6 @@ const editorOverrides = { headerActions: () => null };
 
 function isRecord(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function requireIdentitySnapshot(identity) {
-  const strings = values => Array.isArray(values) && values.every(value => typeof value === 'string');
-  const { configured, windows_enabled, windows_available, user, groups } = identity ?? {};
-  const validGroup = group => isRecord(group) && typeof group.name === 'string'
-    && typeof group.color === 'string' && strings(group.permissions);
-  const validUser = user === null || (isRecord(user) && typeof user.name === 'string'
-    && ['local', 'windows'].includes(user.provider) && strings(user.groups)
-    && strings(user.permissions) && strings(user.roles));
-  if (typeof configured !== 'boolean' || typeof windows_enabled !== 'boolean'
-    || typeof windows_available !== 'boolean' || !Array.isArray(groups) || !groups.every(validGroup)
-    || !validUser || (!configured && user !== null)) {
-    throw new Error('Invalid HMI identity status response');
-  }
-  return identity;
 }
 
 function isRecipeParameter(parameter) {
@@ -385,7 +370,7 @@ function App({ initial, catalog }) {
     setSession(null);
     setIdentityAvailable(false);
     try {
-      const identity = requireIdentitySnapshot(await api('/api/security/session'));
+      const identity = await readSecuritySession();
       if (generation === identityGeneration.current) {
         setSession(identity);
         setIdentityAvailable(true);
@@ -480,7 +465,7 @@ function App({ initial, catalog }) {
     }, () => {
       setLive(previous => ({ ...previous, recipeSelection: null, recipeConnected: false }));
     });
-    const stopIdentity = poll('/api/security/session', identity => {
+    const stopIdentity = poll(securitySessionPath, identity => {
       setSession(requireIdentitySnapshot(identity));
       setIdentityAvailable(true);
     }, () => setIdentityAvailable(false), identityGeneration);

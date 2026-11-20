@@ -22,6 +22,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Activity/diagnostics queries and exports | `test_operations_contract.py`: actual production read helpers/URLs through the registrar; Unicode filters, UTC conversion, precise cursors, limits/defaults, project headers, CSV quoting/formula escaping and export permissions | Journal is real SQLite; driver metadata/security hooks are controlled offline fixtures; no browser-local timezone or controller acceptance claim |
 | Activity/diagnostics responses | `test_operations_responses.py`: real SQL journal outcomes/pages/restart and actual driver/worker projections through the registrar into production JS validators; malformed paging and scan-age checks | Security is stubbed in contract fixtures; browser tests cover denial/recovery; fake transport does not establish PLC or station acceptance |
 | Read-only diagnostics projection | `test_diagnostics.py`: catalog replacement at snapshot release, common snapshot time, worker read outside the driver lock, route fault precedence, filter/paging and value omission | Controlled boundary regression, not a concurrency stress benchmark; HTTP and browser contracts remain separate checks |
+| Identity-session snapshots | `test_security_session_contract.py`: real SQL security service/session route into the production guard; local/expired sessions, live permission changes, mocked Windows mappings/disable, public fields and malformed payloads; validated read-helper errors | Windows authentication is mocked, not OS/domain acceptance; UI retains generation fences and last-confirmed identity behavior |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -95,10 +96,17 @@ View bodies and hook logic are preserved; existing browser regressions exercise
 command feedback, stale actions, retained pages, access denial and recovery.
 No saved-project schema, HTTP response shape or permission model changed.
 
+Identity-session validation is now shared through `security-session.mjs` by
+background polling, explicit login refresh and contract tests. The validated
+read helper retains API timeouts and HTTP error status. The guard retains its
+previous rules and returns the original object; contract tests reject malformed
+identity/group/permission structures without coercion or mutation. Real service
+responses exercise local and mock-Windows lifecycles without OS account changes.
+
 ## Next bounded work
 
-1. Audit app-level project/identity/recipe/alarm snapshot validation, extract the
-   first cohesive shared boundary and verify real backend/browser compatibility.
+1. Extract selected-recipe snapshot validation and verify typed SQL revision/
+   selection responses, followed by alarm and applied-project snapshot boundaries.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

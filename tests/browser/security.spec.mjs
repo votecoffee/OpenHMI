@@ -102,7 +102,9 @@ test('HMI groups administer and enforce button and numeric input access', async 
   await page.locator('[data-control="button"]').click();
   await page.getByRole('group', { name: 'Allowed HMI groups (any selected)', exact: true }).getByLabel('Maintenance', { exact: true }).check();
   await expect(page.getByRole('status', { name: 'Draft status' })).toContainText('saved');
-  const source = await page.getByRole('button', { name: 'Numeric input', exact: true }).boundingBox();
+  const inputBlock = page.getByRole('button', { name: 'Numeric input', exact: true });
+  await inputBlock.scrollIntoViewIfNeeded();
+  const source = await inputBlock.boundingBox();
   const target = await page.locator('.hmi-grid').boundingBox();
   await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
   await page.mouse.down();

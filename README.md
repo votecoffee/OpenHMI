@@ -610,6 +610,8 @@ checks reject missing or duplicated controls, and engineering integration tests
 feed the real draft catalog through browser pickers and backend validation.
 Command, activity and diagnostics consoles have focused view modules; the original
 operations module retains compatible exports.
+Identity-session validation and reads live in a focused module; SQL-backed
+contracts cover local sessions, expiry, permission changes and mocked Windows mappings.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

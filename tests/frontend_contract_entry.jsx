@@ -1,3 +1,4 @@
+import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
 import { isDiagnosticsSnapshot, readDiagnostics, diagnosticsExportPath } from '../frontend/diagnostics-api.mjs';
 // Exercise production palette defaults and serializers without a DOM or PLC.
@@ -20,6 +21,25 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'security_sessions') {
+    const before = JSON.stringify(request.sessions);
+    const valid = request.sessions.map(value => {
+      try { return requireIdentitySnapshot(value) === value; } catch { return false; }
+    });
+    if (JSON.stringify(request.sessions) !== before) throw new Error('Session validation mutated input');
+    return valid;
+  }
+  if (request.operation === 'security_session_read') {
+    const requests = [];
+    globalThis.fetch = async (path, options) => {
+      requests.push({ path, headers: options.headers, timed: options.signal instanceof AbortSignal, method: options.method ?? 'GET' });
+      return new Response(JSON.stringify(request.response), { status: request.status ?? 200,
+        headers: { 'Content-Type': 'application/json' } });
+    };
+    try { return { requests, identity: await readSecuritySession() }; }
+    catch (error) { return { requests, error: error.message, status: error.status ?? null }; }
+  }
+
   if (request.operation === 'operations_responses') return { outcomes: activityOutcomes, pages: request.pages.map(isActivityPage), snapshots: request.snapshots.map(item => isDiagnosticsSnapshot(item.data, item.offset)) };
   if (request.operation === 'trend_responses') return { histories: request.histories.map(isTrendHistory), statuses: request.statuses.map(isCaptureStatus) };
   if (request.operation === 'command_responses') return { states: commandStates, records: request.records.map(isCommandRecord), pages: request.pages.map(isCommandPage) };

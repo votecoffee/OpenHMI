@@ -311,8 +311,15 @@ not close hardware or operator acceptance gates.
     recovery remain unchanged. Existing command and operations browser workflows
     validate the moved components without changing saved schemas or API contracts.
 
+21. Delivered focused identity-session validation, URL and validated read helper.
+    Real SQL service/session responses pass the production browser guard across
+    local sign-in/out, expiry, permission changes and mock-Windows mappings/disable.
+    Contracts cover public fields, malformed payloads and HTTP errors. App generation
+    fences and last-confirmed identity handling remain intact; Windows/domain
+    acceptance is separate.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize auditing and extracting shared app-level snapshot validation next. Keep further module extraction tied
+Prioritize selected-recipe snapshot validation and SQL response parity next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
