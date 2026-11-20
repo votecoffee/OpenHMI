@@ -1,6 +1,7 @@
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe } from '../frontend/recipe-auth.mjs';
+import { isRecipeLibrary } from '../frontend/recipe-library.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
 import { isRecipeTransferPage, isRecipeTransferRecord, requireRecipeTransferReceipt, recipeTransferFailureMessage } from '../frontend/recipe-transfer-responses.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
@@ -27,6 +28,12 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_libraries') {
+    const before = JSON.stringify(request.libraries);
+    const valid = request.libraries.map(isRecipeLibrary);
+    if (JSON.stringify(request.libraries) !== before) throw new Error('Recipe library validation mutated input');
+    return valid;
+  }
   if (request.operation === 'recipe_transfer_receipts') {
     const before = JSON.stringify(request);
     const entries = request.entries.map(item => {

@@ -1,6 +1,44 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
+test('recipe library faults retain unsaved edits and recover without writing', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const library = await (await page.request.get('/api/recipes')).json();
+  let reply = { json: { revisions: null } }, writes = 0;
+  await page.route('**/api/recipes', route => {
+    if (route.request().method() !== 'GET') { writes += 1; return route.continue(); }
+    return reply ? route.fulfill(reply) : route.continue();
+  });
+  await page.goto('/recipe-editor');
+  await expect(page.getByRole('alert')).toContainText('Invalid recipe library response');
+  reply = null;
+  await page.getByRole('button', { name: 'Retry recipe library', exact: true }).click();
+  await page.getByLabel('Recipe user', { exact: true }).fill('engineer');
+  await page.getByLabel('Password', { exact: true }).fill('RecipeTestOnly-2026!');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await page.getByLabel('Recipe code', { exact: true }).fill('UNSAVED');
+  const title = page.getByLabel('Recipe title', { exact: true });
+  await title.fill('Unsaved library fixture');
+  reply = { json: { ...library, change_policy: { version: 1, policy: null } } };
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Showing the last readable library');
+  await expect(title).toHaveValue('Unsaved library fixture');
+  await expect(page.getByRole('button', { name: 'Create recipe', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Clear loaded copy', exact: true })).toBeDisabled();
+  await expect(page.locator('.recipe-session')).toContainText('Signed in: engineer');
+  reply = { status: 503, json: { detail: 'Synthetic library outage' } };
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Synthetic library outage');
+  reply = null;
+  await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(title).toHaveValue('Unsaved library fixture');
+  await expect(page.getByRole('button', { name: 'Create recipe', exact: true })).toBeEnabled();
+  expect(writes).toBe(0);
+  expect(errors).toEqual([]);
+});
+
 test('recipe-local session preserves sign-in when logout fails', async ({ page }) => {
   await page.goto('/recipe-editor');
   const session = page.locator('.recipe-session');

@@ -37,6 +37,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe transfer requests/queries | `test_recipe_transfer_contract.py`: actual browser helpers through SQL-backed routes with simulator-only staging; filter/status query separation, precise cursors, strict bounds/models, stale guards, receipts and JSON export | Transport factory is forbidden; domain/browser regressions cover completion and running-copy verification; no live controller acceptance or full response guard contract |
 | Recipe transfer responses | `test_recipe_transfer_responses.py`: real SQL/HTTP history/detail/verified responses through production record/page guards; all eight modeled command states, verified records outside the page, retired targets, nullable metadata and malformed paging | States are seeded offline; browser guards validate consumed fields, while server checks enforce hashes/integrity; no controller acceptance or strict response DTO filtering |
 | Transfer dispatch receipts | `test_recipe_transfer_receipts.py`: actual simulator-backed success/pending/uncertain HTTP outcomes through pure receipt correlation and error-formatting helpers; malformed identities and no confirmation/replay | A validated receipt confirms request dispatch, not PLC completion; server/domain checks retain hash and running-copy authority; optional legacy receipt headers remain supported |
+| Recipe library responses | `test_recipe_library_contract.py`: SQL/HTTP lifecycle snapshots through the production guard; all six revision states, typed values, policy/gates, audit differences, legacy optional fields and unavailable permits | Guard covers workspace-consumed fields, not full write-schema validation or hash integrity; selection/live-copy status and recipe session replies are separate boundaries |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -250,10 +251,21 @@ a real reply and confirms one request, no false acknowledgement, retained histor
 and subsequent valid receipt handling. Completion still requires PLC acknowledgement
 and running-copy verification.
 
+Recipe library validation and its read helper now share `recipe-library.mjs`.
+The guard checks consumed revision/parameter/policy/gate/audit fields, safe
+ordered identities and typed values. Optional historical attribution, description,
+image and unit fields remain compatible. Independently selected-copy metadata and
+raw permit samples are not used by this view guard; a bad permit disables its
+gate without invalidating an otherwise readable library. SQL/HTTP tests cover
+all six revision states, typed limits, audit differences and malformed shapes.
+Failed refreshes retain readable library and unsaved content, block writes and
+keep a manual recovery path. Initial failure offers retry. Browser regressions
+confirm retained identity/draft fields, no recipe writes and valid-reply recovery.
+
 ## Next bounded work
 
-1. Review recipe library response fields and historical metadata, then introduce
-   focused view-level compatibility guards where needed.
+1. Validate recipe session response fields consumed by local/HMI delegation,
+   preserving legacy roles and failure/recovery behavior.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

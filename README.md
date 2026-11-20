@@ -640,6 +640,8 @@ Transfer response guards retain readable history on malformed replies, disable
 actions while unavailable, and clear inaccessible data on authentication denial.
 Dispatch receipts must match the requested target/revision and durable transaction;
 ambiguous replies show verification guidance and refresh status without replay.
+Recipe library validation retains readable history and unsaved edits on refresh
+failure, blocks writes until recovery, and offers retry after initial-load failure.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

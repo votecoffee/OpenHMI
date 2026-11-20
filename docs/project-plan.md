@@ -423,8 +423,16 @@ not close hardware or operator acceptance gates.
     HTTP success/pending/uncertain tests and a corrupted-reply browser regression
     preserve the distinction between dispatch and verified PLC completion.
 
+36. Delivered focused recipe library validation/read ownership. SQL/HTTP
+    contracts cover six revision states, typed parameters, policy/gates, audit
+    changes, legacy optional metadata and unavailable permits. Failed refreshes
+    retain readable state and unsaved edits while blocking writes; initial load
+    can be retried. Recovery preserves dirty content and restores actions. Browser
+    faults verify no write or page error. Live selected-copy and raw permit
+    metadata remain independent; hash/write rules stay server-owned.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe library response parity and historical metadata review next. Keep further module extraction tied
+Prioritize recipe session response validation and compatibility next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

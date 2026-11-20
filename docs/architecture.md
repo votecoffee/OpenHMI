@@ -518,7 +518,16 @@ HTTP outcomes prompt verification; errors trigger read-only status refresh and
 clear prior receipt links, without replaying dispatch. SQL/HTTP tests cover real
 simulator success, pending audit finalization and uncertain commit failure; browser
 faults prove a corrupted reply still results in one dispatch and a readable record.
-Recipe library response parity is next. Preserve model/import
+Recipe library reads now use `recipe-library.mjs`, validating consumed revision,
+parameter, policy, gate and audit fields before committing workspace state. Safe
+ordered identities and typed values are required; optional legacy attribution,
+image/description/unit fields remain compatible. The independently selected-copy
+field and raw permit samples are not newly constrained. Failed refreshes retain
+readable library/draft state and block writes; an initial failure offers retry.
+Successful refresh restores actions without discarding dirty content. SQL/HTTP
+contracts cover all six revision states and unavailable permits; browser faults
+cover nested malformed policy, HTTP failure, no writes and draft recovery. Recipe
+session response validation remains the next boundary. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
