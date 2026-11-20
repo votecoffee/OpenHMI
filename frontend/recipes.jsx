@@ -1,5 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api, json } from './api.mjs';
+import { RecipeSession } from './recipe-session.jsx';
+import { readRecipeSession } from './recipe-auth.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from './recipe-api.mjs';
 import { Live } from './live-quality.jsx';
 import { useLocalization } from './localization.jsx';
@@ -37,30 +39,6 @@ function ParameterValues({ content }) {
   return <table className="recipe-values"><thead><tr><th>{ui('recipeParameter')}</th><th>{ui('recipeValue')}</th><th>{ui('recipeUnits')}</th></tr></thead>
     <tbody>{content.parameters.map(parameter => <tr key={parameter.name}><td>{parameter.label}</td>
       <td>{typeof parameter.value === 'boolean' ? ui(parameter.value ? 'on' : 'off') : String(parameter.value)}</td><td>{parameter.unit}</td></tr>)}</tbody></table>;
-}
-
-function RecipeSession({ session, onChange }) {
-  const [name, setName] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function signIn(event) {
-    event.preventDefault(); setBusy(true); setError('');
-    try {
-      const result = await api('/api/recipe-auth/login', json('POST', { name, password }));
-      setPassword(''); onChange({ ...session, user: result.user });
-    } catch (problem) { setError(problem.message); }
-    finally { setBusy(false); }
-  }
-  return <div className="recipe-session">
-    {session.user ? <><span>Signed in: <strong>{session.user.name}</strong> ({session.user.roles.join(', ')})</span>
-      <button onClick={async () => { try { await api('/api/recipe-auth/logout', json('POST', {})); onChange({ ...session, user: null }); } catch (problem) { setError(problem.message); } }}>Sign out</button></>
-      : session.configured ? <form onSubmit={signIn}><label>Recipe user<input autoComplete="username" value={name} onChange={event => setName(event.target.value)} /></label>
-        <label>Password<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} /></label>
-        <button disabled={busy}>Sign in</button></form>
-      : <p>Recipe accounts are not configured. An administrator can create them with openhmi-users and restart OpenHMI.</p>}
-    {error && <p role="alert">{error}</p>}
-  </div>;
 }
 
 function ParameterEditor({ content, update, disabled }) {
@@ -107,7 +85,7 @@ export function RecipeWorkspace({ edit, catalog }) {
     setSource(revision); setContent(revision ? clone(revision.content) : blank()); setCode(revision?.code || ''); setReason(''); setDirty(false);
   }
   async function refresh(initial = false) {
-    const [next, identity] = await Promise.all([api('/api/recipes'), api('/api/recipe-auth/session')]);
+    const [next, identity] = await Promise.all([api('/api/recipes'), readRecipeSession()]);
     setState(next); setSession(identity);
     if (initial) { choose(next.revisions[0] || null); setPolicy(next.change_policy.policy); }
     return next;

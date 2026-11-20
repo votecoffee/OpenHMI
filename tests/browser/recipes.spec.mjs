@@ -1,6 +1,45 @@
 import { test, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 
+test('recipe-local session preserves sign-in when logout fails', async ({ page }) => {
+  await page.goto('/recipe-editor');
+  const session = page.locator('.recipe-session');
+  await session.getByLabel('Recipe user', { exact: true }).fill('engineer');
+  await session.getByLabel('Password', { exact: true }).fill('Incorrect fixture password');
+  await session.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(session.getByRole('alert')).toContainText('Invalid recipe credentials');
+  await session.getByLabel('Password', { exact: true }).fill('RecipeTestOnly-2026!');
+  await session.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(session).toContainText('Signed in: engineer');
+  await expect(session.getByRole('alert')).toHaveCount(0);
+  const endpoint = '**/api/recipe-auth/logout';
+  await page.route(endpoint, route => route.fulfill({ status: 503, json: { detail: 'Synthetic logout outage' } }));
+  await session.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(session.getByRole('alert')).toContainText('Synthetic logout outage');
+  await expect(session).toContainText('Signed in: engineer');
+  await page.unroute(endpoint);
+  await session.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(session.getByLabel('Password', { exact: true })).toHaveValue('');
+  expect((await (await page.request.get('/api/recipe-auth/session')).json()).user).toBeNull();
+});
+
+test('recipe workspace delegates sign-in and permissions to HMI security', async ({ page }) => {
+  await page.goto('http://127.0.0.1:8766/recipe-editor');
+  const create = page.getByRole('button', { name: 'Create recipe', exact: true });
+  await expect(page.getByText('Recipe permissions use the signed-in HMI account.', { exact: true })).toBeVisible();
+  await expect(page.locator('.recipe-session')).toHaveCount(0);
+  await expect(create).toBeDisabled();
+  await page.getByRole('button', { name: 'Open HMI login', exact: true }).first().click();
+  await page.getByLabel('HMI user', { exact: true }).fill('admin');
+  await page.getByLabel('HMI password', { exact: true }).fill('SecurityTestOnly-2026!');
+  await page.getByRole('button', { name: 'Sign in to HMI', exact: true }).click();
+  await expect(create).toBeEnabled();
+  await expect(page.locator('.recipe-session')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sign out of HMI', exact: true }).click();
+  await expect(create).toBeDisabled();
+  await expect(page.locator('.recipe-session')).toHaveCount(0);
+});
+
 test('recipe policy reports stale updates and recovers after refresh', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/recipe-editor');

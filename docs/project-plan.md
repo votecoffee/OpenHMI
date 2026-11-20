@@ -389,8 +389,16 @@ not close hardware or operator acceptance gates.
     and refresh recovery. Workspace state/input/feedback ownership and existing
     audit semantics remain intact; fixture permit reads are synthetic.
 
+32. Delivered a focused recipe-local session component and authentication
+    request helpers. Real auth/SQL security contracts cover strict requests,
+    cookie rotation/expiry/sign-out, origin rejection, HMI-account delegation and
+    live group permission changes. Browser tests cover bad credentials, logout
+    failure/recovery and HMI permission delegation. Form state, password clearing,
+    callbacks and workspace refresh ownership remain intact. Windows/domain
+    acceptance and stricter session response filtering remain separate.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe authentication/session UI and request contracts next. Keep further module extraction tied
+Prioritize recipe transfer query/dispatch helpers and contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

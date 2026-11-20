@@ -483,7 +483,16 @@ conflicts, defaults, Boolean permit checks, role/gate denials and normalized
 PNG/JPEG retrieval. HTTP size/type/reason failures retain their existing status
 codes. The workspace keeps input reset, image attachment, dirty state and policy
 refresh sequencing; browser tests cover stale policy feedback and refresh recovery.
-Recipe authentication/session extraction is next. Preserve model/import
+The recipe-local session component now lives in `recipe-session.jsx`, with
+read/login/logout helpers in `recipe-auth.mjs`. Form state, error feedback,
+password clearing and callback timing remain unchanged; the workspace owns
+HMI-session delegation and concurrent recipe/session refresh. Real local auth
+and SQL-backed HMI security contracts cover cookie rotation/expiry/sign-out,
+strict request models, origin rejection and live group permission changes.
+Configured HMI security ignores legacy recipe cookies. Browser regressions cover
+failed logout retention, recovery and HMI sign-in/out permission delegation.
+No new session-response filtering or authentication policy is introduced. Recipe
+transfer query/dispatch helpers and contracts are next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

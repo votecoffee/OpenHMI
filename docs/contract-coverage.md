@@ -33,6 +33,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Shelving-list queries/responses | `test_alarm_shelf_contract.py`: actual browser URLs and DOM-free guard through SQL-backed routes; ordered pages, encoded cursors, strict bounds, row compatibility and restoration of a 100-character alarm ID | Guard covers consumed fields; no strict response DTO filtering or PLC acceptance; browser regression covers retained-data recovery |
 | Recipe write requests | `test_recipe_mutation_contract.py`: production create/revise/transition/select helpers and content normalization through strict models and SQL-backed lifecycle routes; same-user approval, stale conflicts, loaded-copy independence, denials and HTTP error propagation | Identity and publication hooks are stubbed; browser/domain tests cover local authentication and workflow; synthetic receipt headers do not add journal semantics to recipe routes |
 | Recipe policy/image uploads | `test_recipe_settings_contract.py`: actual policy PUT and raw File POST through strict models and SQL-backed routes; version conflicts, Boolean permit fixtures, reason encoding, binary fidelity, PNG/JPEG normalization, denials and upload bounds | Identity hooks and permit values are mocked; HTTP streaming size limit is tested using generated URL/headers with a bounded synthetic payload; no PLC acceptance |
+| Recipe authentication/session requests | `test_recipe_session_contract.py`: production read/login/logout helpers through real RecipeAuth and SQL-backed HMI Security; strict models, cookie rotation/expiry, origin rejection, account delegation and group permission changes | Windows identity provider is mocked; browser tests cover local form/logout errors and HMI UI delegation; no new session-response guard or OS/domain acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -200,10 +201,20 @@ receipt/error propagation does not change recipe-audit behavior. Identity and
 permit reads are stubbed; no live acquisition occurs. Browser tests cover stale
 policy feedback, refresh recovery and the existing image-backed recipe workflow.
 
+Recipe authentication helpers and the local session component now have focused
+modules. Real authentication/security contracts preserve read/login/logout paths,
+exact credential strings, strict Login/Empty models, cookie rotation/expiry and
+origin checks. Once HMI security is configured, recipe-local cookies cannot grant
+access; current HMI group permissions determine recipe roles. Contract fixtures
+exercise local security with a mocked Windows adapter and no driver acquisition.
+Browser checks cover bad credentials, retained identity on failed logout, cleared
+password after successful sign-out, and HMI sign-in/out delegation. Component
+state/callback ordering and existing server response behavior are unchanged.
+
 ## Next bounded work
 
-1. Separate recipe authentication/session UI and requests with model/permission
-   contracts, preserving HMI-account delegation and legacy recipe-local behavior.
+1. Extract recipe transfer query/dispatch helpers and contract tests, preserving
+   revision guards, permissions, receipts and non-replay behavior.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
