@@ -516,13 +516,24 @@ not close hardware or operator acceptance gates.
     checks preserve ordering, startup errors and pre-worker identity behavior.
     Public models, routes and complete OpenAPI remain unchanged.
 
+47. Delivered workspace handoff failure and cancellation handling. Candidate
+    startup failures return sanitized 503 guidance and keep the current runtime.
+    Cancellation before commit drains the candidate; cancellation after commit
+    drains the old runtime and retains ownership of the new one. Post-switch
+    retirement errors explicitly report that the new project is already open,
+    without rollback/replay. The request lock remains held through cleanup;
+    original project headers and stale-write guards are preserved. Workspace
+    lifespan finally closes its current runtime after cancellation or failed
+    startup notification. Synthetic SQL/event tests cover competing reads and
+    store closure with held PLC routes. Complete OpenAPI is unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review project-switch
-cancellation and candidate startup failure recovery, retaining ownership of the
-current runtime and avoiding writes/replay. Preserve scan/resource draining and
-transport ownership. Prioritize observable failure behavior and contract coverage
-over further file splitting. Controller, operator-station and endurance acceptance
-stay deferred.
+Recipe HTTP separation is complete for this scope. Next protect background
+workspace create/import/export operations from request cancellation releasing
+ownership before their synchronous work finishes. Preserve scan/resource draining
+and transport ownership. Prioritize observable failure behavior and contract
+coverage over further file splitting. Controller, operator-station and endurance
+acceptance stay deferred.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

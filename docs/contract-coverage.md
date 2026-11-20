@@ -41,6 +41,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
 | Recipe component import compatibility | `test_frontend_contract.py`: legacy picture/loaded/selected exports and direct readout palette binding retain focused-module function identity; recipe browser workflow checks all four parameter types, preview/images and loaded values | Component bodies and saved schemas are unchanged; existing project/palette contracts cover persistence; no controller acceptance implied |
 | Recipe authentication registrar | `test_recipe_auth_routes.py`: standalone HTTPS cookie/origin/rate-limit/shared-authorizer behavior, HMI delegation, idempotent HMI logout, stable model/OpenAPI ownership and fresh-process import isolation | Auth/recipe/transfer service construction remains in the combined registrar; Windows identity is mocked and no OS/domain acceptance is claimed |
+| Workspace runtime handoff | `test_workspace_switch.py`: candidate construction/startup failure, cancellation before/after ownership switch, blocked competing reads, stale-write rejection, post-switch error guidance without replay, lifespan cancellation/startup notification failure and store closure | Synthetic local databases, held connections and forbidden PLC factories; generic create/import/export thread cancellation is separate; OpenAPI is unchanged |
 | Worker startup and cancellation | `test_worker_startup.py`: failed first/later task creation, unscheduled coroutine disposal, original failure retention, real app cleanup after startup failure, repeated cancellation during callbacks/executor/resource cleanup and initial sampling, unexpected task failure collection | Bounded event-controlled callbacks and in-memory SQL; no network/PLC access, forced process termination or indefinitely blocked vendor call acceptance; OpenAPI is unchanged |
 | PLC shutdown isolation | `test_transport_shutdown.py`: first/last client-close failures, route-wrapper exceptions, per-route logging, independent close attempts, state cleanup, repeated close, bounded active-read draining, no late samples/replacement scans and explicit reopen | Fake PLCs only with no writes; a vendor close exception cannot prove its physical socket was released; no automatic reconnect or close retry |
 | Runtime lifecycle ownership | `test_runtime_lifecycle.py`, `test_runtime_workers.py`: partial assembly across driver/configuration/services/routes/assets, real handler failure, initial sample and worker entry/exit failures, original-error preservation, cleanup isolation/order and no pre-worker identity publication | In-memory SQLite and default simulator with forbidden PLC factory; worker scheduling/transport remain separate; complete OpenAPI is unchanged |
@@ -312,8 +313,8 @@ SQL/domain and browser tests retain actual normalization, images and approvals.
 
 ## Next bounded work
 
-1. Review project-switch cancellation and candidate startup failure recovery,
-   preserving ownership of the current runtime and avoiding writes/replay.
+1. Protect background workspace create/import/export operations from request
+   cancellation releasing ownership while their synchronous work is still running.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

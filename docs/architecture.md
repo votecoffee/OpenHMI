@@ -626,6 +626,19 @@ event-loop progress, no post-close access and no pre-worker identity publication
 Public models, HTTP routes and complete OpenAPI remain unchanged. Forced process
 termination and indefinitely blocked vendor operations remain outside these
 bounded offline checks; no timeout closes resources underneath active work.
+Workspace project handoff distinguishes failures before and after ownership changes.
+Candidate construction/startup failure is logged and returns a sanitized 503 saying
+the current project remains open. Candidate cancellation completes its lifecycle
+cleanup before the workspace request lock releases. After a successful start,
+ownership switches atomically before previous-runtime retirement; retirement is
+shielded through repeated cancellation. An ordinary retirement exception returns
+a 503 explicitly saying the requested project is already open, with reload/review
+guidance, rather than attempting rollback or replaying the open. Project headers
+retain the request's original identity. Workspace lifespan uses finally cleanup;
+shutdown serializes with switching and closes the runtime currently owned, even
+if startup notification or lifespan receive fails. Bounded in-memory/synthetic SQL
+tests cover both sides of handoff, competing reads, stale-write rejection, held
+PLC routes and closure of both old/candidate stores. Complete OpenAPI is unchanged.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

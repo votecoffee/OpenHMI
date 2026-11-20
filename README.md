@@ -658,6 +658,11 @@ Partial worker startup drains every task already created. Repeated cancellation
 waits for active callbacks, executor shutdown, initial alarm sampling and resource
 cleanup before propagating cancellation; it does not abandon work using the
 project database or PLC driver.
+Project switching keeps the current runtime until the candidate starts. Startup
+failures return a readable 503; cancellation drains candidate/previous cleanup
+before releasing the workspace lock. Post-switch shutdown errors identify that
+the new project is already open and require reload/review before further changes.
+Workspace lifespan cancellation also closes its owned runtime.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

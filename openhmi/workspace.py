@@ -5,6 +5,7 @@ from contextlib import closing
 import hashlib
 from io import BytesIO
 import json
+import logging
 from pathlib import Path
 import re
 import sqlite3
@@ -14,6 +15,7 @@ import zipfile
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from .http_context import require_project_instance, set_response_context
+from .async_cleanup import finish_cleanup
 from .project_models import Project, default_project
 from .projects import ProjectStore
 
@@ -182,13 +184,28 @@ class ProjectWorkspace:
             raise HTTPException(422, 'Invalid project location')
         if target == self.path:
             return
-        candidate = self._app(target)  # custom Python is never automatically loaded on project open/import
-        context = candidate.router.lifespan_context(candidate)
-        await context.__aenter__()
+        try:
+            candidate = self._app(target)  # custom Python is never automatically loaded on project open/import
+            context = candidate.router.lifespan_context(candidate)
+            await context.__aenter__()
+        except Exception as error:
+            logging.exception('Project candidate startup failed')
+            raise HTTPException(503, 'The requested project could not start. The current project remains open; review server logs before trying again.') from error
         previous = self.context
         self.context, self.current, self.path, self.handlers = context, candidate, target, None
         if previous:
-            await previous.__aexit__(None, None, None)
+            try:
+                await finish_cleanup(previous.__aexit__(None, None, None))
+            except Exception as error:
+                logging.exception('Previous project shutdown failed after switching')
+                raise HTTPException(503, 'The requested project is now open, but the previous runtime shutdown failed. Reload and review server logs before further changes.') from error
+
+    async def _shutdown(self):
+        # Serialize with switching, then retire whichever runtime the workspace owns.
+        async with self.lock:
+            context, self.context = self.context, None
+            if context:
+                await finish_cleanup(context.__aexit__(None, None, None))
 
     async def handle(self, request):
         security = self.current.state.security
@@ -229,11 +246,14 @@ class ProjectWorkspace:
     async def __call__(self, scope, receive, send):
         if scope['type'] == 'lifespan':
             message = await receive()
-            self.context = self.current.router.lifespan_context(self.current)
-            await self.context.__aenter__()
-            await send({'type': 'lifespan.startup.complete'})
-            await receive()
-            await self.context.__aexit__(None, None, None)
+            context = self.current.router.lifespan_context(self.current)
+            await context.__aenter__()
+            self.context = context
+            try:
+                await send({'type': 'lifespan.startup.complete'})
+                await receive()
+            finally:
+                await finish_cleanup(self._shutdown())
             await send({'type': 'lifespan.shutdown.complete'})
             return
         if scope['type'] != 'http':
