@@ -41,6 +41,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe session responses | `test_recipe_session_responses.py`: actual local/HMI auth/session replies through production guards; expiry/logout, mock-Windows mappings, empty roles, legacy metadata, malformed names/roles/confirmations and input preservation | Guards cover consumed fields and identity confirmation; role authority remains on the server; no OS/domain acceptance or automatic replay |
 | Recipe component import compatibility | `test_frontend_contract.py`: legacy picture/loaded/selected exports and direct readout palette binding retain focused-module function identity; recipe browser workflow checks all four parameter types, preview/images and loaded values | Component bodies and saved schemas are unchanged; existing project/palette contracts cover persistence; no controller acceptance implied |
 | Recipe authentication registrar | `test_recipe_auth_routes.py`: standalone HTTPS cookie/origin/rate-limit/shared-authorizer behavior, HMI delegation, idempotent HMI logout, stable model/OpenAPI ownership and fresh-process import isolation | Auth/recipe/transfer service construction remains in the combined registrar; Windows identity is mocked and no OS/domain acceptance is claimed |
+| Recipe image registrar | `test_recipe_image_routes.py`: standalone read/upload HTTP adapter, public headers, byte/reason/identity forwarding, role/MIME/query guards, exact/overflow bounds and early stream termination; focused import isolation | Service normalization/storage/policy/audit ownership is unchanged; existing SQL/browser tests exercise actual PNG/JPEG handling; complete OpenAPI output is preserved |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -294,10 +295,19 @@ Fresh-process imports do not pull in recipe/transfer services or the server;
 application service ownership remains unchanged. Existing model, session, recipe
 and transfer regressions exercise the delegated authorization path.
 
+Recipe image HTTP registration now has a focused module with the same service,
+authorizer and error translator supplied by the combined registrar. Moved handler
+bodies and complete OpenAPI output are unchanged. New adapter tests preserve
+public read headers, raw byte/reason/identity forwarding, pre-dispatch role/MIME/
+query rejection and exact 5 MiB acceptance versus overflow. A streamed overflow
+reads only the first two chunks and never calls the service or consumes later
+chunks. Focused import tests exclude Pillow and recipe/server services. Existing
+SQL/domain and browser tests retain actual normalization, images and approvals.
+
 ## Next bounded work
 
-1. Separate recipe image read/upload HTTP routes, preserving byte limits, MIME
-   checks, permissions, normalization and response headers.
+1. Separate recipe transfer history/detail/dispatch HTTP routes, retaining
+   authorization, query bounds, exports and journal dispatch ordering.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

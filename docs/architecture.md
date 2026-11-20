@@ -551,7 +551,15 @@ recipe and HMI Login models are present. A before/after comparison verified the
 complete OpenAPI document unchanged. Standalone HTTPS tests cover cookies, origin/
 rate-limit guards, HMI delegation and logout behavior without recipe/driver setup.
 Focused-module imports do not load recipe services or the application server.
-Recipe image HTTP route separation is next. Preserve model/import
+Recipe image read/upload handlers now live in `recipe_image_routes.py`. The
+combined registrar supplies its existing service, user authorizer and domain-error
+translator; normalization, storage, policy and audit ownership remain in the
+service. Handler bodies and complete OpenAPI output are unchanged. Standalone
+HTTP tests verify public cache/security headers, byte/reason/identity forwarding,
+role/MIME/model guards and exact/overflow upload limits. A chunked-request test
+confirms overflow stops consumption before later chunks or service dispatch.
+Focused imports do not load Pillow, recipe services or the server. Transfer HTTP
+route separation is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

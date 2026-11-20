@@ -454,8 +454,15 @@ not close hardware or operator acceptance gates.
     delegation, logout semantics and focused import isolation are verified.
     Recipe/domain/driver responsibilities and existing permissions remain intact.
 
+40. Delivered a focused recipe image HTTP registrar. The combined registrar
+    retains its service, authorizer and error translator; normalization/storage/
+    policy/audit behavior remains unchanged. Handler and complete OpenAPI parity,
+    standalone header/byte/reason/identity checks, role/MIME/query guards, exact
+    upload limits and early stream termination are verified. Focused imports do
+    not load Pillow, recipe services or the server.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe image HTTP router separation next. Keep further module extraction tied
+Prioritize recipe transfer HTTP router separation next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
