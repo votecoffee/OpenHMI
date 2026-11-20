@@ -663,6 +663,10 @@ failures return a readable 503; cancellation drains candidate/previous cleanup
 before releasing the workspace lock. Post-switch shutdown errors identify that
 the new project is already open and require reload/review before further changes.
 Workspace lifespan cancellation also closes its owned runtime.
+Background project create/import/export operations retain the workspace lock
+through cancellation until their thread finishes. Completed files are not undone
+or automatically retried; review the project library after an interrupted request.
+Failures while cancellation is pending are logged without hiding cancellation.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

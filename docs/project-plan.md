@@ -527,10 +527,20 @@ not close hardware or operator acceptance gates.
     startup notification. Synthetic SQL/event tests cover competing reads and
     store closure with held PLC routes. Complete OpenAPI is unchanged.
 
+48. Delivered workspace background-job cancellation safety. Create/import/export
+    threads finish before a cancelled request releases the workspace lock; queued
+    switches and shutdown cannot close their source runtime early. Repeated
+    cancellation is propagated after completion. Job failures during cancellation
+    are logged without hiding cancellation; ordinary HTTP errors retain their
+    status/detail and project identity. Incomplete upload cancellation never
+    starts import. SQL/ZIP/event tests verify completed files, imported hold,
+    export source consistency, store-close ordering and no replay. Completed
+    files are not rolled back by cancellation. Complete OpenAPI is unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next protect background
-workspace create/import/export operations from request cancellation releasing
-ownership before their synchronous work finishes. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review atomic create/import
+publication and partial filesystem failure recovery, preserving existing files,
+completed records and imported connection holds. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

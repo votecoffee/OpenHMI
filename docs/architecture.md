@@ -639,6 +639,18 @@ shutdown serializes with switching and closes the runtime currently owned, even
 if startup notification or lifespan receive fails. Bounded in-memory/synthetic SQL
 tests cover both sides of handoff, competing reads, stale-write rejection, held
 PLC routes and closure of both old/candidate stores. Complete OpenAPI is unchanged.
+Workspace create/import/export threads now use the same owned-work completion
+boundary. Repeated request cancellation cannot release the workspace lock while
+one of these threads is still accessing its source runtime or publishing files;
+queued project switches and shutdown wait for completion. A job failure after
+cancellation is logged, with cancellation still propagated. Ordinary HTTP failures
+retain their existing status/detail and project headers. Cancellation during an
+incomplete upload still releases the lock without starting import. Event-gated
+SQL/ZIP tests verify completed create/import files, imported connection hold,
+export source identity, no replay, store-close ordering and error handling. This
+change does not roll back completed operations or change file publication rules;
+partial filesystem failure recovery is the next separate boundary. Complete
+OpenAPI remains unchanged.
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

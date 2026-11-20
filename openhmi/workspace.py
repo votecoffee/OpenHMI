@@ -218,7 +218,7 @@ class ProjectWorkspace:
         if request.method == 'GET' and path == '/api/workspace':
             return JSONResponse(self.listing())
         if request.method == 'GET' and path == '/api/workspace/backup':
-            data = await asyncio.to_thread(self.export)
+            data = await finish_cleanup(asyncio.to_thread(self.export))
             return Response(data, media_type='application/zip', headers={'Content-Disposition': 'attachment; filename="project.openhmi.zip"'})
         if request.method == 'POST' and path == '/api/workspace/import':
             data = bytearray()
@@ -226,7 +226,7 @@ class ProjectWorkspace:
                 data.extend(chunk)
                 if len(data) > MAX_BACKUP:
                     raise HTTPException(413, 'Backup upload exceeds 256 MiB')
-            return JSONResponse(await asyncio.to_thread(self.import_backup, request.query_params.get('name', ''), bytes(data)))
+            return JSONResponse(await finish_cleanup(asyncio.to_thread(self.import_backup, request.query_params.get('name', ''), bytes(data))))
         if request.method == 'POST' and path in ('/api/workspace/create', '/api/workspace/open'):
             raw = await request.body()
             if len(raw) > 4096:
@@ -238,7 +238,7 @@ class ProjectWorkspace:
             if not isinstance(body, dict):
                 raise HTTPException(422, 'Invalid request')
             if path.endswith('/create'):
-                return JSONResponse(await asyncio.to_thread(self.create, body.get('name', ''), body.get('title', '')))
+                return JSONResponse(await finish_cleanup(asyncio.to_thread(self.create, body.get('name', ''), body.get('title', ''))))
             await self.open(body.get('file', ''))
             return JSONResponse({'ok': True, 'current': self.path.name})
         raise HTTPException(404, 'Workspace operation not found')
