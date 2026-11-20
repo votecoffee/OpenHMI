@@ -569,10 +569,21 @@ not close hardware or operator acceptance gates.
     backup until confirmation. SQL/HTTP/JS and browser faults cover these paths;
     existing wire fields and FastAPI OpenAPI remain unchanged.
 
+52. Delivered complete-backup download contracts and failure feedback. A focused
+    binary helper shares pinned project identity, bounds response reads and checks
+    headers/ZIP structure before starting a save. Stale supplied identities are
+    rejected before export; permission/export errors are private and sanitized.
+    Final ZIP bytes also respect the size limit. Drafts survive failures, denial
+    clears protected data, and recovery requires explicit action with no replay.
+    SQL/HTTP/JS tests verify real manifests/bytes and bad-response/overflow paths;
+    headless browser faults verify no save on failure and exact bytes on recovery.
+    Browser checks do not replace full import checksum/SQL validation or confirm
+    that a prepared download was saved. FastAPI OpenAPI remains unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review complete-backup
-download HTTP contracts and permission/failure feedback, preserving private binary
-archives and avoiding automatic operation replay. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review backup transfer
+lock ownership so a slow client cannot block unrelated HMI requests after the
+independent archive has been prepared. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

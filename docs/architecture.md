@@ -701,6 +701,21 @@ confirmed messages remain after listing refresh. Import is now an explicit butto
 action and retains its selected File until confirmation. Real SQL/HTTP contracts
 feed production JS guards and serializers; browser cases cover listing/receipt
 faults, denial/recovery, retained fields/backups and absence of replay/redirect.
+`workspace-backup.mjs` owns binary download validation and save initiation,
+using `projectRequestHeaders()` from the shared API client without changing its
+initial project-instance pinning. A backup GET with a stale supplied identity is
+rejected before export. Success and handled errors carry no-store/nosniff headers;
+export exceptions become sanitized 503 guidance. Both raw archive content and
+final ZIP bytes respect the 256 MiB limit. The browser validates status, MIME,
+attachment filename, pinned identity, optional length and bounded ZIP directory/
+local-header structure before creating a download. It does not decompress payloads
+or verify checksums/SQL; import retains that responsibility. Requests are never
+retried automatically. The project panel preserves drafts, clears denied data and
+requires review after stale identity; success says prepared, not saved. Real SQL/
+HTTP replies pass through the production JS helper; browser failures never start
+a save, and explicit recovery preserves exact archive bytes. FastAPI OpenAPI is
+unchanged. Transfer-lock ownership remains a separate follow-up.
+
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request

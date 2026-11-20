@@ -88,7 +88,10 @@ class ProjectWorkspace:
                 archive.writestr('manifest.json', json.dumps(manifest, indent=2))
                 for name, data in files.items():
                     archive.writestr(name, data)
-            return output.getvalue()
+            data = output.getvalue()
+            if len(data) > MAX_BACKUP:
+                raise HTTPException(413, 'Project exceeds the 256 MiB browser backup limit')
+            return data
 
     def import_backup(self, name, data):
         target = self.target(name)
@@ -241,7 +244,16 @@ class ProjectWorkspace:
         if request.method == 'GET' and path == '/api/workspace':
             return JSONResponse(self.listing())
         if request.method == 'GET' and path == '/api/workspace/backup':
-            data = await finish_cleanup(asyncio.to_thread(self.export))
+            expected = request.headers.get('x-openhmi-project')
+            if expected and expected != self.current.state.project_instance:
+                raise HTTPException(409, 'A different project was opened. Reload before exporting a backup.')
+            try:
+                data = await finish_cleanup(asyncio.to_thread(self.export))
+            except HTTPException:
+                raise
+            except Exception as error:
+                logging.exception('Complete backup export failed')
+                raise HTTPException(503, 'Complete backup could not be exported. Review server logs and retry explicitly.') from error
             return Response(data, media_type='application/zip', headers={'Content-Disposition': 'attachment; filename="project.openhmi.zip"'})
         if request.method == 'POST' and path == '/api/workspace/import':
             data = bytearray()
@@ -296,6 +308,9 @@ class ProjectWorkspace:
                     response = await self.handle(request)
                 except HTTPException as error:
                     response = JSONResponse({'detail': error.detail}, status_code=error.status_code)
+                if scope['path'] == '/api/workspace/backup':
+                    response.headers['Cache-Control'] = 'no-store'
+                    response.headers['X-Content-Type-Options'] = 'nosniff'
                 set_response_context(request, response, identifier)
                 await response(scope, receive, send)
             else:

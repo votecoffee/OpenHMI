@@ -1,6 +1,10 @@
 let projectInstance = null;
+export function projectRequestHeaders() {
+  return projectInstance ? { 'X-OpenHMI-Project': projectInstance } : {};
+}
+
 export async function api(path, options = {}) {
-  const headers = { ...options.headers, ...(projectInstance ? { 'X-OpenHMI-Project': projectInstance } : {}) };
+  const headers = { ...options.headers, ...projectRequestHeaders() };
   const response = await fetch(path, { signal: AbortSignal.timeout(5000), ...options, headers });
   if (!response.ok) {
     const { detail } = (await response.json().catch(() => null)) ?? {};

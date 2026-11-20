@@ -315,10 +315,20 @@ reads only the first two chunks and never calls the service or consumes later
 chunks. Focused import tests exclude Pillow and recipe/server services. Existing
 SQL/domain and browser tests retain actual normalization, images and approvals.
 
+Complete-backup contracts now exercise real SQL exports through the HTTP boundary
+and production JavaScript binary helper. Tests compare bytes, ZIP integrity and
+manifest checksums for successful exports; reject malformed headers, truncated or
+unsupported ZIP structures, length/stream overflow, stale identity and permissions;
+and preserve sanitized export failures. The browser helper validates bounded ZIP
+structure only; full checksum/database checks remain with import. Headless browser
+faults verify no download or replay on bad replies/denial, retained drafts and an
+explicit successful retry with byte-for-byte saved output. All handled backup
+responses are private/no-store, and final ZIP overhead is included in the size limit.
+
 ## Next bounded work
 
-1. Review complete-backup download HTTP contracts and permission/failure feedback,
-   preserving private binary archives and avoiding automatic operation replay.
+1. Review backup transfer lock ownership so a slow client cannot block unrelated
+   HMI requests after the independent archive has been prepared.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

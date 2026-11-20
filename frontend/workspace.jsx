@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { readWorkspaceLibrary, createWorkspaceProject, openWorkspaceProject, importWorkspaceProject } from './workspace-api.mjs';
 import { WorkspaceArtifacts } from './workspace-artifacts.jsx';
+import { fetchWorkspaceBackup, saveWorkspaceBackup } from './workspace-backup.mjs';
 
 export function WorkspacePage() {
   const [state, setState] = useState(null);
@@ -43,7 +44,7 @@ export function WorkspacePage() {
     {state && <><p>Current project: <strong>{state.current}</strong></p>
       <table><thead><tr><th>Project</th><th /></tr></thead><tbody>{state.projects.map(project => <tr key={project.file}><td>{project.file}{project.current ? ' (open)' : ''}</td><td><button disabled={locked || project.current} onClick={() => run(async () => { await openWorkspaceProject(project.file); location.href = '/'; })}>Open {project.file}</button></td></tr>)}</tbody></table>
       <fieldset disabled={locked}><legend>Create project</legend><label>New project ID<input value={name} onChange={event => setName(event.target.value)} /></label><label>New project title<input value={title} onChange={event => setTitle(event.target.value)} /></label><button onClick={() => run(async () => { const result = await createWorkspaceProject(name, title); setName(''); setTitle(''); return `Created ${result.file}.`; })}>Create project</button><p>New projects inherit this project's HMI security configuration. Existing projects are preserved.</p></fieldset>
-      <fieldset disabled={locked}><legend>Complete backup</legend>{!locked ? <a href="/api/workspace/backup" download>Export complete backup</a> : <span>Export complete backup (refresh required)</span>}<p>Includes database content, recipe images, security/password hashes, alarms, history and the startup Python entry file when configured. Store backups as private project data.</p>
+      <fieldset disabled={locked}><legend>Complete backup</legend><button disabled={locked} onClick={() => run(async () => { const backup = await fetchWorkspaceBackup(); saveWorkspaceBackup(backup); return 'Complete backup prepared for download. Verify the saved archive before relying on it.'; })}>Export complete backup</button><p>Includes database content, recipe images, security/password hashes, alarms, history and the startup Python entry file when configured. Store backups as private project data.</p>
         <label>Imported project ID<input value={importName} onChange={event => setImportName(event.target.value)} /></label><label>OpenHMI backup ZIP<input ref={fileInput} type="file" accept=".zip" onChange={event => setBackupFile(event.target.files?.[0] ?? null)} /></label>
         {backupFile && <p>Selected backup: {backupFile.name}</p>}
         <button disabled={locked || !backupFile} onClick={() => run(async () => { const result = await importWorkspaceProject(importName, backupFile); setBackupFile(null); if (fileInput.current) fileInput.current.value = ''; return `Imported ${result.file}. PLC connections are held until Apply live.`; })}>Import complete backup</button>

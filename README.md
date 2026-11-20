@@ -361,6 +361,12 @@ selection alone does not upload it. The selected backup and form values remain
 available if the result is uncertain. New projects inherit the current HMI security configuration.
 Project administration and complete backups require security administration rights
 when security is configured.
+Click **Export complete backup** to prepare a download. Permission, stale-project,
+network and incomplete-response errors appear in the project panel without starting
+a save or retrying automatically. The browser checks response identity, size and
+ZIP structure; import performs full checksum and database validation. A prepared
+download does not confirm that the browser saved the file. Verify the saved archive
+before relying on it.
 
 Backups contain the database (screens, connections, tags, faceplates, recipes and
 images, security, alarm and tag history), plus the configured startup Python entry
@@ -684,6 +690,11 @@ before display, field reset or navigation. Unavailable listings and uncertain
 operation results require a successful manual refresh before further operations;
 requests are never automatically replayed. Confirmed success messages survive
 listing refresh, and denied library data is cleared.
+Complete-backup downloads use a focused binary helper with the shared pinned
+project header, bounded reads and archive structure checks. Success and handled
+failure replies are private/no-store; export failures give sanitized guidance.
+SQL/HTTP/JavaScript and headless browser checks cover denial, malformed replies,
+explicit recovery and byte-for-byte downloads without automatic replay.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

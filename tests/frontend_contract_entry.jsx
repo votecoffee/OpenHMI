@@ -1,3 +1,4 @@
+import { fetchWorkspaceBackup, isCompleteBackupZip, MAX_BACKUP_BYTES } from '../frontend/workspace-backup.mjs';
 import { isWorkspaceLibrary, isWorkspaceResult, createWorkspaceProject, openWorkspaceProject, importWorkspaceProject } from '../frontend/workspace-api.mjs';
 import { workspaceArtifactPath, isWorkspaceArtifactPage, readWorkspaceArtifacts } from '../frontend/workspace-api.mjs';
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
@@ -33,6 +34,32 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'workspace_backup') {
+    const valid = await Promise.all((request.zips ?? []).map(bytes => isCompleteBackupZip(new Blob([new Uint8Array(bytes)]))));
+    const calls = [], results = [];
+    let index = 0;
+    globalThis.fetch = async (path, options) => {
+      if (path === '/api/project') return new Response(JSON.stringify({ project_instance: request.projectInstance ?? 'a'.repeat(32) }));
+      calls.push({ path, method: options.method, headers: options.headers, cache: options.cache, timed: options.signal instanceof AbortSignal });
+      const reply = request.replies[index++];
+      if (!reply) throw new Error('Unexpected automatic backup request');
+      if (reply.networkError) throw new Error(reply.networkError);
+      const body = reply.data !== undefined ? JSON.stringify(reply.data) : new Uint8Array(reply.bytes ?? []);
+      if (reply.overflow) {
+        let count = 0;
+        return { ok: true, status: 200, headers: new Headers(reply.headers), body: {
+          getReader: () => ({ read: async () => ({ done: false, value: { byteLength: ++count === 1 ? MAX_BACKUP_BYTES : 1 } }),
+            cancel: async () => {}, releaseLock: () => {} }), cancel: async () => {} } };
+      }
+      return new Response(body, { status: reply.status ?? 200, headers: reply.headers });
+    };
+    if (request.replies?.length) await api('/api/project');
+    for (const reply of request.replies ?? []) {
+      try { const result = await fetchWorkspaceBackup(); results.push({ filename: result.filename, bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())) }); }
+      catch (error) { results.push({ error: error.message, status: error.status, requiresReview: error.requiresReview === true }); }
+    }
+    return { valid, maximum: MAX_BACKUP_BYTES, calls, results };
+  }
   if (request.operation === 'workspace_library') {
     return { libraries: (request.libraries ?? []).map(isWorkspaceLibrary),
       results: (request.results ?? []).map(item => isWorkspaceResult(item.data, item.kind, item.expected)) };
