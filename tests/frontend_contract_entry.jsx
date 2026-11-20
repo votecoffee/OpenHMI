@@ -2,7 +2,7 @@ import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage }
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe } from '../frontend/recipe-auth.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
-import { isRecipeTransferPage, isRecipeTransferRecord } from '../frontend/recipe-transfer-responses.mjs';
+import { isRecipeTransferPage, isRecipeTransferRecord, requireRecipeTransferReceipt, recipeTransferFailureMessage } from '../frontend/recipe-transfer-responses.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
@@ -27,6 +27,16 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recipe_transfer_receipts') {
+    const before = JSON.stringify(request);
+    const entries = request.entries.map(item => {
+      try { return { valid: true, same: requireRecipeTransferReceipt(item.data, item.expected) === item.data }; }
+      catch (error) { return { valid: false, message: recipeTransferFailureMessage(error), operation_id: error.operation_id }; }
+    });
+    const messages = request.errors.map(recipeTransferFailureMessage);
+    if (JSON.stringify(request) !== before) throw new Error('Receipt validation mutated input');
+    return { entries, messages };
+  }
   if (request.operation === 'recipe_transfer_responses') {
     const before = JSON.stringify(request);
     const result = { pages: request.pages.map(isRecipeTransferPage), records: request.records.map(isRecipeTransferRecord) };
@@ -176,7 +186,9 @@ export async function contract(request) {
           timeout: options.signal instanceof AbortSignal } : {}) });
       const mutation = ['alarm_mutations', 'recipe_mutations', 'recipe_sessions', 'recipe_transfers'].includes(request.operation) && path !== '/api/project';
       const status = mutation ? request.status ?? 200 : 200;
-      return new Response(JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) }), {
+      const body = mutation && request.malformedResponse ? (request.malformedResponse === 'null' ? 'null' : 'invalid JSON')
+        : JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) });
+      return new Response(body, {
         status, headers: { 'Content-Type': 'application/json', ...(mutation ? {
           'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });

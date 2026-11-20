@@ -30,3 +30,34 @@ export function isRecipeTransferPage(page) {
     && (page.has_history || page.items.length === 0) && typeof page.has_more === 'boolean'
     && (page.has_more ? page.items.length > 0 && page.next_before_id === page.items.at(-1).id : page.next_before_id === null);
 }
+
+const operationId = value => typeof value === 'string' && /^[a-f0-9]{32}$/.test(value);
+
+export function requireRecipeTransferReceipt(result, { profileId, revisionId, revisionVersion } = {}) {
+  const transaction = result?.transaction, transfer = result?.transfer;
+  if (result?.ok !== true || !positiveId(revisionId) || !positiveId(revisionVersion)
+    || typeof profileId !== 'string' || !profileId || !isCommandRecord(transaction) || !isRecipeTransferRecord(transfer)
+    || !operationId(transaction.operation_id) || transaction.state !== 'requested' || transfer.transaction.state !== transaction.state
+    || transaction.id !== transfer.id || transaction.sequence !== transfer.transaction.sequence
+    || !record(transfer.envelope) || transfer.envelope.sequence !== transaction.sequence
+    || transaction.command_id !== transfer.transaction.command_id || transaction.operation_id !== transfer.transaction.operation_id
+    || transfer.profile_id !== profileId || transfer.snapshot.id !== revisionId || transfer.snapshot.version !== revisionVersion
+    || (result.operation_id != null && result.operation_id !== transaction.operation_id)
+    || (result.audit_status != null && !['succeeded', 'pending'].includes(result.audit_status))) {
+    const error = new Error('Invalid recipe transfer receipt.');
+    error.receipt_invalid = true;
+    if (operationId(result?.operation_id)) error.operation_id = result.operation_id;
+    if (typeof result?.audit_status === 'string') error.audit_status = result.audit_status;
+    throw error;
+  }
+  return result;
+}
+
+export function recipeTransferFailureMessage(problem) {
+  let message = typeof problem?.message === 'string' && problem.message ? problem.message : 'Recipe transfer request failed.';
+  const uncertain = problem?.receipt_invalid || !Number.isInteger(problem?.status) || problem.status >= 500
+    || ['pending', 'uncertain'].includes(problem?.audit_status);
+  if (uncertain && !/verify.*before retrying/i.test(message)) message += ' Verify transfer history and PLC state before retrying.';
+  if (operationId(problem?.operation_id) && !message.includes(problem.operation_id)) message += ` Operation ${problem.operation_id}.`;
+  return message;
+}

@@ -13,10 +13,19 @@ export async function api(path, options = {}) {
     error.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
     throw error;
   }
-  const data = await response.json();
-  if (response.headers.has('X-OpenHMI-Operation-ID')) {
-    data.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
-    data.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
+  let data;
+  try {
+    data = await response.json();
+    if (response.headers.has('X-OpenHMI-Operation-ID')) {
+      data.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
+      data.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
+    }
+  } catch (error) {
+    if (response.headers.has('X-OpenHMI-Operation-ID')) {
+      error.operation_id = response.headers.get('X-OpenHMI-Operation-ID');
+      error.audit_status = response.headers.get('X-OpenHMI-Audit-Status');
+    }
+    throw error;
   }
   if (!projectInstance && path === '/api/project') projectInstance = data.project_instance || response.headers.get('X-OpenHMI-Project');
   return data;

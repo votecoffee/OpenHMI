@@ -414,8 +414,17 @@ not close hardware or operator acceptance gates.
     Browser regressions cover failure/recovery. No controller outcome is inferred
     from seeded states; hash/integrity checks remain server-owned.
 
+35. Delivered correlated transfer dispatch receipt validation and error
+    feedback. Target/revision, transaction/sequence/envelope and operation IDs
+    must agree before confirmation. Optional legacy headers and pending audit
+    finalization remain compatible. Invalid/ambiguous replies retain operation
+    hints, clear stale receipt links and refresh status without replay. Operation
+    headers survive API success-body parse/attachment failures. Simulator
+    HTTP success/pending/uncertain tests and a corrupted-reply browser regression
+    preserve the distinction between dispatch and verified PLC completion.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe transfer dispatch receipt response contracts next. Keep further module extraction tied
+Prioritize recipe library response parity and historical metadata review next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from './recipe-transfer-api.mjs';
-import { isRecipeTransferPage } from './recipe-transfer-responses.mjs';
+import { isRecipeTransferPage, requireRecipeTransferReceipt, recipeTransferFailureMessage } from './recipe-transfer-responses.mjs';
 import { SecurityContext, allowed as hasPermission } from './security.jsx';
 
 export function RecipeTransferPanel({ source, session, reason, dirty, busy, setBusy, loadingAllowed, setMessage }) {
@@ -54,14 +54,19 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
   async function dispatch() {
     if (!target) return;
     if (!source || !reason.trim()) { setMessage('Choose a recipe revision and enter a transfer reason.'); return; }
-    setBusy(true);
+    setBusy(true); setReceipt(null);
     try {
-      const result = await dispatchRecipeTransfer(target, source.id, source.version, selection.revision, reason);
+      const result = requireRecipeTransferReceipt(
+        await dispatchRecipeTransfer(target, source.id, source.version, selection.revision, reason),
+        { profileId: target, revisionId: source.id, revisionVersion: source.version });
       setMessage(`PLC transfer requested. Transaction ${result.transaction.id}. Completion requires PLC acknowledgement and a verified running copy.${result.audit_status === 'pending' ? ' Activity journal finalization is pending.' : ''}`);
       setReceipt({ id: result.transaction.id, identity });
       setBefore(null);
       setRefreshVersion(version => version + 1);
-    } catch (problem) { setMessage(problem.message); }
+    } catch (problem) {
+      setMessage(recipeTransferFailureMessage(problem));
+      setBefore(null); setRefreshVersion(version => version + 1);
+    }
     finally { setBusy(false); }
   }
   return <section aria-label="PLC recipe transfers" className="recipe-transfer-panel"><h2>PLC recipe transfer</h2>

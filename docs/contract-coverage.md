@@ -36,6 +36,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe authentication/session requests | `test_recipe_session_contract.py`: production read/login/logout helpers through real RecipeAuth and SQL-backed HMI Security; strict models, cookie rotation/expiry, origin rejection, account delegation and group permission changes | Windows identity provider is mocked; browser tests cover local form/logout errors and HMI UI delegation; no new session-response guard or OS/domain acceptance |
 | Recipe transfer requests/queries | `test_recipe_transfer_contract.py`: actual browser helpers through SQL-backed routes with simulator-only staging; filter/status query separation, precise cursors, strict bounds/models, stale guards, receipts and JSON export | Transport factory is forbidden; domain/browser regressions cover completion and running-copy verification; no live controller acceptance or full response guard contract |
 | Recipe transfer responses | `test_recipe_transfer_responses.py`: real SQL/HTTP history/detail/verified responses through production record/page guards; all eight modeled command states, verified records outside the page, retired targets, nullable metadata and malformed paging | States are seeded offline; browser guards validate consumed fields, while server checks enforce hashes/integrity; no controller acceptance or strict response DTO filtering |
+| Transfer dispatch receipts | `test_recipe_transfer_receipts.py`: actual simulator-backed success/pending/uncertain HTTP outcomes through pure receipt correlation and error-formatting helpers; malformed identities and no confirmation/replay | A validated receipt confirms request dispatch, not PLC completion; server/domain checks retain hash and running-copy authority; optional legacy receipt headers remain supported |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -236,10 +237,23 @@ and disable dispatch/paging; 401/403 responses discard inaccessible data. Browse
 faults cover malformed nested records and valid-reply recovery. Hash integrity
 and actual PLC completion remain server/domain responsibilities.
 
+Dispatch receipt validation now checks the requested target/revision, matching
+transaction identity/state, envelope sequence and durable operation ID before
+creating a confirmation link. Optional legacy headers and pending finalization
+remain compatible; malformed replies preserve known operation hints and require
+verification. The shared API reader preserves operation headers on invalid JSON
+or receipt attachment failures. Transport/JSON failures and uncertain HTTP errors also receive
+verification guidance. Any dispatch error refreshes status and clears stale
+receipt links without sending another POST. Real simulator HTTP success, pending
+audit finalization and commit-failure outcomes are tested; the browser corrupts
+a real reply and confirms one request, no false acknowledgement, retained history
+and subsequent valid receipt handling. Completion still requires PLC acknowledgement
+and running-copy verification.
+
 ## Next bounded work
 
-1. Cover recipe transfer dispatch receipt responses and uncertain/error feedback,
-   preserving non-replay and durable-operation identity.
+1. Review recipe library response fields and historical metadata, then introduce
+   focused view-level compatibility guards where needed.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

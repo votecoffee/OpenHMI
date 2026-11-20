@@ -508,7 +508,17 @@ retain readable history and block dispatch/paging; 401/403 clears inaccessible
 data. SQL-backed response fixtures model all eight command states and exercise
 renamed/retired profiles without controller observations. Browser faults cover
 malformed nested data, retained rows, denial discard and valid-reply recovery.
-Dispatch receipt response contracts are next. Preserve model/import
+Dispatch receipts now pass a pure validator that correlates target/recipe revision,
+transaction IDs, sequence/envelope, operation identity and requested state. Valid
+legacy headerless replies and pending journal finalization remain supported. An
+invalid receipt cannot create an acknowledgement link; known operation IDs and
+verification guidance survive error feedback. The shared API reader retains
+operation headers if success-body parsing or receipt attachment fails. Transport/JSON failures and uncertain
+HTTP outcomes prompt verification; errors trigger read-only status refresh and
+clear prior receipt links, without replaying dispatch. SQL/HTTP tests cover real
+simulator success, pending audit finalization and uncertain commit failure; browser
+faults prove a corrupted reply still results in one dispatch and a readable record.
+Recipe library response parity is next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

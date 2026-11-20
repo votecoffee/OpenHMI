@@ -77,24 +77,36 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(dispatch).toBeDisabled();
   await target.selectOption('product');
   const dispatchEndpoint = '**/api/recipe-transfers/product/dispatch';
-  let failStatus = false;
+  let failStatus = false, dispatchCount = 0;
   await page.route(profilesEndpoint, route => failStatus
     ? route.fulfill({ status: 503, json: { detail: 'Synthetic status outage' } })
     : route.continue());
   await page.route(dispatchEndpoint, async route => {
+    dispatchCount += 1;
     const response = await route.fetch();
     failStatus = response.ok();
-    await route.fulfill({ response });
+    const receipt = await response.json();
+    await route.fulfill({ response, json: { ...receipt, transaction: { ...receipt.transaction, id: receipt.transaction.id + 1 } } });
   });
   await dispatch.click();
   const panel = page.getByRole('region', { name: 'PLC recipe transfers', exact: true });
   await expect(panel.getByRole('alert')).toContainText('Synthetic status outage');
-  await expect(page.getByRole('status', { name: 'Recipe operation' })).toContainText(/PLC transfer requested\. Transaction \d+/);
+  const operationMessage = page.getByRole('status', { name: 'Recipe operation' });
+  await expect(operationMessage).toContainText('Invalid recipe transfer receipt.');
+  await expect(operationMessage).toContainText('Verify transfer history and PLC state before retrying.');
   await expect(dispatch).toBeDisabled();
   const receipts = (await (await page.request.get('/api/recipe-transfers')).json()).items;
   expect(receipts).toHaveLength(1);
   const transaction = receipts[0].transaction;
-  const link = panel.getByRole('link', { name: `View command transaction #${transaction.id}`, exact: true });
+  await expect(operationMessage).toContainText(`Operation ${transaction.operation_id}`);
+  await expect(panel.getByRole('link', { name: /^View command transaction/ })).toHaveCount(0);
+  expect(dispatchCount).toBe(1);
+  await page.unroute(dispatchEndpoint);
+  await page.unroute(profilesEndpoint);
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+  await expect(panel.locator('tbody tr').first()).toContainText('requested');
+  await expect(dispatch).toBeDisabled();
+  const link = panel.getByRole('link', { name: `Transfer #${transaction.id}`, exact: true });
   await expect(link).toHaveAttribute('href', `/commands?transaction=${transaction.id}`);
   const commandView = await page.context().newPage();
   await commandView.goto(await link.getAttribute('href'));
@@ -104,10 +116,6 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await expect(commandRow.getByText(`Operation ${transaction.operation_id}`, { exact: true })).toBeVisible();
   await commandView.close();
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.RequestSequence']).toBe(receipts[0].transaction.sequence);
-  await page.unroute(dispatchEndpoint);
-  await page.unroute(profilesEndpoint);
-  await expect(panel.getByRole('alert')).toHaveCount(0);
-  await expect(panel.locator('tbody tr').first()).toContainText('requested');
   expect((await (await page.request.get('/api/tags')).json()).values['CycleCommand.Running.RevisionId']).toBe(0);
   await page.goto('/runtime');
   await page.getByRole('button', { name: 'Simulate recipe PLC', exact: true }).click();
@@ -139,6 +147,7 @@ test('recipe transfer designer mapping, approved/test PLC copies, image and hist
   await page.getByLabel('Change / approval / load reason', { exact: true }).fill('Transfer unapproved test copy');
   await page.getByRole('button', { name: 'Transfer revision to PLC', exact: true }).click();
   await expect(current.locator('tbody tr').first()).toContainText('Test / not production approved');
+  await expect(current.getByRole('link', { name: /^View command transaction #/ })).toBeVisible();
   const values = (await (await page.request.get('/api/tags')).json()).values;
   expect(values['CycleCommand.Running.RecipeProductionApproved']).toBe(true);
   expect(values['CycleCommand.Staging.RecipeProductionApproved']).toBe(false);

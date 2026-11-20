@@ -638,6 +638,8 @@ Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable
 actions while unavailable, and clear inaccessible data on authentication denial.
+Dispatch receipts must match the requested target/revision and durable transaction;
+ambiguous replies show verification guidance and refresh status without replay.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft
