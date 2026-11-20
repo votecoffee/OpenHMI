@@ -15,13 +15,20 @@ import { isCaptureStatus, captureCsvPath } from '../frontend/trend-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
-import { saveProjectDraft, applyLiveProject } from '../frontend/project-api.mjs';
+import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from '../frontend/project-api.mjs';
 import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath } from '../frontend/alarm-api.mjs';
 import { engineeringCatalog } from '../frontend/engineering.jsx';
 import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'applied_projects') {
+    const before = JSON.stringify(request.snapshots);
+    const valid = request.snapshots.map(isAppliedProjectSnapshot);
+    if (JSON.stringify(request.snapshots) !== before) throw new Error('Project validation mutated input');
+    return { path: appliedProjectPath, valid };
+  }
+
   if (request.operation === 'alarm_snapshots') {
     const before = JSON.stringify(request.snapshots);
     const valid = request.snapshots.map(isAlarmSnapshot);

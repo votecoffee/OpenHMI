@@ -35,27 +35,31 @@ def frontend(operation, **payload):
     return json.loads(result.stdout)
 
 
+def palette_defaults():
+    # Mode feedback deliberately starts unbound in the real palette. Supply
+    # that operator-required binding without replacing any default values.
+    return frontend('defaults', bindings={'ModeSelector': {'confirmed_tag': 'ModeFeedback'}}, catalog={
+        'security_groups': ['Operators'],
+        'actions': [{'name': 'toggle_motor', 'label': 'Toggle motor'}],
+        'tags': [
+            {'name': 'TankLevel', 'type': 'number', 'writable': True},
+            {'name': 'RecipeRevision', 'type': 'number', 'writable': False},
+            {'name': 'AlarmWord', 'type': 'number', 'integer': True, 'unscaled': True, 'writable': True},
+            {'name': 'ModeFeedback', 'type': 'number', 'integer': True, 'unscaled': True, 'writable': False},
+            {'name': 'MotorRunning', 'type': 'boolean', 'writable': True},
+            {'name': 'ProcessAlarm', 'type': 'boolean', 'writable': False},
+            {'name': 'OperatorText', 'type': 'string', 'writable': True},
+            {'name': 'Motor', 'type': 'struct', 'writable': True},
+        ],
+        'connections': [], 'commands': [], 'screens': [],
+        'faceplates': [{'id': 'motor', 'name': 'Motor', 'members': {}}],
+    })
+
+
 class FrontendContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Mode feedback deliberately starts unbound in the real palette. Supply
-        # that operator-required binding without replacing any default values.
-        cls.defaults = frontend('defaults', bindings={'ModeSelector': {'confirmed_tag': 'ModeFeedback'}}, catalog={
-            'security_groups': ['Operators'],
-            'actions': [{'name': 'toggle_motor', 'label': 'Toggle motor'}],
-            'tags': [
-                {'name': 'TankLevel', 'type': 'number', 'writable': True},
-                {'name': 'RecipeRevision', 'type': 'number', 'writable': False},
-                {'name': 'AlarmWord', 'type': 'number', 'integer': True, 'unscaled': True, 'writable': True},
-                {'name': 'ModeFeedback', 'type': 'number', 'integer': True, 'unscaled': True, 'writable': False},
-                {'name': 'MotorRunning', 'type': 'boolean', 'writable': True},
-                {'name': 'ProcessAlarm', 'type': 'boolean', 'writable': False},
-                {'name': 'OperatorText', 'type': 'string', 'writable': True},
-                {'name': 'Motor', 'type': 'struct', 'writable': True},
-            ],
-            'connections': [], 'commands': [], 'screens': [],
-            'faceplates': [{'id': 'motor', 'name': 'Motor', 'members': {}}],
-        })
+        cls.defaults = palette_defaults()
 
     def test_palette_and_backend_control_kinds_match(self):
         schema = CONTROL.json_schema()

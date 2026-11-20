@@ -331,8 +331,16 @@ not close hardware or operator acceptance gates.
     Snapshot reads do not acquire source data. Detailed history and controller
     acceptance remain separate.
 
+24. Delivered shared applied-project validation and polling URL in the project
+    API module, preserving guard rules and canonical control-kind ownership.
+    A shared real-palette fixture drives Pydantic/SQLite/HTTP compatibility checks
+    across all control kinds, screens, faceplates, containers, groups and locked
+    backgrounds. Unapplied drafts preserve the active response. Legacy defaults
+    and malformed consumed fields are covered; runtime bindings/assets and
+    controller/station acceptance stay separate.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize applied-project snapshot validation and saved-project parity next. Keep further module extraction tied
+Prioritize tag-status snapshot validation and acquisition response parity next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

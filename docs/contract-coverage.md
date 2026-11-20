@@ -25,6 +25,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Identity-session snapshots | `test_security_session_contract.py`: real SQL security service/session route into the production guard; local/expired sessions, live permission changes, mocked Windows mappings/disable, public fields and malformed payloads; validated read-helper errors | Windows authentication is mocked, not OS/domain acceptance; UI retains generation fences and last-confirmed identity behavior |
 | Selected-recipe snapshots | `test_recipe_selection_contract.py`: actual SQL create/load/approve/revise/withdraw/clear/reopen responses into the production guard; images, Unicode, typed/safe-integer boundaries and malformed payloads | Security principal and local publication callback are stubbed; display guard covers consumed fields, while request models enforce full recipe limits; no PLC transfer or controller acceptance |
 | Live alarm snapshots | `test_alarm_snapshot_contract.py`: real SQL/HTTP monitor snapshots for priorities, acknowledgement, shelving, quality/staleness, retirement/reopen and legacy/malformed payloads; read endpoint does not acquire source data | Guard validates live-banner fields and legacy fallbacks, not complete occurrence/history DTOs; source values are synthetic and no controller acceptance is implied |
+| Applied-project snapshots | `test_applied_project_contract.py`: real palette/Pydantic/SQLite save/apply and active HTTP responses through the production guard; all control kinds, screens, faceplates, freeform/flow layout metadata, legacy and malformed replies | Runtime callbacks are stubbed; schema/display compatibility does not prove PLC binding validity, asset availability or native station acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -121,10 +122,18 @@ does not clear the condition, and project retirement remains explicit. The contr
 rejects malformed consumed shapes without mutation; detailed history/query payloads
 remain a separate contract.
 
+Applied-project snapshot validation and polling URL are shared through
+`project-api.mjs`. Guard rules remain unchanged and use the canonical control-kind
+map. The shared palette fixture supplies every control family for real saved/
+applied-response checks. Draft-only changes leave the live response intact;
+freeform/flow layouts, scoped screens, faceplates, containers, groups and locked
+background metadata survive apply. Consumed malformed shapes are rejected without
+mutation, preserving legacy defaults. Runtime bindings/assets stay separate checks.
+
 ## Next bounded work
 
-1. Extract applied-project snapshot validation and verify real saved-project/
-   active-response compatibility, including layout and control families.
+1. Extract tag-status snapshot validation and compare actual acquisition metadata
+   with the browser guard, including diagnostic status-only responses and faults.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

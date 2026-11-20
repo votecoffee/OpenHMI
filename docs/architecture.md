@@ -427,7 +427,15 @@ with its previous legacy defaults and display-field rules preserved.
 priorities, acknowledgement, shelving/restoration, bad trigger quality, stale
 evaluation, retirement and reopen. Snapshot reads must not acquire fresh source
 data. Detailed occurrence/history validation remains a separate boundary.
-Next, extract applied-project snapshot validation and verify saved-project parity. Preserve model/import
+Applied-project validation and its polling URL now live in `project-api.mjs`,
+using the canonical browser control-kind map. The previous guard body is preserved.
+`test_applied_project_contract.py` uses the shared real-palette fixture, Pydantic
+validation, SQLite saves/applies and the actual active-read registrar to check all
+control kinds, secondary screens, faceplates, containers and locked backgrounds.
+Unapplied drafts do not replace the active response. Display-level legacy defaults
+remain accepted; full project/request validation and runtime binding checks stay
+on their existing boundaries. Next, extract tag-status snapshot validation and
+compare acquisition metadata with its production browser guard. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

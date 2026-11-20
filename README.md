@@ -616,6 +616,8 @@ Selected-recipe validation has a focused module and real SQL lifecycle contracts
 for typed values, image references, approval metadata and independent loaded copies.
 Alarm snapshot validation is shared with SQL lifecycle contracts covering
 acknowledgement, shelving, trigger quality, stale evaluation and retirement.
+Applied-project validation shares the real palette fixture and SQL active-response
+contracts for control families, secondary screens, faceplates and canvas metadata.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft
