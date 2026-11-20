@@ -6,6 +6,8 @@ import { api, uploadProjectImage } from '../frontend/api.mjs';
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
 import { commandStates } from '../frontend/command-status.mjs';
 import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
+import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage } from '../frontend/history-api.mjs';
+import { captureCsvPath } from '../frontend/trend-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
@@ -16,6 +18,7 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'recorded_pages') return request.pages.map(isRecordedTagPage);
   if (request.operation === 'image_pages') return request.pages.map(isProjectImagePage);
   if (request.operation === 'engineering') {
     const catalog = engineeringCatalog(request.catalog, request.project, request.template ?? null);
@@ -71,12 +74,12 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
       requests.push({ path, method: options.method, headers: options.headers,
-        keepalive: options.keepalive, body: upload ? null : options.body && JSON.parse(options.body),
+        keepalive: options.keepalive, timed: options.signal instanceof AbortSignal, body: upload ? null : options.body && JSON.parse(options.body),
         ...(upload ? { upload: { name: options.body.name, type: options.body.type, bytes: Array.from(new Uint8Array(await options.body.arrayBuffer())) },
           timeout: options.signal instanceof AbortSignal } : {}) });
       return new Response(JSON.stringify({ ok: true, project_instance: 'a'.repeat(32) }), {
@@ -84,6 +87,22 @@ export async function contract(request) {
       });
     };
     await api('/api/project');
+    if (request.operation === 'history_queries') {
+      const tags = '设备 A,Motor.Speed,设备 A';
+      await api(sparklineHistoryPath('设备 A', 10));
+      await api(trendReadPaths({ tags, seconds: 60 }).query);
+      const fixed = trendReadPaths({ tags: 'Motor.Speed', seconds: 30, end: 1700000000.125 });
+      await api(fixed.query);
+      await api(trendReadPaths({ tags: 'Motor.Speed', seconds: 10, end: 0 }).query);
+      await api(trendReadPaths({ tags: 'ignored', seconds: 10, end: 1700000000.125, captureId: '9223372036854775807' }).query);
+      await fetchHistoryCsv(fixed.csv);
+      await fetchHistoryCsv(historyExportPath({ tags, seconds: 3600, end: 1700000000.125 }));
+      await api(historyExportPath({ tags, start: 0, end: 31536000, complete: true, projectInstance: 'a'.repeat(32) }));
+      await recordedHistoryTags({ prefix: '设备 ', after: '设备 A', limit: 100, projectInstance: 'a'.repeat(32) });
+      await recordedHistoryTags({ projectInstance: 'a'.repeat(32) });
+      await api(captureCsvPath(123));
+      return { requests: requests.slice(1), empty: trendReadPaths({ tags: '', seconds: 10 }) };
+    }
     if (request.operation === 'image_queries') {
       await listProjectImages();
       await listProjectImages({ before: 42 });

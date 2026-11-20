@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { api } from './api.mjs';
+import { recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage } from './history-api.mjs';
 
 function structureInitial(members, values) {
   const result = Object.create(null);
@@ -70,9 +71,8 @@ function HistoryExport({ tags, projectInstance }) {
     setSearchError('');
     const search = prefix.trim();
     try {
-      const query = new URLSearchParams({ prefix: search, project_instance: projectInstance });
-      if (after !== null) query.set('after', after);
-      const data = await api('/api/history/tags?' + query);
+      const data = await recordedHistoryTags({ prefix: search, projectInstance, after });
+      if (!isRecordedTagPage(data)) throw new Error('Invalid recorded tag search response');
       setRecorded({ ...data, prefix: search });
     } catch (error) {
       setSearchError(error.message);
@@ -86,29 +86,25 @@ function HistoryExport({ tags, projectInstance }) {
     setBusy(true);
     setMessage('');
     try {
-      const query = new URLSearchParams({ tags: selected.join(',') });
       const finish = end ? exportEpoch(end, zone, 'end') : null;
-      if (finish !== null) query.set('end', String(finish));
+      let begin = null;
       if (range === 'custom') {
-        const begin = exportEpoch(start, zone, 'start');
+        begin = exportEpoch(start, zone, 'start');
         const stop = finish ?? Date.now() / 1000;
         if (begin >= stop) throw new Error('Start time must be before the end time.');
         if (stop - begin > 31536000) throw new Error('Choose a range of 365 days or less.');
-        query.set('start', String(begin));
-      } else {
-        query.set('seconds', range);
       }
+      const exportPath = historyExportPath({ tags: selected.join(','), seconds: range, start: begin, end: finish, complete, projectInstance });
       if (complete) {
-        query.set('project_instance', projectInstance);
         const link = document.createElement('a');
-        link.href = '/api/history/full.csv?' + query;
+        link.href = exportPath;
         link.target = '_blank';
         link.rel = 'noopener';
         link.click();
         setMessage('Complete CSV requested. The browser will show the download or report an error in a new tab.');
         return;
       }
-      const response = await fetch('/api/history.csv?' + query, { signal: AbortSignal.timeout(30000) });
+      const response = await fetchHistoryCsv(exportPath);
       if (!response.ok) throw new Error(`History export failed (HTTP ${response.status}).`);
       if (response.headers.get('X-OpenHMI-Project') !== projectInstance) {
         throw new Error('A different project was opened. Reload before exporting history.');

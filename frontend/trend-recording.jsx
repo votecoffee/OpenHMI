@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
-import { trendCapturePath, sendCaptureCommand } from './trend-api.mjs';
+import { trendCapturePath, sendCaptureCommand, captureCsvPath } from './trend-api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 
@@ -146,7 +146,7 @@ export function CaptureTools({ state, recording, setEndTime, endTime }) {
           aria-valuetext={captureDate(endTime ?? last)}
           onChange={event => setEndTime(event.target.valueAsNumber)} />
       </label>}
-      <div className="trend-tools"><a href={`/api/trend-captures/${capture.id}/csv`}>{ui('trendExportCapture')}</a>
+      <div className="trend-tools"><a href={captureCsvPath(capture.id)}>{ui('trendExportCapture')}</a>
         {canDelete && capture.stopped !== null && (confirm === capture.id ? <>
           <button type="button" disabled={blocked} onClick={() => { command('delete', capture.id); setConfirm(null); setEndTime(null); }}>{ui('trendConfirmDelete')}</button>
           <button type="button" onClick={() => setConfirm(null)}>{ui('cancelEntry')}</button>

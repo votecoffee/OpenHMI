@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useId, useMemo, useState } from 'react';
 import { api } from './api.mjs';
+import { sparklineHistoryPath, trendReadPaths } from './history-api.mjs';
 import { Live, tagValue, Quality } from './live-quality.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 import './trend.css';
@@ -252,7 +253,7 @@ export function Sparkline({ id, label, tag = '', unit = '', decimals = 1, second
   const title = text(`control.${id}.label`, label);
   const source = tag.startsWith('$.') ? (live.previewRoot ? live.previewRoot + tag.slice(1) : '') : tag;
   const query = source && Number.isInteger(seconds) && seconds >= 5 && seconds <= 3600
-    ? '/api/history?' + new URLSearchParams({ tags: source, seconds, limit: 1000, trend_context: true }) : '';
+    ? sparklineHistoryPath(source, seconds) : '';
   const response = useHistory(query, true, 5000);
   const history = response?.data;
   const trace = useMemo(() => {
@@ -298,9 +299,7 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
   const resolve = tag => tag.startsWith('$.') ? (root ? root + tag.slice(1) : '') : tag;
   const names = [...new Set(seriesTags.map(resolve).filter(Boolean))].join(',');
   const follow = endTime === null && (!capture || capture.stopped === null);
-  const parameters = new URLSearchParams({ seconds: windowSeconds, ...(endTime === null ? {} : { end: endTime }) });
-  if (!capture) parameters.set('tags', names);
-  const query = capture ? `/api/trend-captures/${capture.id}?${parameters}` : names ? `/api/history?${parameters}&trend_context=true` : '';
+  const { query, csv } = trendReadPaths({ tags: names, seconds: windowSeconds, end: endTime, captureId: capture?.id ?? null });
   const response = useHistory(query, follow);
   const history = response?.data;
   const error = response?.error;
@@ -398,7 +397,7 @@ export function Trend({ id, label, pens, tags = ['TankLevel'], series: settings,
         : history && !hasSamples ? <p>{ui('trendNoSamples')}</p> : null}
     {history?.truncated && <p>{ui('trendLimited')}</p>}
     {Object.keys(history?.change_context ?? {}).length > 0 && <small>{ui('trendOnChangeHint')}</small>}
-    {!puck?.isEditing && !capture && query && <a href={'/api/history.csv?' + parameters}>{ui('trendExportHistory')}</a>}
+    {!puck?.isEditing && !capture && query && <a href={csv}>{ui('trendExportHistory')}</a>}
   </article>;
 }
 

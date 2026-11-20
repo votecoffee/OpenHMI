@@ -366,3 +366,42 @@ test('PLC browse keeps a delayed response from replacing the selected connection
     release();
   }
 });
+
+
+test('recorded tag search rejects malformed pages without crashing the editor', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  let mode = 'valid';
+  const row = { tag: 'Retired.Sensor', latest: '2026-01-01T00:00:00+00:00' };
+  await page.route(/\/api\/history\/tags\?/, route => route.fulfill({ json:
+    mode === 'missing' ? { next_after: null }
+      : mode === 'cursor' ? { items: [row], next_after: 42 }
+        : { items: mode === 'empty' ? [] : [row], next_after: null } }));
+  try {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+    const panel = page.getByRole('group', { name: 'Export recorded data', exact: true });
+    const find = panel.getByRole('button', { name: 'Find recorded tags', exact: true });
+    const choice = panel.getByRole('checkbox', { name: 'Include Retired.Sensor · Not in draft', exact: true });
+    const status = panel.getByRole('status', { name: 'Recorded tag search status', exact: true });
+    await find.click();
+    await expect(choice).toBeVisible();
+    for (const invalid of ['missing', 'cursor']) {
+      mode = invalid;
+      await find.click();
+      await expect(status).toHaveText('Invalid recorded tag search response');
+      await expect(choice).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Apply live', exact: true })).toBeVisible();
+    }
+    mode = 'valid';
+    await find.click();
+    await expect(status).toHaveText('1 recorded tags on this page.');
+    mode = 'empty';
+    await find.click();
+    await expect(status).toHaveText('No recorded tags found.');
+    await expect(choice).toBeHidden();
+    expect(errors).toEqual([]);
+  } finally {
+    if (!page.isClosed()) await page.unrouteAll({ behavior: 'wait' });
+  }
+});

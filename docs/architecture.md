@@ -370,8 +370,15 @@ pages through the production browser validator. Invalid or unsafe cursors and
 malformed entries never replace the last readable page. Access denial clears
 retained metadata; newer requests and close keep their original sequence guard.
 Browser regressions cover paging, malformed-page recovery and denial/recovery.
-Next, cover historian/trend read queries and exports; review shared response
-contracts separately. Preserve model/import
+`history-api.mjs` and `trend-api.mjs` own sparkline, live/capture history,
+recorded-tag search and CSV query paths. Their router contract tests preserve
+window/tag limits, context flags, fixed ends, complete-export project guards,
+CSV quoting and export-slot cleanup. UTC/local parsing and bounded-export response
+project checks remain in the History panel. Its recorded-tag pages are now
+validated before React state is updated, with real SQLite pages and malformed
+response/browser recovery coverage. Next, compare command transaction/history
+responses with their production JS validators before expanding response parity
+across other operator pages. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

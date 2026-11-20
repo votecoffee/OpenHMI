@@ -266,10 +266,16 @@ not close hardware or operator acceptance gates.
     the last readable page with an error; access denial clears it. Browser
     regressions cover paging, malformed response, retry and denial/recovery.
 
+14. Delivered historian/trend query contracts for sparklines, live/captured windows,
+    recorded tags and bounded/complete CSV. Tests cover epoch zero/fractional ends,
+    tag/window bounds, project fences, CSV quoting and complete-export slot cleanup.
+    Recorded-tag replies are validated before entering the editor, with real SQL
+    page and malformed-response recovery coverage.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize the audit's remaining gaps: historian/trend read-window and export
-queries, then shared operator response contracts. Keep further module extraction
-tied to a concrete responsibility or compatibility gap.
+Prioritize shared operator response contracts, starting with command transaction
+and history pages, then history/trend status. Keep further module extraction tied
+to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
