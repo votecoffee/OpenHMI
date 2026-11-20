@@ -205,6 +205,15 @@ paths, authorization, revision guards and lock ownership.
   belongs to the scheduler, and affected sample mutation belongs to the cache.
   Existing imports from `openhmi.logix` remain compatible, including address
   overlap checks now shared through `tag_values.py`.
+- `openhmi/tag_catalog.py` owns logical definitions, UDT source aliases, physical
+  address groups and the set of configured local tags. Reconfiguration preserves
+  edited local values for unchanged definitions, initializes changed definitions,
+  removes retired local values and invalidates samples on changed routes.
+  `route_status.py` projects diagnostic DTOs, with optional groups and timing
+  details. The driver invokes both under its existing state lock. Connection
+  replacement remains in the driver under `io_lock`; retired connections close
+  after releasing the state lock. Project copying, assignment and obsolete-scan
+  rejection retain their existing boundaries.
 
 `tests/test_frontend_contract.py` invokes the real `createConfig`, `toEditor`
 and `toProject` functions through a DOM-free Node test entry. It compares every
@@ -252,8 +261,8 @@ project/control failures and confirms that rejection preserves both the draft
 and its revision. Correcting the failures in sequence must allow the same
 candidate to save without an apply.
 
-The subscription, sample and scheduling components deliberately own no locks or worker
-pools. The driver retains its state `RLock`, configuration/write `io_lock` and
+The catalog, subscription, sample and scheduling components deliberately own no
+locks or worker pools. The driver retains its state `RLock`, configuration/write `io_lock` and
 per-route locks. Lease mutation and sample projection use the existing state
 lock; a route lock is never acquired while projecting samples. Transport work
 still runs outside the state lock, and the project-generation fence is checked
@@ -265,7 +274,9 @@ Legacy `samples`, `leases`, `trend_demands`, `_screen_demands` and
 `_lease_sequences` attributes forward to live component-owned dictionaries,
 including replacement assignments. Scheduling attributes `deadlines`,
 `last_rates`, `_refresh_after`, `_bad_tag_retry_at` and `_demanded_aliases`
-similarly forward to the scheduler. No detached compatibility copies are kept.
+similarly forward to the scheduler. Catalog attributes `definitions`, `sources`,
+`address_aliases` and `local_names` forward to the live catalog, also supporting
+replacement. No detached compatibility copies are kept.
 The sample cache owns timing access, freshness tightening and receipt storage.
 Reconciliation and publication execute within the original state-lock boundary;
 publication also retains the route lock. Bad tags retain the 30-second retry
@@ -289,8 +300,15 @@ lock at their original boundaries. Transport does not retry or replay a write.
 Runtime-owned identity/command guards, local-tag edits and multi-step write
 scopes remain in the driver.
 
-Next, review driver configuration and route-status projection for focused module
-boundaries. Preserve project-instance identity, write non-replay behavior, apply
-rollback, command locks and journal ordering in further extractions. Extend the
-contract fixtures whenever a saved control field or editor serialization branch is added. These
-software checks do not establish controller or operator-station acceptance.
+`tests/test_driver_configuration.py` covers preserved local edits, nested initial
+value isolation, reset/removal, independent route replacement and acquisition
+hold. It verifies the retired-connection lock boundary, live catalog replacement,
+independent driver instances, status DTO isolation and lazy optional diagnostics.
+Existing blocked-read/project-switch tests continue to check obsolete receipts.
+
+Next, separate API registration still embedded in command, trend-recording,
+canvas-image and identity-publication services. Preserve project-instance
+identity, write non-replay behavior, apply rollback, command locks and journal
+ordering in further extractions. Extend the contract fixtures whenever a request
+model, saved control field or editor serialization branch changes. These software
+checks do not establish controller or operator-station acceptance.

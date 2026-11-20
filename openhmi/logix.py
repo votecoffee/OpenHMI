@@ -13,6 +13,8 @@ from .runtime_models import MAX_PLC_CONNECTIONS
 from .tag_subscriptions import (TagSubscriptions, build_screen_demands,
                                  MAX_VIEWER_LEASES, MAX_SUBSCRIPTION_SEQUENCES)
 from .tag_samples import SampleCache
+from .tag_catalog import TagCatalog
+from .route_status import route_status
 from .tag_scheduling import ScanSchedule, BAD_TAG_RETRY_SECONDS
 from .scan_publication import publish_scan_receipts
 from .tag_writes import validate_logical_write, prepare_physical_write
@@ -35,13 +37,12 @@ class RuntimeDriver(SimulatorDriver):
         self._scans = {}
         self._scan_started = {}
         self._closing = False
-        self.connections, self.definitions, self.sources = {}, {}, {}
+        self.connections = {}
+        self.tag_catalog = TagCatalog()
         self.subscriptions = TagSubscriptions()
         self.sample_cache = SampleCache()
         self.schedule = ScanSchedule()
-        self.address_aliases = {}
         self.project = None
-        self.local_names = set()
         self.plc_hold = False
 
     # Compatibility views are live component-owned dictionaries, not copies.
@@ -125,6 +126,38 @@ class RuntimeDriver(SimulatorDriver):
     def _demanded_aliases(self, value):
         self.schedule.demanded_aliases = value
 
+    @property
+    def definitions(self):
+        return self.tag_catalog.definitions
+
+    @definitions.setter
+    def definitions(self, value):
+        self.tag_catalog.definitions = value
+
+    @property
+    def sources(self):
+        return self.tag_catalog.sources
+
+    @sources.setter
+    def sources(self, value):
+        self.tag_catalog.sources = value
+
+    @property
+    def address_aliases(self):
+        return self.tag_catalog.address_aliases
+
+    @address_aliases.setter
+    def address_aliases(self, value):
+        self.tag_catalog.address_aliases = value
+
+    @property
+    def local_names(self):
+        return self.tag_catalog.local_names
+
+    @local_names.setter
+    def local_names(self, value):
+        self.tag_catalog.local_names = value
+
     def configure(self, project):
         with self.io_lock:
             project = deepcopy(project)
@@ -141,30 +174,8 @@ class RuntimeDriver(SimulatorDriver):
                     if identifier not in self.connections:
                         changed_connections.add(identifier)
                         self.connections[identifier] = LogixConnection(config, self.factory)
-                old = self.definitions
-                self.definitions = {tag['name']: deepcopy(tag) for tag in project.get('tags', [])}
-                for name in self.local_names - self.definitions.keys():
-                    self._tags.pop(name, None)
-                self.local_names = {name for name, tag in self.definitions.items() if not tag['connection']}
-                self.sources = {}
-                for name, tag in self.definitions.items():
-                    self.sources[name] = (name, '')
-                    for member in tag['members']:
-                        self.sources[f'{name}.{member}'] = (name, member)
-                    if old.get(name) != tag or tag['connection'] in changed_connections:
-                        for alias, (root, _) in self.sources.items():
-                            if root == name:
-                                self.samples.pop(alias, None)
-                        if not tag['connection']:
-                            self._tags[name] = float(tag['initial']) if tag['type'] == 'number' else deepcopy(tag['initial'])
-                        else:
-                            self._tags.pop(name, None)
-                self.address_aliases = {}
-                for alias, (root, member) in self.sources.items():
-                    tag = self.definitions[root]
-                    if tag['connection']:
-                        key = (tag['connection'], tag['address'])
-                        self.address_aliases.setdefault(key, []).append((alias, tag, member))
+                self.tag_catalog.configure(project.get('tags', []), changed_connections,
+                                           self.sample_cache, self._tags)
                 self.project = project
                 self._screen_demands = screen_demands
                 self.deadlines.clear()
@@ -398,30 +409,9 @@ class RuntimeDriver(SimulatorDriver):
     def status(self, *, include_timing=False, include_groups=True, now=None):
         now = time.monotonic() if now is None else now
         with self.lock:
-            routes = []
-            for identifier, connection in self.connections.items():
-                scan = self._scans.get(identifier)
-                age = max(0, now - self._scan_started[identifier]) if scan and not scan.done() else None
-                groups = {}
-                if include_groups:
-                    for (route, address), rate in self.last_rates.items():
-                        if route == identifier:
-                            groups.setdefault(rate, []).append(address)
-                active = connection.connected and bool(self._demanded_aliases.get(identifier))
-                recovering = active and connection.outage_started is not None
-                routes.append({'id': identifier, 'connected': connection.connected, 'error': connection.error,
-                               'connection_instance': connection.instance,
-                               'scan_age_seconds': age,
-                               'recovering': recovering,
-                               'awaiting_data': active and not recovering and not connection.has_usable_sample,
-                               'data_unavailable': (active and not recovering and connection.has_usable_sample
-                                                    and not self._has_usable_data(identifier, connection.failure_generation, now)),
-                               'scan_overdue': age is not None and age >= max(5, connection.config['timeout_seconds']),
-                               'read_calls': connection.read_calls, 'tags_read': connection.tags_read,
-                               **({'groups': [{'rate_ms': rate, 'addresses': sorted(addresses)}
-                                              for rate, addresses in sorted(groups.items())]} if include_groups else {}),
-                               **({'timings': connection.timings.snapshot(), 'route_failures': connection.failure_generation} if include_timing else {})})
-            return routes
+            return route_status(self.connections, self._scans, self._scan_started,
+                                self.last_rates, self._demanded_aliases, self._has_usable_data,
+                                now, include_timing=include_timing, include_groups=include_groups)
 
     def close(self):
         with self.io_lock:

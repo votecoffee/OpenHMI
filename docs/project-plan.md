@@ -222,8 +222,14 @@ not close hardware or operator acceptance gates.
    Driver/transport lock boundaries and single-attempt write/readback ordering
    remain intact. Tests cover member/root aliases, sibling names, identical
    addresses on another route and polling-owned display updates after a write.
-   Next, review driver configuration and route-status projection for focused
-   boundaries while preserving project identity, lock order and recovery state.
+7. Delivered tag-catalog reconciliation and route-status projection modules.
+   The driver retains project copying/identity, connection replacement and lock
+   ownership. Local edits survive unchanged applies, changed routes invalidate
+   their own samples, and retired connections close outside the state lock.
+   Tests cover held acquisition, catalog compatibility and diagnostic isolation.
+   Next, separate API registration still embedded in command, trend-recording,
+   canvas-image and identity-publication services, preserving existing contracts
+   and authorization/journal behavior.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).
