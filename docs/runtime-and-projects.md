@@ -230,6 +230,11 @@ configured. Legacy recipe-only projects require a recipe administrator. An empty
 unsecured simulation library remains available for initial project creation.
 
 Export uses SQLite's online backup API to create a consistent database snapshot.
+Preparation retains the workspace lock until source work and cancellation cleanup
+finish. Sending the prepared archive releases that lock, so slow download clients
+do not prevent HMI requests, switching projects or shutting down the runtime.
+The download retains its source project's bytes and identity after a switch.
+This does not establish how quickly a particular web server exits with open clients.
 The ZIP contains a versioned manifest and SHA-256 checksums, the database and,
 when configured, the startup Python entry file and legacy recipe account file.
 SQL includes screens, UDT definitions, connections/tags, recipes/images/reviews,

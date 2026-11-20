@@ -298,6 +298,7 @@ class ProjectWorkspace:
         # download of the finished file need not delay HMI requests.
         if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
             return await self.current(scope, receive, send)
+        detached_backup = scope['method'] == 'GET' and scope['path'] == '/api/workspace/backup'
         # A project switch cannot close a database while an HTTP operation is using it.
         async with self.lock:
             if scope['path'].startswith('/api/workspace'):
@@ -312,6 +313,11 @@ class ProjectWorkspace:
                     response.headers['Cache-Control'] = 'no-store'
                     response.headers['X-Content-Type-Options'] = 'nosniff'
                 set_response_context(request, response, identifier)
-                await response(scope, receive, send)
+                if not detached_backup:
+                    return await response(scope, receive, send)
             else:
-                await self.current(scope, receive, send)
+                return await self.current(scope, receive, send)
+        # Backup preparation (including cancellation cleanup) stays serialized.
+        # The completed response owns its bytes and source identity; sending it
+        # no longer uses the runtime or needs to hold up reads/switch/shutdown.
+        await response(scope, receive, send)

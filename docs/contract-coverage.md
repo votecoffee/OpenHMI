@@ -325,10 +325,20 @@ faults verify no download or replay on bad replies/denial, retained drafts and a
 explicit successful retry with byte-for-byte saved output. All handled backup
 responses are private/no-store, and final ZIP overhead is included in the size limit.
 
+Backup-transfer ASGI checks now pause both headers and body while real SQL/ZIP
+responses are ready. Reads, project switching and runtime shutdown finish before
+the send resumes; downloaded bytes and project identity remain those prepared from
+the source runtime. Other tests hold export preparation in a thread, proving queued
+requests cannot close its source store early, and cover cancellation/disconnect
+without replay plus detached error responses. Existing cancellation contracts
+continue to own preparation cleanup. These are bounded offline event tests, not
+network-throughput or server-process shutdown acceptance.
+
 ## Next bounded work
 
-1. Review backup transfer lock ownership so a slow client cannot block unrelated
-   HMI requests after the independent archive has been prepared.
+1. Review import-upload lock ownership and bounded cancellation so slow or abandoned
+   uploads cannot monopolize HMI requests, preserving authorization and project
+   revalidation before dispatch.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

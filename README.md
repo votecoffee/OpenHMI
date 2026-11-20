@@ -367,6 +367,9 @@ a save or retrying automatically. The browser checks response identity, size and
 ZIP structure; import performs full checksum and database validation. A prepared
 download does not confirm that the browser saved the file. Verify the saved archive
 before relying on it.
+Once the archive is prepared, a slow backup download no longer holds the workspace
+lock: HMI reads, project switching and runtime shutdown can proceed. Preparation
+still protects its source runtime, and the download retains that source snapshot.
 
 Backups contain the database (screens, connections, tags, faceplates, recipes and
 images, security, alarm and tag history), plus the configured startup Python entry

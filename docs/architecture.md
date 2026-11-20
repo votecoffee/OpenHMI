@@ -714,7 +714,18 @@ retried automatically. The project panel preserves drafts, clears denied data an
 requires review after stale identity; success says prepared, not saved. Real SQL/
 HTTP replies pass through the production JS helper; browser failures never start
 a save, and explicit recovery preserves exact archive bytes. FastAPI OpenAPI is
-unchanged. Transfer-lock ownership remains a separate follow-up.
+unchanged.
+Backup GET responses now leave the workspace lock after preparation and response
+context are complete, before sending either headers or body. Their bytes and
+source project identity are independent of the runtime; slow sends therefore allow
+ordinary reads, switching and runtime shutdown without rebinding the archive.
+Preparation, including cancelled thread completion, remains serialized so its
+source store cannot close early. Handled backup errors detach in the same way;
+other workspace/runtime response lock behavior is preserved. Synthetic ASGI
+backpressure tests pause headers and body, switch and close both runtimes, then
+verify exact archive bytes and source identity. Cancellation/send failures never
+restart export or retire the active runtime. This establishes lock ownership,
+not web-server process exit timing or real network throughput.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

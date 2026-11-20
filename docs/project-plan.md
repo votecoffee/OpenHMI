@@ -580,10 +580,21 @@ not close hardware or operator acceptance gates.
     Browser checks do not replace full import checksum/SQL validation or confirm
     that a prepared download was saved. FastAPI OpenAPI remains unchanged.
 
+53. Delivered backup-transfer lock ownership. Fully prepared backup GET responses,
+    including handled errors, send outside the workspace lock with frozen bytes
+    and source identity. Slow headers/body no longer block reads, project switches
+    or runtime shutdown. Archive preparation and cancellation cleanup retain the
+    lock until source work finishes. Real SQL/ZIP and event-gated ASGI tests verify
+    reads/switch/shutdown during sends, source closure ordering, exact bytes and
+    identity after switching, and cancellation/disconnect without export replay.
+    Existing API/OpenAPI contracts remain unchanged. Web-server process exit timing
+    and network throughput remain outside this offline verification.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review backup transfer
-lock ownership so a slow client cannot block unrelated HMI requests after the
-independent archive has been prepared. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review import-upload
+lock ownership and bounded cancellation so slow or abandoned uploads cannot
+monopolize HMI requests, preserving authorization and project revalidation before
+dispatch. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.
