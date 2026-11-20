@@ -1,3 +1,5 @@
+import { activityOutcomes, isActivityPage } from '../frontend/activity-api.mjs';
+import { isDiagnosticsSnapshot } from '../frontend/diagnostics-api.mjs';
 // Exercise production palette defaults and serializers without a DOM or PLC.
 import { createConfig } from '../frontend/controls.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
@@ -18,6 +20,7 @@ import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
 
 export async function contract(request) {
+  if (request.operation === 'operations_responses') return { outcomes: activityOutcomes, pages: request.pages.map(isActivityPage), snapshots: request.snapshots.map(item => isDiagnosticsSnapshot(item.data, item.offset)) };
   if (request.operation === 'trend_responses') return { histories: request.histories.map(isTrendHistory), statuses: request.statuses.map(isCaptureStatus) };
   if (request.operation === 'command_responses') return { states: commandStates, records: request.records.map(isCommandRecord), pages: request.pages.map(isCommandPage) };
   if (request.operation === 'recorded_pages') return request.pages.map(isRecordedTagPage);

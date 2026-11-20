@@ -286,8 +286,15 @@ not close hardware or operator acceptance gates.
     browser recovery coverage. Equal epochs and optional legacy fields remain
     compatible. Acquisition/PLC acceptance stays separate.
 
+17. Delivered focused activity/diagnostics response validators and real SQL/runtime
+    response parity, covering journal outcomes, restart reconciliation, filtered
+    pages, route holds, worker health and value-free diagnostics exports. Invalid
+    IDs/order/cursors, duplicate rows and malformed scan ages are rejected before
+    replacing readable data. Browser regressions verify paging lockout, denial
+    clearing and valid-reply recovery. Controller/station acceptance stays open.
+
 The current control/router/driver/schema-store separation baseline is delivered.
-Prioritize activity/diagnostics response contracts next. Keep further module extraction tied
+Prioritize activity/diagnostics query builders and router contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

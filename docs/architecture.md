@@ -387,7 +387,13 @@ recording responses through those functions, including change context, truncatio
 quality gaps, rollover, stopping and restart reconciliation. Per-tag chronological
 order, unique capture IDs and coherent retention counts are checked before state
 is replaced; equal sample epochs and optional legacy pen fields remain compatible.
-Next, cover activity/diagnostics response parity. Preserve model/import
+Activity and diagnostics validators now live in `activity-api.mjs` and
+`diagnostics-api.mjs`. Real journal pages and runtime/worker projections pass
+through those production validators in `test_operations_responses.py`. Activity
+IDs/order/cursors and diagnostic offset/row/truncation metadata are checked
+before state replacement; optional legacy metadata remains compatible. Scan-age
+values are checked before the UI formats them. Next, extract the remaining
+activity/diagnostics query builders and verify their router contracts. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

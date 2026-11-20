@@ -51,12 +51,13 @@ test('a stale operator button cannot dispatch a replacement action', async ({ pa
 });
 
 test('diagnostics keeps readable results through bad polls and clears them on denied access', async ({ page }) => {
+  test.setTimeout(60000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const login = await page.request.post('/api/security/login', { data: { name: 'admin', password: 'SecurityTestOnly-2026!' } });
   expect(login.ok()).toBe(true);
   const snapshot = await (await page.request.get('/api/diagnostics')).json();
-  const healthy = { json: { ...snapshot, total_tags: 101, next_offset: 100 } };
+  const healthy = { json: { ...snapshot, total_tags: snapshot.tags.length + 1, next_offset: snapshot.tags.length, truncated: true } };
   let reply = healthy;
   await page.route('**/api/diagnostics?*', route => reply ? route.fulfill(reply) : route.continue());
   await page.goto('/diagnostics');
@@ -66,6 +67,9 @@ test('diagnostics keeps readable results through bad polls and clears them on de
   await expect(rows).toContainText('TankLevel');
 
   for (const invalid of [{}, { ...snapshot, tags: [null] },
+    { ...snapshot, next_offset: 100, truncated: true },
+    { ...snapshot, connections: [{ id: 'plc', name: 'Synthetic', path: 'offline', state: 'scan overdue',
+      scan_age_seconds: {}, read_calls: 0, tags_read: 0, route_failures: 0, groups: [], timings: {} }] },
     { ...snapshot, workers: [{ ...snapshot.workers[0], state: 'overdue', running_seconds: null }] }]) {
     reply = { json: invalid };
     await expect(warning).toContainText('Showing last received diagnostics');
@@ -122,6 +126,12 @@ test('activity preserves the current page through malformed replies and retries 
   await expect(olderButton).toBeEnabled();
 
   reply = { json: { ...newest, items: [{ ...entry, groups: {} }] } };
+  await expect(warning).toContainText('Showing last received activity', { timeout: 8000 });
+  await expect(rows).toContainText('newer-record');
+  await expect(olderButton).toBeDisabled();
+  reply = { json: newest };
+  await expect(warning).toBeHidden({ timeout: 8000 });
+  reply = { json: { ...newest, next_before_id: 1 } };
   await expect(warning).toContainText('Showing last received activity', { timeout: 8000 });
   await expect(rows).toContainText('newer-record');
   await expect(olderButton).toBeDisabled();

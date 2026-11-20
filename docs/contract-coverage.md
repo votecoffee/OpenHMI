@@ -19,6 +19,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | History windows and recording status responses | `test_trend_responses.py`: actual SQL sampling/query/listing through real HTTP registrars into production JS validators; context, truncation, quality, rollover, stopped/restarted captures and malformed replies | Offline sample snapshots do not prove acquisition; history supports equal epochs and different ordering between tags; optional legacy pen metadata remains accepted |
 | Recorded-tag catalog responses | Real SQLite historian pages through `isRecordedTagPage`, malformed-page fixtures and browser no-crash/recovery regression | This is a bounded catalog response contract, not complete history/capture response parity |
 | Schema ownership/import compatibility | `test_project_models.py`: direct family/domain imports, no service/HTTP/Pillow/SQLite dependency, shared canonical/legacy classes and project round trips | Import isolation is not a runtime performance or packaging benchmark |
+| Activity/diagnostics responses | `test_operations_responses.py`: real SQL journal outcomes/pages/restart and actual driver/worker projections through the registrar into production JS validators; malformed paging and scan-age checks | Security is stubbed in contract fixtures; browser tests cover denial/recovery; fake transport does not establish PLC or station acceptance |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -72,11 +73,19 @@ rejected. Browser regressions retain readable traces/status through these faults
 and restore normal controls after valid replies. Existing quality-gap handling,
 nullable fields and source-time metadata are preserved.
 
+Activity pages now validate positive safe IDs, descending unique rows, unique
+operation IDs, the 1,000-row bound and last-row cursors. Diagnostics checks unique
+tag names and coherent offset/count/cursor/truncation metadata, including empty
+pages beyond the current result set. Nullable scan ages remain valid; objects
+are rejected before numeric formatting. Browser regressions retain prior data,
+disable forward paging, clear data on denial and recover on valid replies.
+
 ## Next bounded work
 
-1. Extend response parity to activity/diagnostics and other shared operator pages, including
-   malformed/missing fields and permission loss. Review older nullable/history
-   data before adding strict response filtering to a production endpoint.
+1. Extract activity/diagnostics query builders and bind their actual URLs through
+   the registrar: filters, UTC conversion, paging, exports and invalid requests.
+2. Continue response parity across other operator pages as concrete gaps arise.
+   Review older nullable/history data before adding strict response filtering.
 
 Keep further refactoring tied to a boundary or contract gap in this list rather
 than file size alone. See [extending controls](extending-controls.md) for the

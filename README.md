@@ -397,7 +397,9 @@ usable. Loss of all usable data bypasses the delay, and applying a project clear
 it so corrected bindings can be tried immediately.
 
 Filter diagnostic tags by name, sample quality, and PLC connection or local HMI
-source. JSON exports use the same tag filters.
+source. JSON exports use the same tag filters. Invalid activity or diagnostics
+responses retain the last readable page with a warning and block forward paging;
+access denial clears the retained page.
 Diagnostics also shows background worker health and retry state. Grant `activity.view` / `diagnostics.view` through HMI
 groups; security administrators can inspect both. See
 [journal behavior, recovery and retention](docs/activity-and-diagnostics.md).

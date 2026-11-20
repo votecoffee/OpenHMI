@@ -1,5 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { api } from './api.mjs';
+import { activityOutcomes, isActivityPage } from './activity-api.mjs';
+import { isDiagnosticsSnapshot } from './diagnostics-api.mjs';
 import { commandHistoryPath, commandTransactionPath } from './command-api.mjs';
 import { commandStates, isCommandPage, isCommandRecord } from './command-status.mjs';
 import { SecurityContext, allowed, canInspect } from './security.jsx';
@@ -71,29 +73,6 @@ function activityParams(filters, before) {
   for (const key of ['start', 'end']) if (filters[key]) query.set(key, new Date(filters[key]).toISOString());
   if (before) query.set('before_id', before);
   return query;
-}
-
-const activityOutcomes = ['pending', 'succeeded', 'denied', 'rejected', 'uncertain', 'interrupted'];
-
-function isActivityRecord(item) {
-  const isObject = value => value != null && typeof value === 'object' && !Array.isArray(value);
-  const optionalText = value => value == null || typeof value === 'string';
-  if (!isObject(item) || !activityOutcomes.includes(item.status) || !isObject(item.context)
-    || !['operation_id', 'started_at', 'actor', 'provider', 'operation', 'entity', 'phase']
-      .every(key => typeof item[key] === 'string')) return false;
-  const { context, outcome } = item;
-  return Array.isArray(item.groups) && item.groups.every(group => typeof group === 'string')
-    && [item.finished_at, item.error, context.tag, context.target, context.before?.quality, context.before?.timestamp]
-      .every(optionalText)
-    && (outcome === null || (isObject(outcome) && optionalText(outcome.verification)
-      && optionalText(outcome.observed_at) && (outcome.count == null || Number.isSafeInteger(outcome.count))));
-}
-
-function isActivityPage(page) {
-  return Array.isArray(page?.items) && page.items.every(isActivityRecord) && typeof page.has_more === 'boolean'
-    && (page.has_more ? Number.isSafeInteger(page.next_before_id) && page.next_before_id > 0 : page.next_before_id === null)
-    && [page.pending_finalizations, page.retention_days, page.max_resolved_rows]
-      .every(value => Number.isSafeInteger(value) && value >= 0);
 }
 
 export function ActivityConsole() {
@@ -203,27 +182,6 @@ function WorkerHealth({ workers }) {
       </tr>)}</tbody>
     </table>
   </>;
-}
-
-function isDiagnosticsSnapshot(data, offset) {
-  if (data?.offset !== offset || !Number.isSafeInteger(data.total_tags) || data.total_tags < 0
-    || typeof data.plc_hold !== 'boolean' || (data.next_offset !== null
-      && (!Number.isSafeInteger(data.next_offset) || data.next_offset <= offset))) return false;
-  const textFields = (row, ...fields) => row != null && fields.every(field => typeof row[field] === 'string');
-  const optionalText = value => value == null || typeof value === 'string';
-  const optionalNumber = value => value == null || Number.isFinite(value);
-  return Array.isArray(data.tags) && data.tags.every(tag => textFields(tag, 'name', 'address', 'type', 'quality')
-      && optionalText(tag.connection) && optionalText(tag.timestamp) && optionalText(tag.error) && optionalNumber(tag.age_seconds))
-    && Array.isArray(data.workers) && data.workers.every(worker => textFields(worker, 'id', 'state')
-      && Number.isSafeInteger(worker.failures) && optionalText(worker.last_success_at) && optionalText(worker.last_error_type)
-      && optionalNumber(worker.retry_in_seconds) && (worker.state !== 'overdue' || Number.isFinite(worker.running_seconds)))
-    && Array.isArray(data.connections) && data.connections.every(route => textFields(route, 'id', 'name', 'path', 'state')
-      && optionalText(route.error) && [route.read_calls, route.tags_read, route.route_failures].every(Number.isSafeInteger)
-      && Array.isArray(route.groups) && route.groups.every(group => Number.isFinite(group?.rate_ms)
-        && Array.isArray(group.addresses) && group.addresses.every(address => typeof address === 'string'))
-      && route.timings && typeof route.timings === 'object' && !Array.isArray(route.timings)
-      && Object.values(route.timings).every(timing => timing && ['last_ms', 'p50_ms', 'p95_ms', 'p99_ms', 'count']
-        .every(field => Number.isFinite(timing[field]))));
 }
 
 const diagnosticQualities = {
