@@ -461,9 +461,19 @@ not close hardware or operator acceptance gates.
     upload limits and early stream termination are verified. Focused imports do
     not load Pillow, recipe services or the server.
 
+41. Delivered a focused recipe transfer HTTP registrar for history, detail/export
+    and dispatch. The combined registrar retains service ownership; canonical
+    request models, handler bodies, route order and complete OpenAPI are unchanged.
+    Standalone HTTP tests use an in-memory journal to verify query/role/export
+    boundaries, recipe-local/HMI attribution, conditional security checks and
+    journal-before-dispatch ordering. Invalid requests, denied identity and an
+    unavailable journal do not dispatch. Existing domain, SQL and browser contracts
+    continue to protect transfer behavior without controller access.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe transfer HTTP router separation next. Keep further module extraction tied
-to a concrete responsibility or compatibility gap.
+Next review the remaining recipe CRUD, selection and policy adapters as one cohesive
+recipe-library responsibility. Extract only if it improves an actual ownership or
+compatibility boundary; keep service orchestration and transfer execution intact.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

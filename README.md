@@ -634,6 +634,10 @@ Recipe policy and raw image-upload helpers also have version, permission, binary
 payload, image normalization and failure-recovery contracts. Recipe session UI
 and authentication helpers are separate, with contracts for local cookies, HMI
 account delegation, expiry, strict login/logout models and sign-out recovery.
+Recipe transfer history, exports and dispatch now have a focused HTTP registrar.
+Standalone tests use an in-memory activity journal to check identity attribution,
+authorization and journal failures before dispatch, alongside existing SQL,
+simulator and browser transfer contracts. Complete OpenAPI output is unchanged.
 Recipe transfer helpers cover history/status query separation, revision-guarded
 dispatch, audit receipts and JSON export using simulator-only contracts.
 Transfer response guards retain readable history on malformed replies, disable

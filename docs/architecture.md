@@ -558,8 +558,16 @@ service. Handler bodies and complete OpenAPI output are unchanged. Standalone
 HTTP tests verify public cache/security headers, byte/reason/identity forwarding,
 role/MIME/model guards and exact/overflow upload limits. A chunked-request test
 confirms overflow stops consumption before later chunks or service dispatch.
-Focused imports do not load Pillow, recipe services or the server. Transfer HTTP
-route separation is next. Preserve model/import
+Focused imports do not load Pillow, recipe services or the server. Transfer history,
+detail/export and dispatch handlers now live in `recipe_transfer_routes.py`.
+The combined registrar retains service construction and supplies the existing
+journal, authorization and error translation. Handler bodies, route order,
+canonical request models and complete OpenAPI output are unchanged. Standalone
+HTTP tests with an in-memory journal cover bounded queries, role checks, export
+headers, recipe-local/HMI identity attribution, conditional group authorization,
+and journal-before-dispatch ordering. Validation, denied identity and unavailable
+journal cases prevent dispatch. Focused imports do not load recipe services,
+pycomm3 or the server. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
