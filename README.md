@@ -589,7 +589,9 @@ in memory, compare its control kinds with Pydantic, and check complete control a
 project serialization round trips, including optional fields and Unicode text.
 They also compare UDT faceplate bindings with backend expansion and validate
 real browser write, button, subscription, project save/apply and alarm
-acknowledgement payloads against the router models. Catalog rebuild checks cover
+acknowledgement payloads against the router models. Trend capture commands,
+identity station claims/renewals/releases and binary image uploads also exercise
+the actual browser helpers, including project headers and encoded Unicode paths. Catalog rebuild checks cover
 tag-option freshness and numeric versus text choices. Family/category coverage
 checks reject missing or duplicated controls, and engineering integration tests
 feed the real draft catalog through browser pickers and backend validation.

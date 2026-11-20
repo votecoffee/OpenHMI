@@ -227,9 +227,16 @@ not close hardware or operator acceptance gates.
    ownership. Local edits survive unchanged applies, changed routes invalidate
    their own samples, and retired connections close outside the state lock.
    Tests cover held acquisition, catalog compatibility and diagnostic isolation.
-   Next, separate API registration still embedded in command, trend-recording,
-   canvas-image and identity-publication services, preserving existing contracts
-   and authorization/journal behavior.
+8. Delivered the remaining service-embedded command-history, trend-recording,
+   canvas-image and identity-publication registrars in focused router modules.
+   Shared request contracts and legacy registrar/model exports preserve callers.
+   Production browser capture/station helpers and binary image uploads have
+   Pydantic/transport compatibility coverage. Authorization, limits, error mapping
+   and service transactions retain their existing boundaries.
+
+The current control/router/driver separation baseline is delivered. Next, review
+project schema definitions versus SQLite revision persistence in `projects.py`;
+keep model/import compatibility and revision/migration/apply transactions intact.
 
 Each increment must pass relevant regression tests and contract checks before
 publication. See [module boundaries](architecture.md#module-boundaries-and-compatibility-checks).

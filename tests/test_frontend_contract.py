@@ -9,12 +9,15 @@ from pathlib import Path
 import subprocess
 import unittest
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 from openhmi.projects import Control, Project, SaveRequest, ApplyRequest
 from openhmi.screens import expanded_controls
 from openhmi.control_contracts import ButtonRequest, ValueRequest, EDIT_INPUTS
 from openhmi.acquisition_routes import SubscriptionRequest
 from openhmi.alarm_contracts import AcknowledgeRequest, SelectedAcknowledgement
+from openhmi.trend_contracts import CaptureCommand
+from openhmi.identity_contracts import StationClaim
+from urllib.parse import parse_qs, urlsplit, unquote
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,6 +115,44 @@ class FrontendContractTests(unittest.TestCase):
         for request in requests:
             self.assertEqual(request['headers']['X-OpenHMI-Project'], 'a' * 32)
             self.assertEqual(request['headers']['Content-Type'], 'application/json')
+
+    def test_capture_station_and_image_requests_match_service_contracts(self):
+        requests = frontend('service_requests')
+        self.assertEqual(len(requests), 8)
+        for request, action, capture in zip(requests[:3], ['start', 'stop', 'delete'], [0, 123, 123], strict=True):
+            self.assertEqual(unquote(request['path']), '/api/trends/设备 / trend?#')
+            self.assertNotIn('?', request['path'])
+            self.assertEqual(request['method'], 'POST')
+            body = CaptureCommand.model_validate(request['body'])
+            self.assertEqual((body.action, body.capture_id), (action, capture))
+        self.assertEqual(requests[3]['path'], '/api/security/publication')
+        self.assertNotIn('body', requests[3])
+        for request, suffix in zip(requests[4:7], ['claim', 'claim?renew=true', 'release'], strict=True):
+            self.assertEqual(request['path'], '/api/security/publication/' + suffix)
+            self.assertEqual(request['method'], 'POST')
+            self.assertEqual(StationClaim.model_validate(request['body']).client, 'station 设备')
+        self.assertEqual(parse_qs(urlsplit(requests[5]['path']).query), {'renew': ['true']})
+        image = requests[7]
+        self.assertEqual(urlsplit(image['path']).path, '/api/canvas-images')
+        self.assertEqual(parse_qs(urlsplit(image['path']).query), {'name': ['机器 pic #.png']})
+        self.assertEqual(image['method'], 'POST')
+        self.assertEqual(image['upload'], {'name': '机器 pic #.png', 'type': 'image/png', 'bytes': [137, 80, 78, 71]})
+        self.assertTrue(image['timeout'])
+        self.assertNotIn('Content-Type', image['headers'])
+        for request in requests:
+            self.assertEqual(request['headers']['X-OpenHMI-Project'], 'a' * 32)
+        for request in [*requests[:3], *requests[4:7]]:
+            self.assertEqual(request['headers']['Content-Type'], 'application/json')
+
+    def test_capture_and_station_contracts_reject_invalid_payloads(self):
+        for body in ({'action': 'restart'}, {'action': 'start', 'capture_id': True},
+                     {'action': 'stop', 'capture_id': -1}, {'action': 'delete', 'capture_id': 2**63},
+                     {'action': 'start', 'extra': 1}):
+            with self.subTest(body=body), self.assertRaises(ValidationError):
+                CaptureCommand.model_validate(body)
+        for body in ({'client': ''}, {'client': 'x' * 101}, {'client': 123}, {'client': 'station', 'extra': True}):
+            with self.subTest(body=body), self.assertRaises(ValidationError):
+                StationClaim.model_validate(body)
 
     def test_project_and_alarm_payloads_match_lifecycle_models(self):
         project = Project.model_validate(self.defaults['project']).model_dump(mode='json')

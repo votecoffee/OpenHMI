@@ -12,22 +12,26 @@ from fastapi.staticfiles import StaticFiles
 
 from .application import Application
 from .activity import ActivityJournal
-from .commands import CommandService, add_command_routes
+from .commands import CommandService
+from .command_routes import add_command_routes
 from .operations_routes import add_operations_routes
 from .logix import RuntimeDriver
 from .runtime_workers import RuntimeWorkers
 from .historian import Historian
 from .history_routes import add_history_routes
-from .trend_recording import TrendRecorder, add_trend_routes
+from .trend_recording import TrendRecorder
+from .trend_routes import add_trend_routes
 from .alarms import AlarmMonitor
 from .alarm_routes import add_alarm_routes
-from .identity_publish import IdentityPublisher, add_identity_routes
+from .identity_publish import IdentityPublisher
+from .identity_routes import add_identity_routes
 from .recipe_routes import add_recipe_routes
 from .security import Security
 from .security_routes import add_security_routes
 from .projects import Project, ProjectStore, RevisionConflict, ApplyRequest, SaveRequest
 from .project_routes import add_project_routes
-from .canvas import CanvasImages, add_canvas_routes
+from .canvas import CanvasImages
+from .canvas_routes import add_canvas_routes
 
 
 # Compatibility imports for existing callers of the application entry point.

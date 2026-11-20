@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { api, json } from './api.mjs';
+import { publicationStatus, claimPublicationStation, releasePublicationStation } from './identity-api.mjs';
 import { Live } from './live-quality.jsx';
 
 function validateStatus(state) {
@@ -27,8 +27,8 @@ export function PublicationStation({ session }) {
     async function refresh() {
       try {
         const state = validateStatus(renewing && permitted
-          ? await api('/api/security/publication/claim?renew=true', json('POST', { client }))
-          : await api('/api/security/publication'));
+          ? await claimPublicationStation(client, true)
+          : await publicationStatus());
         if (!stopped) {
           setStatus(state);
           setUnavailable(false);
@@ -54,7 +54,7 @@ export function PublicationStation({ session }) {
     setRenewing(false);
     setMessage('');
     try {
-      const next = validateStatus(await api(`/api/security/publication/${action}`, json('POST', { client })));
+      const next = validateStatus(await (action === 'claim' ? claimPublicationStation(client) : releasePublicationStation(client)));
       const claimed = action === 'claim';
       if ((next.owner === client) !== claimed) throw new Error('Station ownership was not confirmed');
       setStatus(next);

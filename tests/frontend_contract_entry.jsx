@@ -2,7 +2,9 @@
 import { createConfig } from '../frontend/controls.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
 import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
-import { api } from '../frontend/api.mjs';
+import { api, uploadProjectImage } from '../frontend/api.mjs';
+import { sendCaptureCommand } from '../frontend/trend-api.mjs';
+import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject } from '../frontend/project-api.mjs';
 import { acknowledgeAlarms } from '../frontend/alarm-api.mjs';
@@ -65,16 +67,30 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
+      const upload = options.body instanceof Blob;
       requests.push({ path, method: options.method, headers: options.headers,
-        keepalive: options.keepalive, body: options.body && JSON.parse(options.body) });
+        keepalive: options.keepalive, body: upload ? null : options.body && JSON.parse(options.body),
+        ...(upload ? { upload: { name: options.body.name, type: options.body.type, bytes: Array.from(new Uint8Array(await options.body.arrayBuffer())) },
+          timeout: options.signal instanceof AbortSignal } : {}) });
       return new Response(JSON.stringify({ ok: true, project_instance: 'a'.repeat(32) }), {
         headers: { 'Content-Type': 'application/json' },
       });
     };
     await api('/api/project');
+    if (request.operation === 'service_requests') {
+      for (const [action, captureId] of [['start', 0], ['stop', 123], ['delete', 123]]) {
+        await sendCaptureCommand('设备 / trend?#', action, captureId);
+      }
+      await publicationStatus();
+      await claimPublicationStation('station 设备');
+      await claimPublicationStation('station 设备', true);
+      await releasePublicationStation('station 设备');
+      await uploadProjectImage(new File([new Uint8Array([137, 80, 78, 71])], '机器 pic #.png', { type: 'image/png' }));
+      return requests.slice(1);
+    }
     if (request.operation === 'lifecycle_requests') {
       await saveProjectDraft(request.project, 123);
       await applyLiveProject(123, '  更改画面  ');

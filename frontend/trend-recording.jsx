@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { api, json } from './api.mjs';
+import { api } from './api.mjs';
+import { trendCapturePath, sendCaptureCommand } from './trend-api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 
@@ -54,7 +55,7 @@ export function useTrendCaptures(id, editing, recording) {
   const [error, setError] = useState('');
   const [selection, setSelection] = useState('auto');
   const [busy, setBusy] = useState(false);
-  const url = '/api/trends/' + encodeURIComponent(id);
+  const url = trendCapturePath(id);
   const current = response?.url === url ? response : null;
   const status = current?.status;
   const available = current?.available === true;
@@ -87,7 +88,7 @@ export function useTrendCaptures(id, editing, recording) {
     if (!available || busy) return;
     setBusy(true);
     try {
-      await api(url, json('POST', { action, capture_id: captureId }));
+      await sendCaptureCommand(id, action, captureId);
       if (action === 'start' || action === 'delete') setSelection('auto');
       setError('');
     } catch (problem) {

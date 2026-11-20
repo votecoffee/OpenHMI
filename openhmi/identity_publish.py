@@ -5,9 +5,10 @@ from copy import deepcopy
 import time
 from threading import RLock
 from typing import Literal
-from fastapi import HTTPException, Request
+from fastapi import HTTPException
 from pydantic import Field, model_validator
 from .runtime_models import Model
+from .identity_contracts import StationClaim  # compatibility export
 
 
 class PrivilegeBit(Model):
@@ -33,10 +34,6 @@ class IdentityPublication(Model):
         if self.heartbeat_tag and self.heartbeat_tag in (self.username_tag, self.privileges_tag):
             raise ValueError('Heartbeat must use its own DINT tag')
         return self
-
-
-class StationClaim(Model):
-    client: str = Field(min_length=1, max_length=100)
 
 
 class IdentityPublisher:
@@ -185,15 +182,5 @@ class IdentityPublisher:
         self.poll()
 
 
-def add_identity_routes(app, publisher):
-    @app.get('/api/security/publication')
-    def status():
-        return publisher.snapshot()
-
-    @app.post('/api/security/publication/claim')
-    def claim(body: StationClaim, request: Request, renew: bool = False):
-        return publisher.claim(request, body.client, renew=renew)
-
-    @app.post('/api/security/publication/release')
-    def release(body: StationClaim, request: Request):
-        return publisher.release(request, body.client)
+# Compatibility export for existing service imports.
+from .identity_routes import add_identity_routes

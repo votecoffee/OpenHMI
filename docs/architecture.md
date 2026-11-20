@@ -175,7 +175,14 @@ paths, authorization, revision guards and lock ownership.
   and runtime reconfiguration. `alarm_ack_routes.py` owns alarm snapshots and
   individual, selected and all acknowledgements, with request models in
   `alarm_contracts.py`. Existing review/history, note and shelving APIs remain
-  in `alarm_routes.py`. Legacy request-model imports from `server.py` remain
+  in `alarm_routes.py`. Command history/export, trend recording, canvas-image and
+  identity-publication HTTP registration now live in `command_routes.py`,
+  `trend_routes.py`, `canvas_routes.py` and `identity_routes.py`. Their request
+  contracts are shared through `command_contracts.py`, `trend_contracts.py` and
+  `identity_contracts.py`. Existing registrar/model imports from service modules
+  remain compatible; `server.py` imports the focused registrars directly.
+  Service authorization, query limits, error mapping, upload bounds and response
+  headers retain their prior behavior. Legacy request-model imports from `server.py` remain
   compatible. `engineering_routes.py` owns the draft engineering catalog, and
   `project_validation.py` supplies the same binding validator to save, staging,
   merge and apply. The validator closes over explicit services and the asset
@@ -239,7 +246,14 @@ against the lifecycle models, including revision numbers, Unicode comments,
 selected IDs, default apply reasons and project identity headers. Additional
 catalog cases check unscaled integer, real, text-only, read-only and empty tag
 sets, plus isolation after a prior configuration's options/defaults are mutated.
-The DOM-free contract tests send no runtime/controller requests.
+`trend-api.mjs` and `identity-api.mjs` centralize the browser's capture and station
+ownership requests. Their contract checks validate start/stop/delete payloads,
+strict IDs, claim/renew/release bodies, Unicode names, encoded control paths and
+project headers. Existing `uploadProjectImage` is tested with a binary File,
+encoded filename, unchanged bytes, a timeout signal and browser-supplied media
+headers. Invalid capture actions/IDs, station types/lengths and extra fields are
+rejected by the Pydantic models. The DOM-free contract tests send no
+runtime/controller requests.
 
 `tests/test_engineering_contract.py` additionally uses an in-process TestClient
 to feed the real draft catalog through `engineeringCatalog` and palette tag
@@ -306,9 +320,10 @@ hold. It verifies the retired-connection lock boundary, live catalog replacement
 independent driver instances, status DTO isolation and lazy optional diagnostics.
 Existing blocked-read/project-switch tests continue to check obsolete receipts.
 
-Next, separate API registration still embedded in command, trend-recording,
-canvas-image and identity-publication services. Preserve project-instance
-identity, write non-replay behavior, apply rollback, command locks and journal
-ordering in further extractions. Extend the contract fixtures whenever a request
+The current control-family, HTTP-registration and driver-responsibility
+separation baseline is delivered. Next, review the boundary between project
+schema definitions and SQLite revision persistence in `projects.py`. Preserve
+model/import compatibility, project-instance identity, write non-replay behavior,
+apply rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software
 checks do not establish controller or operator-station acceptance.
