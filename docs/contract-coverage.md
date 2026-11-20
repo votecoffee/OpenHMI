@@ -34,6 +34,7 @@ the [project plan](project-plan.md). No PLC access or soak is required here.
 | Recipe write requests | `test_recipe_mutation_contract.py`: production create/revise/transition/select helpers and content normalization through strict models and SQL-backed lifecycle routes; same-user approval, stale conflicts, loaded-copy independence, denials and HTTP error propagation | Identity and publication hooks are stubbed; browser/domain tests cover local authentication and workflow; synthetic receipt headers do not add journal semantics to recipe routes |
 | Recipe policy/image uploads | `test_recipe_settings_contract.py`: actual policy PUT and raw File POST through strict models and SQL-backed routes; version conflicts, Boolean permit fixtures, reason encoding, binary fidelity, PNG/JPEG normalization, denials and upload bounds | Identity hooks and permit values are mocked; HTTP streaming size limit is tested using generated URL/headers with a bounded synthetic payload; no PLC acceptance |
 | Recipe authentication/session requests | `test_recipe_session_contract.py`: production read/login/logout helpers through real RecipeAuth and SQL-backed HMI Security; strict models, cookie rotation/expiry, origin rejection, account delegation and group permission changes | Windows identity provider is mocked; browser tests cover local form/logout errors and HMI UI delegation; no new session-response guard or OS/domain acceptance |
+| Recipe transfer requests/queries | `test_recipe_transfer_contract.py`: actual browser helpers through SQL-backed routes with simulator-only staging; filter/status query separation, precise cursors, strict bounds/models, stale guards, receipts and JSON export | Transport factory is forbidden; domain/browser regressions cover completion and running-copy verification; no live controller acceptance or full response guard contract |
 | Runtime faults and status | Domain tests and selected browser fault-injection workflows for stale/bad data, malformed responses and recovery | Response DTO parity is not yet a complete cross-language schema contract |
 
 ## Delivered query contracts
@@ -211,10 +212,21 @@ Browser checks cover bad credentials, retained identity on failed logout, cleare
 password after successful sign-out, and HMI sign-in/out delegation. Component
 state/callback ordering and existing server response behavior are unchanged.
 
+Recipe transfer query/dispatch/export helpers now share `recipe-transfer-api.mjs`.
+History identity excludes the verified target, while the status endpoint includes
+it when selected. Tests bind actual browser requests through SQL-backed routes
+using simulator-only staging and a forbidden transport factory. Contracts cover
+empty/default/filter queries, Unicode encoding, signed-64-bit cursor strings,
+query/model rejection before service calls, stale project/revision rejection
+before staging, unauthenticated reads/dispatch, durable operation receipts and
+JSON detail/export parity. Optional synthetic receipt/error propagation verifies
+non-replay. Panel polling, selection/revision fences, permission checks and
+retained history ownership remain unchanged.
+
 ## Next bounded work
 
-1. Extract recipe transfer query/dispatch helpers and contract tests, preserving
-   revision guards, permissions, receipts and non-replay behavior.
+1. Cover recipe transfer response parity, reviewing historical/nullable metadata
+   before introducing view-level guards.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

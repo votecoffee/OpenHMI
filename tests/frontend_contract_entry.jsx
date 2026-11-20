@@ -1,6 +1,7 @@
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe } from '../frontend/recipe-auth.mjs';
+import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
 import { requireIdentitySnapshot, readSecuritySession } from '../frontend/security-session.mjs';
 import { activityOutcomes, isActivityPage, readActivity, activityCsvPath } from '../frontend/activity-api.mjs';
@@ -158,7 +159,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries' || request.operation === 'alarm_mutations' || request.operation === 'recipe_mutations' || request.operation === 'recipe_sessions') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries' || request.operation === 'alarm_mutations' || request.operation === 'recipe_mutations' || request.operation === 'recipe_sessions' || request.operation === 'recipe_transfers') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -166,14 +167,28 @@ export async function contract(request) {
         keepalive: options.keepalive, timed: options.signal instanceof AbortSignal, body: upload ? null : options.body && JSON.parse(options.body),
         ...(upload ? { upload: { name: options.body.name, type: options.body.type, bytes: Array.from(new Uint8Array(await options.body.arrayBuffer())) },
           timeout: options.signal instanceof AbortSignal } : {}) });
-      const mutation = ['alarm_mutations', 'recipe_mutations', 'recipe_sessions'].includes(request.operation) && path !== '/api/project';
+      const mutation = ['alarm_mutations', 'recipe_mutations', 'recipe_sessions', 'recipe_transfers'].includes(request.operation) && path !== '/api/project';
       const status = mutation ? request.status ?? 200 : 200;
-      return new Response(JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: 'a'.repeat(32) }), {
+      return new Response(JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) }), {
         status, headers: { 'Content-Type': 'application/json', ...(mutation ? {
           'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });
     };
     await api('/api/project');
+    if (request.operation === 'recipe_transfers') {
+      const histories = [], results = [];
+      for (const item of request.queries ?? []) {
+        const paths = recipeTransferPaths(item.filters, item.before, item.verified, item.options);
+        histories.push(paths.historyQuery);
+        await api(paths.endpoint);
+      }
+      for (const item of request.details ?? []) await api(recipeTransferPath(item.id, item.options));
+      for (const item of request.dispatches ?? []) {
+        try { results.push(await dispatchRecipeTransfer(item.profile, item.revision, item.version, item.project, item.reason)); }
+        catch (error) { results.push({ error: error.message, status: error.status, operation_id: error.operation_id, audit_status: error.audit_status }); }
+      }
+      return { requests: requests.slice(1), histories, results };
+    }
     if (request.operation === 'recipe_sessions') {
       const results = [];
       for (const item of request.actions) {

@@ -634,6 +634,8 @@ Recipe policy and raw image-upload helpers also have version, permission, binary
 payload, image normalization and failure-recovery contracts. Recipe session UI
 and authentication helpers are separate, with contracts for local cookies, HMI
 account delegation, expiry, strict login/logout models and sign-out recovery.
+Recipe transfer helpers cover history/status query separation, revision-guarded
+dispatch, audit receipts and JSON export using simulator-only contracts.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

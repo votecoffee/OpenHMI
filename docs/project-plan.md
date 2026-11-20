@@ -397,8 +397,16 @@ not close hardware or operator acceptance gates.
     callbacks and workspace refresh ownership remain intact. Windows/domain
     acceptance and stricter session response filtering remain separate.
 
+33. Delivered recipe transfer query/dispatch/export helpers. SQL-backed
+    simulator-only contracts cover separate history/status queries, encoding,
+    precise cursors, bounds, strict request models, stale guards before staging,
+    unauthenticated requests, durable receipts and JSON export parity. Panel
+    polling, selection/project revision fences, permissions, retained-history
+    identity and non-replay behavior remain intact. Transport creation is
+    forbidden in the contract fixture; controller acceptance remains separate.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize recipe transfer query/dispatch helpers and contracts next. Keep further module extraction tied
+Prioritize recipe transfer response parity and historical metadata review next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before

@@ -492,7 +492,14 @@ strict request models, origin rejection and live group permission changes.
 Configured HMI security ignores legacy recipe cookies. Browser regressions cover
 failed logout retention, recovery and HMI sign-in/out permission delegation.
 No new session-response filtering or authentication policy is introduced. Recipe
-transfer query/dispatch helpers and contracts are next. Preserve model/import
+transfer history/status query builders, detail/export paths and dispatch requests
+now live in `recipe-transfer-api.mjs`. History query identity remains independent
+of the verified target; polling, selection revision, refresh fences, permissions
+and receipt ownership stay in the panel. Actual browser requests bind through
+SQL-backed routes with simulator-only staging, checking bounds, filters, exact
+cursors, request models, version rejection, audit receipts and JSON export.
+The transport factory is forbidden in these fixtures. Transfer response parity
+and historical metadata compatibility are next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

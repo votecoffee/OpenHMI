@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { api, json } from './api.mjs';
+import { api } from './api.mjs';
+import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from './recipe-transfer-api.mjs';
 import { SecurityContext, allowed as hasPermission } from './security.jsx';
 
 export function RecipeTransferPanel({ source, session, reason, dirty, busy, setBusy, loadingAllowed, setMessage }) {
@@ -15,13 +16,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
   const [loadedVersion, setLoadedVersion] = useState(0);
   const [receipt, setReceipt] = useState(null);
   const identity = session.user?.name;
-  const parameters = new URLSearchParams({ limit: '25' });
-  if (before) parameters.set('before_id', before);
-  if (applied.profile) parameters.set('profile_id', applied.profile);
-  if (applied.production) parameters.set('production_approved', applied.production);
-  const historyQuery = parameters.toString();
-  if (selection) parameters.set('verified_profile', selection.id);
-  const endpoint = `/api/recipe-transfers?${parameters}`;
+  const { historyQuery, endpoint } = recipeTransferPaths(applied, before, selection ? selection.id : null);
   useEffect(() => {
     if (!identity) { setData(null); return; }
     let stopped = false, timer;
@@ -56,9 +51,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
     if (!source || !reason.trim()) { setMessage('Choose a recipe revision and enter a transfer reason.'); return; }
     setBusy(true);
     try {
-      const result = await api(`/api/recipe-transfers/${encodeURIComponent(target)}/dispatch`, json('POST', {
-        revision_id: source.id, expected_revision_version: source.version, expected_project_revision: selection.revision, reason,
-      }));
+      const result = await dispatchRecipeTransfer(target, source.id, source.version, selection.revision, reason);
       setMessage(`PLC transfer requested. Transaction ${result.transaction.id}. Completion requires PLC acknowledgement and a verified running copy.${result.audit_status === 'pending' ? ' Activity journal finalization is pending.' : ''}`);
       setReceipt({ id: result.transaction.id, identity });
       setBefore(null);
@@ -108,7 +101,7 @@ export function RecipeTransferPanel({ source, session, reason, dirty, busy, setB
       <td>{item.snapshot.production_approved ? 'Production approved' : 'Test / not production approved'}<br />{item.snapshot.approved_by && `Approved by ${item.snapshot.approved_by}`}</td>
       <td>{item.transaction.state}{item.transaction.result_code !== null ? ` · result ${item.transaction.result_code}` : ''}</td>
       <td><details><summary>Transfer details</summary><p>Requested by {item.snapshot.transferred_by}: {item.snapshot.transfer_reason}</p><p>{item.transaction.error}</p>{item.transaction.events.map((event, i) => <p key={i}>{event.state}: {event.detail}</p>)}<p>Content hash: {item.snapshot.content_hash}</p><p>Transfer hash: {item.transfer_hash}</p>
-        <p><a href={`/api/recipe-transfers/${item.id}?download=true`}>Download recipe transfer JSON</a></p>
+        <p><a href={recipeTransferPath(item.id, { download: true })}>Download recipe transfer JSON</a></p>
         <a href={`/activity?search=${encodeURIComponent(item.transaction.operation_id)}`}>Operator activity</a></details></td>
     </tr>)}</tbody></table>
     {history?.length === 0 && <p>{applied.profile || applied.production ? 'No recipe transfers match these filters.' : 'No recipe transfers on this page.'}</p>}
