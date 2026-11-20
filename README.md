@@ -623,7 +623,9 @@ state, partial faults, stale recovery and lightweight diagnostics polling.
 Alarm-console query contracts bind actual filter, paging, detail, note and CSV
 URLs through SQL-backed routes, including UTC conversion and exact cursor strings.
 Detailed alarm-response contracts share DOM-free validators and reject incoherent
-paging while preserving nullable and legacy metadata.
+paging while preserving nullable and legacy metadata. Alarm note/shelve/restore
+mutation contracts cover production request helpers, strict models, attribution,
+permission denials, stale restore guards and audit receipt/error propagation.
 Activity/diagnostics query contracts send actual browser-generated URLs through
 the registrar, covering filters, UTC dates, paging, export permissions and headers.
 API regression checks also preserve validation precedence and the saved draft

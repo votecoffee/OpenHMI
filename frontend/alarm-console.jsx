@@ -1,9 +1,8 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { PrioritySymbol } from './alarm-controls.jsx';
-import { acknowledgeAlarms, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents } from './alarm-api.mjs';
+import { acknowledgeAlarms, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents, saveAlarmNote, shelveAlarm, restoreAlarm } from './alarm-api.mjs';
 import { Live, Quality, sampleQualityProblem, tagQuality, alarmMonitorProblem, alarmEvaluationPending, unavailableAlarmTriggers } from './live-quality.jsx';
 import { useLocalization, LanguageSelector, alarmMessage } from './localization.jsx';
-import { api, json } from './api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import './alarm-workflows.css';
 import { AlarmShelving } from './alarm-shelving.jsx';
@@ -67,7 +66,7 @@ export function AlarmConsole() {
   }
   async function saveNote(event) {
     event.preventDefault(); setBusy(true);
-    try { const result = await api(alarmNotesPath(identifier), json('POST', { comment: note })); setNote(''); setNotesBefore(null); setGeneration(value => value + 1); setFeedback(result.audit_status === 'pending' ? ui('alarmNotePending', { id: result.operation_id }) : ui('noteSaved')); }
+    try { const result = await saveAlarmNote(identifier, note); setNote(''); setNotesBefore(null); setGeneration(value => value + 1); setFeedback(result.audit_status === 'pending' ? ui('alarmNotePending', { id: result.operation_id }) : ui('noteSaved')); }
     catch (problem) { setFeedback(problem.message); }
     finally { setBusy(false); }
   }
@@ -78,8 +77,8 @@ export function AlarmConsole() {
   async function changeShelf(item = null) {
     setBusy(true);
     try {
-      const result = item ? await api(`/api/alarms/shelves/${encodeURIComponent(item.alarm_id)}/restore`, json('POST', { expected_operation_id: item.operation_id, reason: shelfReason }))
-        : await api(`/api/alarms/occurrences/${identifier}/shelve`, json('POST', { duration_seconds: Number(shelfDuration), reason: shelfReason }));
+      const result = item ? await restoreAlarm(item.alarm_id, item.operation_id, shelfReason)
+        : await shelveAlarm(identifier, shelfDuration, shelfReason);
       setFeedback(result.audit_status === 'pending' ? ui('shelfPending', { id: result.operation_id }) : ui(item ? 'shelfRestored' : 'shelfSaved'));
       setSelected([]); setGeneration(value => value + 1);
     } catch (problem) { setFeedback(problem.message); }

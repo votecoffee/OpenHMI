@@ -17,7 +17,7 @@ import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription, requireTagSnapshot, tagSnapshotPath } from '../frontend/runtime-api.mjs';
 import { saveProjectDraft, applyLiveProject, isAppliedProjectSnapshot, appliedProjectPath } from '../frontend/project-api.mjs';
-import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents } from '../frontend/alarm-api.mjs';
+import { acknowledgeAlarms, isAlarmSnapshot, alarmSnapshotPath, alarmOccurrencesPath, alarmEventsPath, alarmDetailPath, alarmNotesPath, alarmEventsCsvPath, alarmStates, alarmShelvingFilters, alarmEvents, saveAlarmNote, shelveAlarm, restoreAlarm } from '../frontend/alarm-api.mjs';
 import { engineeringCatalog } from '../frontend/engineering.jsx';
 import { createPaletteFields } from '../frontend/palette-fields.jsx';
 import { paletteFactories } from '../frontend/palette-components.jsx';
@@ -149,7 +149,7 @@ export async function contract(request) {
     if (JSON.stringify(request.project) !== original) throw new Error('Faceplate resolution mutated the project');
     return controls;
   }
-  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries') {
+  if (request.operation === 'requests' || request.operation === 'lifecycle_requests' || request.operation === 'service_requests' || request.operation === 'command_queries' || request.operation === 'image_queries' || request.operation === 'history_queries' || request.operation === 'operations_queries' || request.operation === 'alarm_mutations') {
     const requests = [];
     globalThis.fetch = async (path, options) => {
       const upload = options.body instanceof Blob;
@@ -157,11 +157,25 @@ export async function contract(request) {
         keepalive: options.keepalive, timed: options.signal instanceof AbortSignal, body: upload ? null : options.body && JSON.parse(options.body),
         ...(upload ? { upload: { name: options.body.name, type: options.body.type, bytes: Array.from(new Uint8Array(await options.body.arrayBuffer())) },
           timeout: options.signal instanceof AbortSignal } : {}) });
-      return new Response(JSON.stringify({ ok: true, project_instance: 'a'.repeat(32) }), {
-        headers: { 'Content-Type': 'application/json' },
+      const mutation = request.operation === 'alarm_mutations' && path !== '/api/project';
+      const status = mutation ? request.status ?? 200 : 200;
+      return new Response(JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: 'a'.repeat(32) }), {
+        status, headers: { 'Content-Type': 'application/json', ...(mutation ? {
+          'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });
     };
     await api('/api/project');
+    if (request.operation === 'alarm_mutations') {
+      const results = [];
+      for (const item of request.mutations) {
+        try {
+          results.push(item.action === 'note' ? await saveAlarmNote(item.id, item.comment)
+            : item.action === 'shelve' ? await shelveAlarm(item.id, item.duration, item.reason)
+            : await restoreAlarm(item.id, item.expected, item.reason));
+        } catch (error) { results.push({ error: error.message, status: error.status, operation_id: error.operation_id, audit_status: error.audit_status }); }
+      }
+      return { requests: requests.slice(1), results };
+    }
     if (request.operation === 'operations_queries') {
       for (const item of request.activity) await readActivity(item.filters, item.before, item.options);
       for (const item of request.diagnostics) await readDiagnostics(item.criteria, item.offset, item.options);

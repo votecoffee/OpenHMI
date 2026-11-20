@@ -158,12 +158,18 @@ be strictly descending with unique safe IDs and last-row cursors, bounded at
 results with warnings and disables older navigation; valid replies recover.
 Row/detail nullable-field rules remain unchanged, without strict HTTP filtering.
 
+Alarm note/shelve/restore helpers now share `alarm-api.mjs`. Contracts bind actual
+browser POST paths and payloads through secured SQL-backed routes, preserving
+Unicode/comments, numeric duration conversion and server-owned attribution.
+Strict-model/path failures precede journal creation; anonymous/limited-user
+denials and stale restore conflicts precede mutation dispatch. Receipts, pending
+audit status and HTTP errors propagate without automatic replay. Tests use
+synthetic sources and never acquire or write PLC data.
+
 ## Next bounded work
 
-1. Extract shared alarm note/shelve/restore mutation helpers and verify real
-   request-model/authorization contracts.
-2. Cover shelving-list query/response contracts separately from occurrence pages.
-3. Continue response parity across other operator pages as concrete gaps arise.
+1. Cover shelving-list query/response contracts separately from occurrence pages.
+2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
 Keep further refactoring tied to a boundary or contract gap in this list rather

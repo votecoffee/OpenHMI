@@ -455,8 +455,13 @@ strictly descending unique IDs and a cursor matching the last row. Existing row/
 detail and nullable metadata rules remain compatible. Real SQL/HTTP response
 contracts cover paging, shelving, notes, cached trigger details and legacy null
 event attribution; browser tests retain readable pages and block older navigation
-through incoherent replies. Next, extract note/shelve/restore mutation helpers
-and verify their request-model/authorization contracts. Preserve model/import
+through incoherent replies. Note/shelve/restore request helpers also live in
+`alarm-api.mjs`, retaining duration conversion, payload fields, project headers,
+timeouts and audit receipts/errors. Secured SQL-backed registrar contracts bind
+actual browser payloads through strict models, permissions and journal dispatch
+guards; anonymous/limited users and stale restore attempts cannot mutate state.
+These routes do not sample or write the source. Shelving-list query/response
+contracts are next. Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
 rollback, command locks and journal ordering in further extractions. Extend the contract fixtures whenever a request
 model, saved control field or editor serialization branch changes. These software

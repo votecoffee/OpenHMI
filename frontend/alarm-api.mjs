@@ -63,3 +63,16 @@ export function alarmNotesPath(identifier, before = null, { limit = null } = {})
   if (limit !== null) query.set('limit', limit);
   return alarmDetailPath(identifier) + '/notes' + (query.size ? '?' + query : '');
 }
+
+export function saveAlarmNote(identifier, comment) {
+  return api(alarmNotesPath(identifier), json('POST', { comment }));
+}
+
+export function shelveAlarm(identifier, duration, reason) {
+  return api(alarmDetailPath(identifier) + '/shelve', json('POST', { duration_seconds: Number(duration), reason }));
+}
+
+export function restoreAlarm(alarmId, expectedOperationId, reason) {
+  return api('/api/alarms/shelves/' + encodeURIComponent(alarmId) + '/restore',
+    json('POST', { expected_operation_id: expectedOperationId, reason }));
+}

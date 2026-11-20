@@ -360,8 +360,15 @@ not close hardware or operator acceptance gates.
     pages. Browser regressions preserve readable results, disable older navigation
     and recover on valid replies; row/detail rules remain compatible.
 
+28. Delivered shared alarm note/shelve/restore request helpers. Secured SQL-backed
+    contracts bind actual browser payloads through strict models, authorization,
+    server attribution and journal dispatch guards. Invalid/denied requests do not
+    mutate state; stale restore conflicts preserve the current shelf. Duration
+    conversion, receipt/error propagation, UI feedback and non-replay behavior
+    remain intact. Fixtures are offline; no controller acceptance is claimed.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Prioritize alarm note/shelve/restore mutation helpers and request-model contracts next. Keep further module extraction tied
+Prioritize shelving-list query/response contracts next. Keep further module extraction tied
 to a concrete responsibility or compatibility gap.
 
 Each increment must pass relevant regression tests and contract checks before
