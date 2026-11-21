@@ -22,6 +22,7 @@ from .projects import ProjectStore
 from .workspace_publication import PublicationError, ensure_available, publish_project
 from .workspace_inventory import ArtifactQuery, InventoryUnavailable, inventory
 from .workspace_contracts import LibrarySnapshot, CreatedProject, ImportedProject, OpenedProject
+from .workspace_import import import_response
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -37,6 +38,8 @@ class ProjectWorkspace:
         self.handlers, self.recipe_users = handlers, recipe_users
         self.hold_connections = hold_connections
         self.lock = asyncio.Lock()
+        self.upload_lock = asyncio.Lock()
+        self.stopping = False
         self.context = None
         self.current = self._app(self.path, handlers)
 
@@ -219,17 +222,21 @@ class ProjectWorkspace:
     async def _shutdown(self):
         # Serialize with switching, then retire whichever runtime the workspace owns.
         async with self.lock:
+            self.stopping = True
             context, self.context = self.context, None
             if context:
                 await finish_cleanup(context.__aexit__(None, None, None))
 
-    async def handle(self, request):
+    def require_management(self, request):
         security = self.current.state.security
         security.require(request, 'security.manage')
         if not security.configured() and self.current.state.recipe_auth.users:
             legacy_user = self.current.state.recipe_auth.user(request.cookies.get('openhmi_recipe_session'))
             if not legacy_user or not legacy_user.permits('administrator'):
                 raise HTTPException(403, 'A legacy recipe administrator or HMI security administrator is required for project management')
+
+    async def handle(self, request):
+        self.require_management(request)
         path = request.url.path
         if request.method == 'GET' and path == '/api/workspace/artifacts':
             try:
@@ -255,13 +262,6 @@ class ProjectWorkspace:
                 logging.exception('Complete backup export failed')
                 raise HTTPException(503, 'Complete backup could not be exported. Review server logs and retry explicitly.') from error
             return Response(data, media_type='application/zip', headers={'Content-Disposition': 'attachment; filename="project.openhmi.zip"'})
-        if request.method == 'POST' and path == '/api/workspace/import':
-            data = bytearray()
-            async for chunk in request.stream():
-                data.extend(chunk)
-                if len(data) > MAX_BACKUP:
-                    raise HTTPException(413, 'Backup upload exceeds 256 MiB')
-            return JSONResponse(await finish_cleanup(asyncio.to_thread(self.import_backup, request.query_params.get('name', ''), bytes(data))))
         if request.method == 'POST' and path in ('/api/workspace/create', '/api/workspace/open'):
             raw = await request.body()
             if len(raw) > 4096:
@@ -284,6 +284,7 @@ class ProjectWorkspace:
             context = self.current.router.lifespan_context(self.current)
             await context.__aenter__()
             self.context = context
+            self.stopping = False
             try:
                 await send({'type': 'lifespan.startup.complete'})
                 await receive()
@@ -298,6 +299,9 @@ class ProjectWorkspace:
         # download of the finished file need not delay HMI requests.
         if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
             return await self.current(scope, receive, send)
+        if scope['method'] == 'POST' and scope['path'] == '/api/workspace/import':
+            response = await import_response(self, Request(scope, receive), MAX_BACKUP)
+            return await response(scope, receive, send)
         detached_backup = scope['method'] == 'GET' and scope['path'] == '/api/workspace/backup'
         # A project switch cannot close a database while an HTTP operation is using it.
         async with self.lock:

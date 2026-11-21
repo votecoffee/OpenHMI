@@ -726,6 +726,21 @@ backpressure tests pause headers and body, switch and close both runtimes, then
 verify exact archive bytes and source identity. Cancellation/send failures never
 restart export or retire the active runtime. This establishes lock ownership,
 not web-server process exit timing or real network throughput.
+`workspace_import.py` now owns backup-upload admission, bounded receive and import
+HTTP orchestration. The workspace supplies one upload slot and its runtime lock,
+plus a shared management authorizer used by all project operations. Admission
+checks the supplied project header and permission without consuming denied bodies.
+Receive runs outside the runtime lock, capped at 256 MiB and 30 seconds; a second
+import returns 429 without waiting or reading its body. Before dispatch, the lock
+is reacquired and shutdown state, captured project identity (including headerless
+callers) and authorization are rechecked. An upload cannot migrate across a switch
+or use a closed runtime after shutdown. Import's thread and cancellation cleanup
+remain serialized until completion, retaining the upload slot. Receive timeout,
+disconnect, overflow and cancellation never dispatch; the slot always releases.
+Immutable JSON replies send outside the lock with source identity and private
+headers. Existing publication/checksum/hold semantics remain unchanged. Browser
+import requests use a two-minute overall deadline instead of the ordinary five
+seconds; ambiguous post-dispatch failures still require review without replay.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

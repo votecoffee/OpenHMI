@@ -244,6 +244,15 @@ It does not capture a controller's running memory, external Python modules,
 environment dependencies or the OpenHMI installation. Backups contain private
 account/project data; checksums detect corruption, not publisher authenticity.
 
+Uploads receive outside the runtime lock with a 30-second deadline and one import
+in progress per workspace. Busy requests return 429; receive timeout returns 408
+without importing. The selected browser file remains available for explicit retry.
+Permission and project identity are rechecked after receipt; switching projects,
+signing out or shutting down during upload prevents import dispatch. Validation
+and publication retain the runtime lock and drain owned work before propagating
+cancellation. The browser allows two minutes overall, but an interrupted request
+after dispatch can still have completed: review the library before retrying.
+
 Import is bounded to 256 MiB, rejects unexpected/duplicate ZIP entries, verifies
 checksums, checks SQLite integrity/schema and validates project models. It creates
 a new project rather than overwriting existing data. Imported PLC configuration

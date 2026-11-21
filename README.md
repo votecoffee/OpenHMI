@@ -370,6 +370,11 @@ before relying on it.
 Once the archive is prepared, a slow backup download no longer holds the workspace
 lock: HMI reads, project switching and runtime shutdown can proceed. Preparation
 still protects its source runtime, and the download retains that source snapshot.
+Backup uploads also receive outside the workspace lock, with one import in progress
+per workspace, a 256 MiB limit and a 30-second receive deadline. Permission and
+project identity are checked again before import. A switch, sign-out or shutdown
+during upload prevents dispatch. Timeout/busy feedback keeps the selected file for
+an explicit retry; the browser allows up to two minutes for the whole request.
 
 Backups contain the database (screens, connections, tags, faceplates, recipes and
 images, security, alarm and tag history), plus the configured startup Python entry

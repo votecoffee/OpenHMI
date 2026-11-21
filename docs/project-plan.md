@@ -590,11 +590,23 @@ not close hardware or operator acceptance gates.
     Existing API/OpenAPI contracts remain unchanged. Web-server process exit timing
     and network throughput remain outside this offline verification.
 
+54. Delivered bounded import-upload orchestration in a focused module. Upload
+    receipt leaves the runtime lock, with one active import slot, a 256 MiB cap
+    and a 30-second receive deadline. Admission and dispatch check permission;
+    captured identity prevents even headerless uploads from crossing a switch.
+    Shutdown rejects dispatch before accessing a closed store. Timeout, disconnect,
+    overflow, denial and cancellation never start import and release the slot;
+    dispatched threads retain lock/slot ownership through cancellation cleanup.
+    Private replies send outside the lock. Browser imports have a two-minute
+    overall deadline and retain selected files on timeout/busy feedback for an
+    explicit retry. SQL/HTTP/JS and browser contracts cover these paths. Existing
+    payload/OpenAPI fields, immutable publication and imported PLC holds remain.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review import-upload
-lock ownership and bounded cancellation so slow or abandoned uploads cannot
-monopolize HMI requests, preserving authorization and project revalidation before
-dispatch. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review create/open JSON
+request ingress: enforce the existing small body limit during streaming and avoid
+holding the runtime lock while awaiting client data, preserving authorization,
+identity and mutation non-replay. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

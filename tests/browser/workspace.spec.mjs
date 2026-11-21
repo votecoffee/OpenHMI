@@ -244,3 +244,35 @@ test('backup download rejects bad replies and denial before saving, then recover
   expect(downloads).toHaveLength(1); expect(requests).toBe(4);
   await expect(name).toHaveValue('KeepBackupDraft');
 });
+
+test('import timeout and busy admission retain the selected backup for explicit retry', async ({ page }) => {
+  await signedInLibrary(page);
+  const payload = Buffer.from('synthetic retained upload');
+  const uploads = [];
+  let status = 408;
+  await page.route('**/api/workspace/import?*', route => {
+    uploads.push(route.request().postDataBuffer());
+    return route.fulfill({ status, json: status === 200
+      ? { file: 'UploadRetry.openhmi.sqlite3', handlers_saved_for_review: false, plc_hold: true }
+      : { detail: status === 408 ? 'Backup upload timed out before completion; no project was imported.' : 'Another backup import is in progress. Wait before retrying explicitly.' } });
+  });
+  await page.goto('/projects');
+  await page.getByLabel('Imported project ID', { exact: true }).fill('UploadRetry');
+  await page.getByLabel('OpenHMI backup ZIP', { exact: true }).setInputFiles({ name: 'retry.zip', mimeType: 'application/zip', buffer: payload });
+  const button = page.getByRole('button', { name: 'Import complete backup', exact: true });
+  for (const [code, detail] of [[408, 'timed out'], [429, 'Another backup import']]) {
+    status = code;
+    await button.click();
+    await expect(page.getByRole('alert', { name: 'Project operation', exact: true })).toContainText(detail);
+    await expect(page.getByText('Selected backup: retry.zip', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Imported project ID', { exact: true })).toHaveValue('UploadRetry');
+    await expect(button).toBeEnabled();
+    expect(uploads).toHaveLength(code === 408 ? 1 : 2);
+  }
+  status = 200;
+  await button.click();
+  await expect(page.getByRole('status', { name: 'Project operation', exact: true })).toContainText('Imported UploadRetry.openhmi.sqlite3');
+  await expect(page.getByText('Selected backup: retry.zip', { exact: true })).toHaveCount(0);
+  expect(uploads).toHaveLength(3);
+  expect(uploads.every(bytes => bytes.equals(payload))).toBe(true);
+});

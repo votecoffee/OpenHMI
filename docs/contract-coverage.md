@@ -334,11 +334,21 @@ without replay plus detached error responses. Existing cancellation contracts
 continue to own preparation cleanup. These are bounded offline event tests, not
 network-throughput or server-process shutdown acceptance.
 
+Import-upload contracts now cover bounded receive outside the runtime lock and
+one active import slot. Real SQL/ZIP and event-gated HTTP tests prove reads/switches
+continue during uploads, headerless and pinned uploads cannot cross a switch,
+logout revokes admission before dispatch, and shutdown never accesses a closed
+store. Denied/stale/busy requests do not read bodies; timeout, disconnect, overflow
+and cancellation release the slot without dispatch or replay. Actual receive-error
+HTTP replies feed production JS serializers and error handling. Browser faults
+verify timeout/busy messages, retained names/files and explicit recovery. Existing
+job cancellation tests retain lock ownership through import thread completion.
+
 ## Next bounded work
 
-1. Review import-upload lock ownership and bounded cancellation so slow or abandoned
-   uploads cannot monopolize HMI requests, preserving authorization and project
-   revalidation before dispatch.
+1. Review create/open JSON request ingress: enforce the existing small body limit
+   during streaming and avoid holding the runtime lock while awaiting client data,
+   preserving authorization, identity and mutation non-replay.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

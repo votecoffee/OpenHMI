@@ -103,5 +103,5 @@ export function openWorkspaceProject(file) {
 
 export function importWorkspaceProject(name, file) {
   return workspaceOperation('import', name + '.openhmi.sqlite3', '/api/workspace/import?' + new URLSearchParams({ name }),
-    { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file });
+    { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: file, signal: AbortSignal.timeout(120000) });
 }
