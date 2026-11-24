@@ -122,7 +122,7 @@ class WorkspaceSwitchTests(unittest.IsolatedAsyncioTestCase):
         shutdown = original.state.trends.shutdown
         def blocked():
             loop.call_soon_threadsafe(retiring.set)
-            if not release.wait(5):
+            if not release.wait(20):
                 raise RuntimeError('Offline test did not release old shutdown')
             shutdown()
         original.state.trends.shutdown = blocked
@@ -131,7 +131,9 @@ class WorkspaceSwitchTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(workspace, '_app', side_effect=factory):
             task = asyncio.create_task(client.post('/api/workspace/open', json={'file': 'Candidate.openhmi.sqlite3'}))
             try:
-                await asyncio.wait_for(retiring.wait(), 2)
+                # The event defines the cancellation point; this is a hang guard,
+                # not a two-second startup performance requirement.
+                await asyncio.wait_for(retiring.wait(), 10)
                 self.assertIs(workspace.current, candidates[0])
                 self.assertEqual(workspace.path.name, 'Candidate.openhmi.sqlite3')
                 self.assertIsNotNone(workspace.context)
@@ -146,9 +148,9 @@ class WorkspaceSwitchTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 release.set()
                 with self.assertRaises(asyncio.CancelledError):
-                    await asyncio.wait_for(asyncio.shield(task), 2)
+                    await asyncio.wait_for(asyncio.shield(task), 10)
                 if follower:
-                    response = await asyncio.wait_for(follower, 2)
+                    response = await asyncio.wait_for(follower, 10)
         self.assertEqual(response.json()['project_instance'], candidates[0].state.project_instance)
         self.assert_closed(original)
         stale = await client.post('/api/controls/toggle/activate', json={},

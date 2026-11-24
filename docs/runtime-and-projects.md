@@ -244,6 +244,12 @@ It does not capture a controller's running memory, external Python modules,
 environment dependencies or the OpenHMI installation. Backups contain private
 account/project data; checksums detect corruption, not publisher authenticity.
 
+Project-library and file-inventory GET snapshots are fully prepared before their
+responses leave the workspace lock. Slow readers can continue receiving the fixed
+snapshot while other requests, project switching or runtime shutdown proceed.
+Responses retain the source identity and are private/no-store, including handled
+errors. Authorization and owned inventory-scan cleanup still finish under the lock.
+
 Create/open JSON bodies receive outside the runtime lock, with a 4 KiB streaming
 limit, 30-second receive deadline and at most four pending requests. Additional
 requests return 429 without reading their bodies. Before dispatch, the current

@@ -359,11 +359,20 @@ race found by the ambiguous-acknowledgement browser test without weakening its
 draft-retention assertions. Existing handoff/job
 cancellation regressions retain thread, candidate and retirement ownership.
 
+Project-library/inventory read-delivery contracts pause headers and bodies of real
+SQL-backed responses while reads, switching and closure of both source/candidate
+runtimes complete. Exact bytes, source identity, private headers and length remain
+fixed, and actual replies pass canonical Pydantic and production JS guards. Send
+cancellation/disconnect never repeats preparation or retires the runtime. A held
+inventory scan with repeated cancellation keeps the lock until scanning finishes,
+then permits a queued switch; denial and scan-error sends detach without exposing
+private failure details. Existing query/paging/permission contracts are preserved.
+
 ## Next bounded work
 
-1. Review immutable project-library and file-inventory response delivery so slow
-   read clients cannot hold the runtime lock after their snapshots are prepared,
-   preserving permission, source identity and owned scan cleanup.
+1. Review cached runtime readout delivery, starting with tag/quality snapshots,
+   for remaining workspace lock contention; preserve subscription lifetime,
+   sample ownership and project-instance guards.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

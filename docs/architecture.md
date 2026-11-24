@@ -760,6 +760,16 @@ form. Previously, a fast library reply could expose editable fields before ident
 resolved; the user-keyed form would then remount and erase early input. Identity
 changes still reset the keyed form as before. A held-identity browser test verifies
 that edits cannot start during hydration and remain after normal library refresh.
+Project-library and file-inventory GET responses now share the prepared-backup
+send boundary: authorization, snapshot construction, serialization and source
+identity are completed under the workspace lock, then immutable responses send
+outside it. Success and handled errors carry no-store/nosniff headers. Paused
+headers/body therefore allow ordinary reads, project switches and runtime shutdown
+without rebinding bytes or context. Inventory thread cancellation still drains
+owned scanning before the lock releases; cancellation/disconnect during send does
+not repeat preparation or retire a runtime. Existing permission/query/paging,
+Pydantic/JS payloads and FastAPI OpenAPI are unchanged. These event-gated offline
+checks establish resource ownership, not web-server exit timing or throughput.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

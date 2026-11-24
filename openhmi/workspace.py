@@ -293,7 +293,8 @@ class ProjectWorkspace:
         if scope['method'] == 'POST' and scope['path'] in ('/api/workspace/create', '/api/workspace/open'):
             response = await mutation_response(self, Request(scope, receive))
             return await response(scope, receive, send)
-        detached_backup = scope['method'] == 'GET' and scope['path'] == '/api/workspace/backup'
+        detached_read = scope['method'] == 'GET' and scope['path'] in (
+            '/api/workspace', '/api/workspace/artifacts', '/api/workspace/backup')
         # A project switch cannot close a database while an HTTP operation is using it.
         async with self.lock:
             if scope['path'].startswith('/api/workspace'):
@@ -304,15 +305,15 @@ class ProjectWorkspace:
                     response = await self.handle(request)
                 except HTTPException as error:
                     response = JSONResponse({'detail': error.detail}, status_code=error.status_code)
-                if scope['path'] == '/api/workspace/backup':
+                if detached_read or scope['path'] == '/api/workspace/backup':
                     response.headers['Cache-Control'] = 'no-store'
                     response.headers['X-Content-Type-Options'] = 'nosniff'
                 set_response_context(request, response, identifier)
-                if not detached_backup:
+                if not detached_read:
                     return await response(scope, receive, send)
             else:
                 return await self.current(scope, receive, send)
-        # Backup preparation (including cancellation cleanup) stays serialized.
-        # The completed response owns its bytes and source identity; sending it
-        # no longer uses the runtime or needs to hold up reads/switch/shutdown.
+        # Snapshot preparation (including cancellation cleanup) stays serialized.
+        # Finished JSON/ZIP responses own their bytes and source identity; sending
+        # them no longer needs the runtime or delays reads/switch/shutdown.
         await response(scope, receive, send)

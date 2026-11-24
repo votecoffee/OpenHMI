@@ -381,6 +381,9 @@ identity are rechecked before dispatch. Timeout/busy feedback retains draft fiel
 requests are never replayed automatically. Completed acknowledgements can send
 without blocking runtime shutdown. The project form waits for the first confirmed
 HMI identity before accepting edits, avoiding draft loss during initial sign-in.
+Prepared project-library and file-inventory snapshots also send outside the runtime
+lock, so a slow reader cannot delay HMI requests, switching or runtime shutdown.
+Their bytes and project identity stay fixed; replies are private/no-store.
 
 Backups contain the database (screens, connections, tags, faceplates, recipes and
 images, security, alarm and tag history), plus the configured startup Python entry

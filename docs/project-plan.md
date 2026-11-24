@@ -615,11 +615,20 @@ not close hardware or operator acceptance gates.
     sign-in hydration; a delayed-identity browser test covers it. Model re-exports,
     payload/OpenAPI fields and mutation non-replay remain intact.
 
+56. Delivered immutable project-library and file-inventory response delivery
+    outside the workspace lock. Preparation, permission checks, serialization and
+    source identity stay protected; success/handled errors are private/no-store.
+    Slow headers/body allow reads, switching and runtime shutdown without changing
+    prepared bytes or context. Scan cancellation drains owned work before a queued
+    switch can close its source; send cancellation/disconnect never repeats work or
+    retires a runtime. SQL/HTTP/Pydantic/JS contracts verify these boundaries plus
+    denial/error privacy. Existing query/paging, payload and OpenAPI fields remain.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review immutable project-
-library and file-inventory response delivery so slow read clients cannot hold the
-runtime lock after their snapshots are prepared, preserving permission, source
-identity and owned scan cleanup. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review cached runtime
+readout delivery, starting with tag/quality snapshots, for remaining workspace lock
+contention; preserve subscription lifetime, sample ownership and project-instance
+guards. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.
