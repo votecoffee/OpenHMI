@@ -375,6 +375,12 @@ per workspace, a 256 MiB limit and a 30-second receive deadline. Permission and
 project identity are checked again before import. A switch, sign-out or shutdown
 during upload prevents dispatch. Timeout/busy feedback keeps the selected file for
 an explicit retry; the browser allows up to two minutes for the whole request.
+Create/open request bodies also receive outside the runtime lock, capped at 4 KiB
+and 30 seconds, with at most four pending requests. Authorization and source project
+identity are rechecked before dispatch. Timeout/busy feedback retains draft fields;
+requests are never replayed automatically. Completed acknowledgements can send
+without blocking runtime shutdown. The project form waits for the first confirmed
+HMI identity before accepting edits, avoiding draft loss during initial sign-in.
 
 Backups contain the database (screens, connections, tags, faceplates, recipes and
 images, security, alarm and tag history), plus the configured startup Python entry

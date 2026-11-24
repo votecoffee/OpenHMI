@@ -741,6 +741,25 @@ Immutable JSON replies send outside the lock with source identity and private
 headers. Existing publication/checksum/hold semantics remain unchanged. Browser
 import requests use a two-minute overall deadline instead of the ordinary five
 seconds; ambiguous post-dispatch failures still require review without replay.
+`workspace_mutations.py` now owns create/open HTTP ingress and dispatch. Admission
+checks management permission, supplied project identity and stopping state before
+reading a body. A workspace-owned bounded semaphore admits up to four requests;
+excess requests return 429 without reading or waiting. Receipt runs outside the
+runtime lock with a 4 KiB streaming cap and a 30-second deadline. Overflow stops
+before appending the offending chunk or reading later chunks. Timeout/disconnect/
+cancellation do not dispatch and return admission capacity. Under the reacquired
+lock, shutdown state, captured identity (including headerless callers) and current
+permission are checked before JSON decoding and dispatch. Existing invalid-JSON/
+non-object validation is retained, and excessive nesting returns 422. Create's
+owned thread cleanup and open's handoff/retirement retain their serialized lifetime.
+Once complete, immutable JSON acknowledgements/errors send outside the lock with
+source project identity and private headers. Existing model re-exports, payloads,
+FastAPI OpenAPI and browser deadlines remain unchanged; ambiguity never replays.
+The app now waits for the initial validated identity before mounting the project
+form. Previously, a fast library reply could expose editable fields before identity
+resolved; the user-keyed form would then remount and erase early input. Identity
+changes still reset the keyed form as before. A held-identity browser test verifies
+that edits cannot start during hydration and remain after normal library refresh.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

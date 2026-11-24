@@ -276,3 +276,62 @@ test('import timeout and busy admission retain the selected backup for explicit 
   expect(uploads).toHaveLength(3);
   expect(uploads.every(bytes => bytes.equals(payload))).toBe(true);
 });
+
+test('create/open ingress errors retain drafts and wait for an explicit retry', async ({ page }) => {
+  await signedInLibrary(page);
+  let creates = 0, opens = 0;
+  await page.route('**/api/workspace/create', route => {
+    creates++;
+    if (creates > 2) return route.continue();
+    return route.fulfill({ status: creates === 1 ? 408 : 429, json: { detail: creates === 1
+      ? 'Project request timed out before completion; no operation was started.'
+      : 'Too many project requests are pending. Wait before retrying explicitly.' } });
+  });
+  await page.route('**/api/workspace/open', route => {
+    opens++;
+    return opens > 1 ? route.continue() : route.fulfill({ status: 429, json: { detail: 'Too many project requests are pending. Wait before retrying explicitly.' } });
+  });
+  await page.goto('/projects');
+  const name = page.getByLabel('New project ID', { exact: true });
+  const title = page.getByLabel('New project title', { exact: true });
+  const button = page.getByRole('button', { name: 'Create project', exact: true });
+  await name.fill('IngressRetry'); await title.fill('Retained ingress title');
+  for (const detail of ['timed out', 'Too many project requests']) {
+    await button.click();
+    await expect(page.getByRole('alert', { name: 'Project operation', exact: true })).toContainText(detail);
+    await expect(name).toHaveValue('IngressRetry'); await expect(title).toHaveValue('Retained ingress title');
+    await expect(button).toBeEnabled();
+    expect(creates).toBe(detail === 'timed out' ? 1 : 2);
+  }
+  await button.click();
+  await expect(page.getByRole('status', { name: 'Project operation', exact: true })).toContainText('Created IngressRetry.openhmi.sqlite3');
+  await expect(name).toHaveValue(''); await expect(title).toHaveValue('');
+  expect(creates).toBe(3);
+  const open = page.getByRole('button', { name: 'Open IngressRetry.openhmi.sqlite3', exact: true });
+  await open.click();
+  await expect(page.getByRole('alert', { name: 'Project operation', exact: true })).toContainText('Too many project requests');
+  expect(page.url()).toContain('/projects'); expect(opens).toBe(1);
+  await open.click();
+  await expect(page).not.toHaveURL(/\/projects/);
+  expect(opens).toBe(2);
+});
+
+test('project forms wait for initial identity before accepting draft edits', async ({ page }) => {
+  await signedInLibrary(page);
+  let release;
+  const ready = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/security/session', async route => {
+    await ready;
+    return route.continue();
+  });
+  try {
+    await page.goto('/projects');
+    await expect(page.getByText('Confirming HMI identity before opening the project library.', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('New project ID', { exact: true })).toHaveCount(0);
+  } finally { release(); }
+  const name = page.getByLabel('New project ID', { exact: true });
+  await name.fill('IdentityReady');
+  await page.getByRole('button', { name: 'Refresh projects', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Create project', exact: true })).toBeEnabled();
+  await expect(name).toHaveValue('IdentityReady');
+});

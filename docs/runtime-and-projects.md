@@ -244,6 +244,15 @@ It does not capture a controller's running memory, external Python modules,
 environment dependencies or the OpenHMI installation. Backups contain private
 account/project data; checksums detect corruption, not publisher authenticity.
 
+Create/open JSON bodies receive outside the runtime lock, with a 4 KiB streaming
+limit, 30-second receive deadline and at most four pending requests. Additional
+requests return 429 without reading their bodies. Before dispatch, the current
+permission, source project identity and shutdown state are checked again. A body
+that times out, disconnects, exceeds the limit or contains invalid JSON cannot
+start an operation. The browser retains draft fields after these errors; retry is
+explicit. An interrupted request after dispatch still requires completion review.
+Completed acknowledgements send outside the runtime lock, retaining source identity.
+
 Uploads receive outside the runtime lock with a 30-second deadline and one import
 in progress per workspace. Busy requests return 429; receive timeout returns 408
 without importing. The selected browser file remains available for explicit retry.

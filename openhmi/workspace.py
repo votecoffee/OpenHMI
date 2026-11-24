@@ -23,6 +23,7 @@ from .workspace_publication import PublicationError, ensure_available, publish_p
 from .workspace_inventory import ArtifactQuery, InventoryUnavailable, inventory
 from .workspace_contracts import LibrarySnapshot, CreatedProject, ImportedProject, OpenedProject
 from .workspace_import import import_response
+from .workspace_mutations import mutation_response
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -39,6 +40,7 @@ class ProjectWorkspace:
         self.hold_connections = hold_connections
         self.lock = asyncio.Lock()
         self.upload_lock = asyncio.Lock()
+        self.mutation_slots = asyncio.BoundedSemaphore(4)
         self.stopping = False
         self.context = None
         self.current = self._app(self.path, handlers)
@@ -262,20 +264,6 @@ class ProjectWorkspace:
                 logging.exception('Complete backup export failed')
                 raise HTTPException(503, 'Complete backup could not be exported. Review server logs and retry explicitly.') from error
             return Response(data, media_type='application/zip', headers={'Content-Disposition': 'attachment; filename="project.openhmi.zip"'})
-        if request.method == 'POST' and path in ('/api/workspace/create', '/api/workspace/open'):
-            raw = await request.body()
-            if len(raw) > 4096:
-                raise HTTPException(413, 'Request too large')
-            try:
-                body = json.loads(raw)
-            except (ValueError, UnicodeDecodeError) as error:
-                raise HTTPException(422, 'Invalid request') from error
-            if not isinstance(body, dict):
-                raise HTTPException(422, 'Invalid request')
-            if path.endswith('/create'):
-                return JSONResponse(await finish_cleanup(asyncio.to_thread(self.create, body.get('name', ''), body.get('title', ''))))
-            await self.open(body.get('file', ''))
-            return JSONResponse(OpenedProject(ok=True, current=self.path.name).model_dump())
         raise HTTPException(404, 'Workspace operation not found')
 
     async def __call__(self, scope, receive, send):
@@ -301,6 +289,9 @@ class ProjectWorkspace:
             return await self.current(scope, receive, send)
         if scope['method'] == 'POST' and scope['path'] == '/api/workspace/import':
             response = await import_response(self, Request(scope, receive), MAX_BACKUP)
+            return await response(scope, receive, send)
+        if scope['method'] == 'POST' and scope['path'] in ('/api/workspace/create', '/api/workspace/open'):
+            response = await mutation_response(self, Request(scope, receive))
             return await response(scope, receive, send)
         detached_backup = scope['method'] == 'GET' and scope['path'] == '/api/workspace/backup'
         # A project switch cannot close a database while an HTTP operation is using it.

@@ -344,11 +344,26 @@ HTTP replies feed production JS serializers and error handling. Browser faults
 verify timeout/busy messages, retained names/files and explicit recovery. Existing
 job cancellation tests retain lock ownership through import thread completion.
 
+Create/open ingress now has real SQL/event-gated HTTP contracts for exact 4 KiB
+Unicode requests, streaming overflow without later reads, malformed encoding/JSON
+and excessive nesting, timeout/disconnect, four-request admission and cancellation
+capacity recovery. Slow bodies allow reads and switches; captured identities and
+permission rechecks prevent stale/headerless or signed-out requests from dispatching.
+Shutdown during receipt rejects work before touching closed state; slow completed
+acknowledgements allow runtime shutdown and preserve source identity. Actual error
+replies feed production JS operation handling without retry. Browser faults retain
+create fields on timeout/busy replies, require explicit retry, then exercise real
+SQL create/open and successful field reset/navigation. A delayed initial-identity
+test verifies no editable form appears before sign-in is confirmed; this closes a
+race found by the ambiguous-acknowledgement browser test without weakening its
+draft-retention assertions. Existing handoff/job
+cancellation regressions retain thread, candidate and retirement ownership.
+
 ## Next bounded work
 
-1. Review create/open JSON request ingress: enforce the existing small body limit
-   during streaming and avoid holding the runtime lock while awaiting client data,
-   preserving authorization, identity and mutation non-replay.
+1. Review immutable project-library and file-inventory response delivery so slow
+   read clients cannot hold the runtime lock after their snapshots are prepared,
+   preserving permission, source identity and owned scan cleanup.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

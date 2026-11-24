@@ -602,11 +602,24 @@ not close hardware or operator acceptance gates.
     explicit retry. SQL/HTTP/JS and browser contracts cover these paths. Existing
     payload/OpenAPI fields, immutable publication and imported PLC holds remain.
 
+55. Delivered create/open ingress in a focused mutation module. Bodies receive
+    outside the runtime lock with a streaming 4 KiB cap, 30-second deadline and
+    four pending admission slots. Denied/stale/busy requests do not read bodies.
+    Dispatch rechecks shutdown, captured identity and permission; malformed JSON,
+    excessive nesting, overflow, timeout, disconnect and cancellation never start
+    an operation. Create thread cleanup and open handoff stay serialized. Completed
+    private acknowledgements send outside the lock with source identity. SQL/HTTP/
+    JS and browser tests cover exact limits, retained drafts, explicit recovery,
+    slot reuse, switch/session/shutdown rejection and slow response delivery.
+    Initial identity gating also prevents early draft edits from being erased by
+    sign-in hydration; a delayed-identity browser test covers it. Model re-exports,
+    payload/OpenAPI fields and mutation non-replay remain intact.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review create/open JSON
-request ingress: enforce the existing small body limit during streaming and avoid
-holding the runtime lock while awaiting client data, preserving authorization,
-identity and mutation non-replay. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review immutable project-
+library and file-inventory response delivery so slow read clients cannot hold the
+runtime lock after their snapshots are prepared, preserving permission, source
+identity and owned scan cleanup. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.
