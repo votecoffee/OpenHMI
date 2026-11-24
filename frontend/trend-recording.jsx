@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { api } from './api.mjs';
-import { trendCapturePath, sendCaptureCommand, captureCsvPath, isCaptureStatus } from './trend-api.mjs';
+import { trendCapturePath, readCaptureStatus, sendCaptureCommand, captureCsvPath, isCaptureStatus } from './trend-api.mjs';
 import { SecurityContext, allowed } from './security.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 
@@ -50,7 +49,7 @@ export function useTrendCaptures(id, editing, recording) {
     async function poll() {
       let retry = recording;
       try {
-        const next = await api(url);
+        const next = await readCaptureStatus(id);
         if (!isCaptureStatus(next)) throw new Error('Invalid recording status response');
         if (!stopped) setResponse({ url, status: next, available: true });
       } catch (problem) {

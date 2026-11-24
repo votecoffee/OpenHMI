@@ -1,5 +1,7 @@
-import { api } from './api.mjs';
+import { api, readRuntimeSnapshot } from './api.mjs';
 import { captureHistoryPath } from './trend-api.mjs';
+
+export const readTrendHistory = path => readRuntimeSnapshot(path);
 
 export function sparklineHistoryPath(tag, seconds) {
   return '/api/history?' + new URLSearchParams({ tags: tag, seconds, limit: 1000, trend_context: true });

@@ -1,6 +1,7 @@
-import { api, json } from './api.mjs';
+import { api, json, readRuntimeSnapshot } from './api.mjs';
 
 export const trendCapturePath = id => '/api/trends/' + encodeURIComponent(id);
+export const readCaptureStatus = id => readRuntimeSnapshot(trendCapturePath(id));
 
 export function sendCaptureCommand(id, action, captureId) {
   return api(trendCapturePath(id), json('POST', { action, capture_id: captureId }));

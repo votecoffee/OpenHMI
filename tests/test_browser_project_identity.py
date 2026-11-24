@@ -216,3 +216,56 @@ class BrowserProjectIdentityTests(unittest.TestCase):
         for app in (original, replacement):
             self.assertEqual(len(app.state.activity.query()['items']), 1, 'Read recovery cannot append operator actions')
             app.state.driver.factory.assert_not_called()
+
+    def test_trend_helpers_reject_foreign_history_and_colliding_capture_ids_without_commands(self):
+        from unittest.mock import patch
+        from openhmi.project_models import Project
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        for app, value in ((original, 12.5), (replacement, 9876.5)):
+            project = app.state.store.snapshot()['active']
+            self.assertFalse(project['connections'])
+            project['controls'].append({'id': 'identity_trend', 'kind': 'trend', 'label': 'Offline trend',
+                'tags': ['TankLevel'], 'recording': {'sample_ms': 100, 'max_samples': 10}})
+            app.state.trends.configure(Project.model_validate(project).model_dump())
+            app.state.driver.plc_hold = False  # Local memory only, no lifespan/acquisition.
+            app.state.driver.sample_snapshot = Mock(return_value={
+                'TankLevel': {'value': value, 'quality': 'good', 'timestamp': None}})
+            app.state.historian.configure({'tags': [{'tag': 'TankLevel', 'sample_ms': 100, 'deadband': 0}],
+                                            'retention_days': 30, 'max_rows': 1000})
+            with patch('openhmi.trend_recording.time.time', return_value=100):
+                self.assertEqual(app.state.trends.start('identity_trend'), 1)
+            for now in (1, 2):
+                app.state.historian.sample(now, 99 + now)
+                app.state.trends.sample(now, 99 + now)
+            with patch('openhmi.trend_recording.time.time', return_value=101):
+                app.state.trends.stop('identity_trend', 1)
+        paths = ['/api/history?tags=TankLevel&seconds=10&end=101&trend_context=true',
+                 '/api/trend-captures/1?seconds=10&end=101', '/api/trends/identity_trend']
+        requests = [dict(trendHistory=paths[0]), dict(trendHistory=paths[1]), dict(captureStatus='identity_trend')]
+        same = [self.wire(client.get(path)) for path in paths]
+        foreign = [self.wire(other.get(path)) for path in paths]
+        missing = [{**reply, 'headers': {key: value for key, value in reply['headers'].items()
+                                       if key != 'x-openhmi-project'}} for reply in same]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        self.assertEqual(json.loads(same[0]['body'])['samples'][0]['value'], 12.5)
+        self.assertEqual(json.loads(foreign[1]['body'])['samples'][0]['value'], 9876.5)
+        with patch.object(replacement.state.trends, 'delete', side_effect=AssertionError('No stale recording command')) as delete:
+            stale = other.post('/api/trends/identity_trend', json={'action': 'delete', 'capture_id': 1},
+                               headers={'X-OpenHMI-Project': original.state.project_instance})
+            self.assertEqual(stale.status_code, 409)
+            delete.assert_not_called()
+        samples_before = [app.state.driver.sample_snapshot.call_count for app in (original, replacement)]
+        result = frontend('http_context', requests=[dict(path='/api/project')] + requests * 4,
+                          replies=[self.wire(client.get('/api/project')), *same, *foreign, *missing, *same])
+        for start in (1, 10):
+            self.assertEqual([row['data'] for row in result['results'][start:start + 3]],
+                             [json.loads(reply['body']) for reply in same])
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][4:10]))
+        self.assertEqual([row['project_changed'] for row in result['results'][4:10]], [True] * 3 + [False] * 3)
+        self.assertEqual(len(result['calls']), 13)
+        self.assertTrue(all(call['method'] == 'GET' and call['headers']['X-OpenHMI-Project'] == original.state.project_instance
+                            for call in result['calls'][1:]))
+        self.assertEqual(samples_before, [app.state.driver.sample_snapshot.call_count for app in (original, replacement)])
+        self.assertEqual(replacement.state.activity.query()['items'], [])
+        original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()

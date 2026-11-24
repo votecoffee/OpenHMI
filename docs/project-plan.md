@@ -699,11 +699,22 @@ not close hardware or operator acceptance gates.
     payload/OpenAPI and export links remain unchanged. Checkpoints 51–60 are
     preserved verbatim in the existing history document to keep issue 15 usable.
 
+64. Delivered guarded API helpers for trend/sparkline history, saved-capture history
+    and recording status. Foreign/missing replies retain only the same query's trace
+    or URL's capture metadata, with existing unavailable feedback. Query changes
+    hide prior traces; recording-status failures block Run/Stop/Delete and open
+    delete confirmations. History-only faults leave healthy recording controls
+    usable. Denied data clears, matching reads recover and commands never replay.
+    Real SQL/HTTP/JS and headless cases cover reused capture IDs, source rejection,
+    independent failures, query changes and explicit recording actions. Server
+    payload/OpenAPI, mutation helpers, CSV links and recorded-tag browsing remain
+    unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
 Recipe HTTP separation is complete for this scope. Next extend the source-identity
-audit to trend history and saved recording status, preserving query/capture ownership,
-retained traces, permission clearing and recording-command non-replay. Keep exports
-separate from JSON read contracts. Preserve scan/resource draining
+audit to recipe workspace library/revision readers, preserving selected revision,
+edit drafts, permission handling and mutation non-replay. Keep exports separate
+from JSON read contracts. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

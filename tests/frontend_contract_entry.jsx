@@ -22,8 +22,8 @@ import { api, uploadProjectImage, readRuntimeSnapshot } from '../frontend/api.mj
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
 import { commandStates, isCommandRecord, isCommandPage } from '../frontend/command-status.mjs';
 import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
-import { sparklineHistoryPath, trendReadPaths, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage, isTrendHistory } from '../frontend/history-api.mjs';
-import { isCaptureStatus, captureCsvPath } from '../frontend/trend-api.mjs';
+import { sparklineHistoryPath, trendReadPaths, readTrendHistory, recordedHistoryTags, historyExportPath, fetchHistoryCsv, isRecordedTagPage, isTrendHistory } from '../frontend/history-api.mjs';
+import { isCaptureStatus, captureCsvPath, readCaptureStatus } from '../frontend/trend-api.mjs';
 import { sendCaptureCommand } from '../frontend/trend-api.mjs';
 import { publicationStatus, claimPublicationStation, releasePublicationStation } from '../frontend/identity-api.mjs';
 import { writeControlValue, activateControl, renewSubscription, requireTagSnapshot, tagSnapshotPath } from '../frontend/runtime-api.mjs';
@@ -103,6 +103,8 @@ export async function contract(request) {
         try { results.push({ data: await (item.latestCommand ? readLatestCommand(item.latestCommand)
           : item.activity ? readActivity(item.activity.filters, item.activity.before, item.activity.options)
           : item.diagnostics ? readDiagnostics(item.diagnostics.criteria, item.diagnostics.offset, item.diagnostics.options)
+          : item.trendHistory ? readTrendHistory(item.trendHistory)
+          : item.captureStatus ? readCaptureStatus(item.captureStatus)
           : item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
       catch (error) { results.push({ error: error.message, status: error.status,
           conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status,

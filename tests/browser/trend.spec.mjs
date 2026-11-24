@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test.use({ hasTouch: true });
 
@@ -22,7 +23,7 @@ test('sparkline keeps live value and recent history quality separate', async ({ 
     await page.route(url => url.pathname === '/api/history' && url.searchParams.get('tags') === 'TankLevel', route => {
       expect(route.request().url()).toContain('seconds=30');
       expect(route.request().url()).toContain('limit=1000');
-      return route.fulfill(unavailable ? { status: 503 } : { json: {
+      return fulfillProjectRead(route, unavailable ? { status: 503 } : { json: {
         start: 100, end: 130, truncated: false,
         samples: [
           { epoch: 100, value: 10, quality: 'good' },
@@ -45,7 +46,7 @@ test('sparkline keeps live value and recent history quality separate', async ({ 
 
     const live = await (await page.request.get('/api/tags')).json();
     live.samples.TankLevel = { quality: 'stale', age_seconds: 4 };
-    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await page.route('**/api/tags', route => fulfillProjectRead(route, { json: live }));
     await expect(card).toContainText('STALE DATA');
     await expect(traces).toHaveCount(2);
     unavailable = true;
@@ -67,7 +68,7 @@ test('on-change trend holds prior values and leaves a gap after a missed heartbe
     let windowOffset = 0;
     let fault;
     await page.route(url => url.pathname === '/api/history' && url.searchParams.get('trend_context') === 'true',
-      route => route.fulfill(fault ?? { json: {
+      route => fulfillProjectRead(route, fault ?? { json: {
         start: 100 + windowOffset, end: 110 + windowOffset, truncated: false,
         samples: [{ tag: 'TankLevel', epoch: 108, value: 20, quality: 'good' }],
         change_context: {
@@ -191,7 +192,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
       const end = Number(query.get('end') ?? 1800000000);
       const start = end - seconds;
       const sample = (tag, position, value, quality = 'good') => ({ tag, epoch: start + position * seconds, value, quality });
-      return route.fulfill({ json: { start, end, truncated: false, samples: [
+      return fulfillProjectRead(route, { json: { start, end, truncated: false, samples: [
         sample('TrendLevel', 0, 30), sample('TrendLevel', 0.25, 50), sample('TrendLevel', 0.5, null, 'bad'), sample('TrendLevel', 0.75, 50),
         sample('TrendPressure', 0, 1000), sample('TrendPressure', 0.25, 1200),
         sample('TrendMotor', 0, false), sample('TrendMotor', 0.25, true),
@@ -246,7 +247,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     const stop = chart.getByRole('button', { name: 'Arrêter la tendance' });
     const statusWarning = chart.getByRole('status').filter({ hasText: 'Recording status unavailable' });
     let fault = { json: { enabled: true, captures: {} } };
-    await page.route(endpoint, route => route.fulfill(fault));
+    await page.route(endpoint, route => fulfillProjectRead(route, fault));
     await expect(statusWarning).toBeVisible();
     await expect(run).toBeDisabled();
     await page.unroute(endpoint);
@@ -255,7 +256,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await expect(retained).toBeVisible();
     const savedStatus = await (await page.request.get('/api/trends/trend')).json();
     fault = { status: 503, json: { detail: 'Synthetic recording status outage' } };
-    await page.route(endpoint, route => route.fulfill(fault));
+    await page.route(endpoint, route => fulfillProjectRead(route, fault));
     await expect(statusWarning).toContainText('Showing last received recording status');
     await expect(retained).toBeVisible();
     await expect(stop).toBeDisabled();
@@ -263,7 +264,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     await page.unroute(endpoint);
     await expect(statusWarning).toBeHidden();
     fault = { json: { ...savedStatus, captures: [savedStatus.captures[0], savedStatus.captures[0]] } };
-    await page.route(endpoint, route => route.fulfill(fault));
+    await page.route(endpoint, route => fulfillProjectRead(route, fault));
     await expect(statusWarning).toContainText('Showing last received recording status');
     await expect(retained).toBeVisible();
     await expect(stop).toBeDisabled();
@@ -282,7 +283,7 @@ test('configure independent trend scales, live precision, and aligned Boolean la
     fault = { json: { ...stoppedStatus, captures: stoppedStatus.captures.map(item => ({
       ...item, retained: item.max_samples + 1,
     })) } };
-    await page.route(endpoint, route => route.fulfill(fault));
+    await page.route(endpoint, route => fulfillProjectRead(route, fault));
     await expect(statusWarning).toBeVisible();
     await expect(confirmDelete).toBeDisabled();
     await expect(download).toHaveAttribute('href', href);

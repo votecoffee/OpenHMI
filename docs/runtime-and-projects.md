@@ -48,6 +48,15 @@ the previous page as its result and continues to retry normally. Denial clears t
 affected records, tag-quality rows and worker health. Matching-source replies
 recover while unapplied filters remain intact. These cached reads do not create
 operator actions or change subscriptions. CSV/JSON export links remain separate.
+Trend and sparkline history, saved-capture history and recording-status JSON reads
+now verify project identity before payload validation. Foreign/missing history
+replies retain only the current query's trace with unavailable feedback; changing
+the query hides that trace until valid data arrives. Recording-status failures
+retain confirmed capture details but block Run, Stop and Delete, including an open
+delete confirmation. History failure alone leaves healthy recording controls
+usable. Matching-source reads recover without command replay, while permission
+denial clears the affected data. Live tag readouts remain independent. CSV links
+and recorded-tag browsing are outside this increment.
 
 ## Connection and tag contract
 

@@ -430,6 +430,10 @@ Activity and diagnostics reads also verify their source before displaying journa
 records, tag quality or worker health. Source failures retain confirmed data for
 the current filter/page with a warning and block forward paging. Permission denial
 clears that data; matching replies recover without losing unapplied filters.
+Trend/sparkline history and saved recording status also check their source project.
+Failed history reads retain only the same query's trace; failed recording-status
+reads retain capture details while blocking Run, Stop and Delete. Matching replies
+recover without replaying recording commands, and denied data is cleared.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

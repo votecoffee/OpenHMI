@@ -446,11 +446,22 @@ paging, denied-data clearing, no previous-page substitution and successful retry
 of failed older reads. Foreign fixtures intentionally bypass the same-project
 header helper. Existing payload/cursor and protected export regressions remain.
 
+Trend source contracts feed SQL historian/capture histories and recording listings
+from two offline apps through the production read helpers. Reused capture IDs and
+different sample values cannot admit foreign data; missing sources are rejected
+and matching replies recover. Reads do not resample drivers, journal actions or
+dispatch recording commands, and stale delete requests are rejected before recorder
+access. Headless coverage retains traces/metadata through source failures, keeps
+recording controls independent of history faults, hides old traces after a query
+change, clears denied data and blocks an open delete confirmation during status
+loss. Exactly one explicit Start, Stop and Delete is observed. Existing sparse
+history, cursor, precision, Boolean lane and capture workflow regressions remain.
+
 ## Next bounded work
 
-1. Extend the source-identity audit to trend history and saved recording status,
-   preserving query/capture ownership, retained traces, permission clearing and
-   recording-command non-replay. Keep exports separate from JSON read contracts.
+1. Extend the source-identity audit to recipe workspace library/revision reads,
+   preserving selected revision, edit drafts, permission handling and mutation
+   non-replay. Keep exports separate from JSON read contracts.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

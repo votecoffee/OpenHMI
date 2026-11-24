@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useId, useMemo, useState } from 'react';
-import { api } from './api.mjs';
-import { sparklineHistoryPath, trendReadPaths, isTrendHistory } from './history-api.mjs';
+import { sparklineHistoryPath, trendReadPaths, isTrendHistory, readTrendHistory } from './history-api.mjs';
 import { Live, tagValue, Quality } from './live-quality.jsx';
 import { formatLocalDateTime, useLocalization } from './localization.jsx';
 import './trend.css';
@@ -211,7 +210,7 @@ function useHistory(query, follow, interval = 1000) {
     async function refresh() {
       let retry = follow;
       try {
-        const data = await api(query);
+        const data = await readTrendHistory(query);
         if (!isTrendHistory(data)) throw new Error('Invalid trend history response');
         if (!stopped) setResponse({ query, data });
       } catch (problem) {

@@ -841,8 +841,17 @@ Foreign/missing replies cannot install activity attribution, tag quality or work
 health. Confirmed results stay readable only for the same query/page, unavailable
 feedback disables forward paging, and failed older reads still retry. Matching
 replies recover without clearing unapplied filters or issuing operator mutations.
-CSV/JSON exports stay separate. Trend history and saved recording status remain
-the next source-identity audit.
+CSV/JSON exports stay separate.
+`readTrendHistory()` and `readCaptureStatus()` now own guarded GET calls for
+trend/sparkline and saved-capture histories and recording listings. Their hooks
+retain query/URL and generation ownership, existing payload validation, permission
+clearing and normal retry rules. Foreign/missing history replies preserve only the
+same query's trace; changed queries cannot reuse it. Recording-status failures
+retain capture metadata while blocking commands and open delete confirmations.
+History-only failure leaves healthy recording controls usable. A matching read
+recovers without repinning or repeating Run/Stop/Delete; mutation helpers and CSV
+links remain unchanged. Recorded-tag browsing remains outside this increment.
+Recipe workspace library/revision readers are the next source-identity audit.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
