@@ -635,10 +635,20 @@ not close hardware or operator acceptance gates.
     Real SQL/HTTP/ASGI and production JS contracts cover these boundaries. No PLC
     polling/subscription is added, and payload/OpenAPI fields remain unchanged.
 
+58. Delivered prepared applied-screen snapshot delivery. `/api/project/active`
+    finishes its normal store projection, serializer and middleware under the
+    workspace lock, then sends immutable data outside it. Revision/layout and
+    body/header project identity stay paired through newer local apply, switching
+    and shutdown. Existing revision/instance guards reject stale dispatch. Cancelled
+    SQL preparation drains before source closure; send failures never repeat work.
+    Unexpected projection failures are sanitized/recoverable, and stopped workspaces
+    reject closed-store access. SQL/HTTP/ASGI, canonical Project and production JS
+    contracts cover these paths; payload/OpenAPI fields remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review `/api/project/active`
-response ownership under slow clients, preserving revision/project identity pairing,
-frontend snapshot guards and source cleanup. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review `/api/alarms` snapshot
+delivery under slow clients, preserving occurrence identity, quality/recovery
+information and acknowledgement/journal boundaries. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

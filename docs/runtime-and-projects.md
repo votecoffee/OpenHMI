@@ -4,6 +4,13 @@ The runtime uses pycomm3 1.2.16 for ControlLogix/CompactLogix explicit messaging
 The driver is optional in use: projects start with simulation and no PLC connection.
 No controller has been contacted during development/validation.
 
+Applied-screen GET snapshots also finish their SQL projection, serialization and
+middleware under the workspace lock, then send outside it. A slow reply retains its
+original revision, layout and project identity even if a newer layout is applied
+or another project opens before delivery completes. Existing revision/instance
+checks protect writes; failed reads return sanitized private 503 feedback and can
+recover. Cancelled preparation drains before a source store can close.
+
 ## Connection and tag contract
 
 Tag and status-only readout responses use cached data through the normal API route.

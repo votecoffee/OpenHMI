@@ -404,6 +404,10 @@ Full and status-only tag snapshots are prepared through the normal API middlewar
 then send outside the runtime lock. A slow viewer no longer blocks subscription
 renewal, other HMI requests, project switching or runtime shutdown. Encoded values,
 per-tag quality and source identity remain fixed; reads do not add PLC acquisition.
+Applied-screen snapshots use the same boundary. Their revision, layout and project
+identity remain paired even if a newer revision is applied while a reply is still
+sending. Existing revision and project-instance checks continue to reject stale
+control actions and writes.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

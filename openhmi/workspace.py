@@ -288,17 +288,18 @@ class ProjectWorkspace:
         # download of the finished file need not delay HMI requests.
         if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
             return await self.current(scope, receive, send)
-        if scope['method'] == 'GET' and scope['path'] == '/api/tags':
+        if scope['method'] == 'GET' and scope['path'] in ('/api/tags', '/api/project/active'):
+            label = 'Tag snapshot' if scope['path'] == '/api/tags' else 'Applied project snapshot'
             async with self.lock:
                 identifier = self.current.state.project_instance
                 if self.stopping:
-                    response = JSONResponse({'detail': 'Tag snapshot is unavailable while the workspace is stopping'}, status_code=503)
+                    response = JSONResponse({'detail': f'{label} is unavailable while the workspace is stopping'}, status_code=503)
                 else:
                     try:
                         response = await finish_cleanup(prepare_snapshot(self.current, scope, receive))
                     except Exception:
-                        logging.exception('Cached tag readout preparation failed')
-                        response = JSONResponse({'detail': 'Tag snapshot is temporarily unavailable'}, status_code=503)
+                        logging.exception('%s preparation failed', label)
+                        response = JSONResponse({'detail': f'{label} is temporarily unavailable'}, status_code=503)
                 response.headers['Cache-Control'] = 'no-store'
                 response.headers['X-Content-Type-Options'] = 'nosniff'
                 set_response_context(Request(scope, receive), response, identifier)

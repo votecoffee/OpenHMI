@@ -780,8 +780,18 @@ and middleware cleanup cannot outlive their source runtime. A slow send then all
 subscriptions, other requests, switching and shutdown without depending on runtime
 resources. Responses are private/no-store; unexpected preparation errors become a
 sanitized 503 with source identity. No poll/lease is added by staging. This helper
-is restricted to the audited finite tag endpoint, not streaming/file responses.
+is restricted to audited finite tag/applied-project endpoints, not streaming/file
+responses.
 Public fields, status-only omission, query validation and OpenAPI remain unchanged.
+GET `/api/project/active` now shares that finite-response staging boundary. The
+existing store snapshot, route serializer and identity middleware finish under the
+workspace lock before immutable delivery leaves it. Revision, applied layout and
+body/header project identity cannot rebind to a later apply or switch. Slow clients
+allow draft saves, local apply, reads and switching; existing revision/instance write
+fences reject operations from the older screen. Cancelled preparation drains SQL
+projection before source closure, while send failures never repeat it. Unexpected
+store/projection errors return sanitized private 503 feedback, and stopped workspaces
+reject reads without touching closed stores. Payloads and OpenAPI remain unchanged.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

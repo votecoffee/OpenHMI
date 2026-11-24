@@ -379,10 +379,21 @@ context and recover; fragmented finite ASGI framing retains duplicate headers an
 rejects incomplete/unsupported responses. Existing real-cache tag contracts still
 cover stale/recovery behavior and prohibit polling or leasing from GET.
 
+Applied-screen delivery checks stage real SQL/FastAPI responses and pause headers
+and bodies while saving/applying a newer local-only revision, switching projects
+and closing both runtimes. Exact old bytes, revision/layout and body/header identity
+remain paired and pass canonical Project validation plus the production frontend
+guard. Existing revision and project-instance fences reject stale dispatch without
+calling actions/apply. Repeated cancellation drains a held synchronous store snapshot
+before a queued switch; send cancellation/disconnect never repeats projection or
+retires an active runtime. Store failures are sanitized/recoverable and stopped
+workspaces reject projection before accessing a closed store. Existing applied-
+project palette/layout and legacy/malformed response contracts remain in the run.
+
 ## Next bounded work
 
-1. Review `/api/project/active` response ownership under slow clients, preserving
-   revision/project identity pairing, frontend snapshot guards and source cleanup.
+1. Review `/api/alarms` snapshot delivery under slow clients, preserving occurrence
+   identity, quality/recovery information and acknowledgement/journal boundaries.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 
