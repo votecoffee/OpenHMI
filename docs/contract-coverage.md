@@ -425,11 +425,22 @@ and dispatches one acknowledgement only after an explicit operator action. Exist
 workflow coverage still exercises malformed bodies/cursors, isolated notes/history
 outages, shelving, permission denial and restoration with realistic source headers.
 
+Command source contracts feed real history/detail/latest HTTP responses from two
+offline apps through the production guarded reader and latest-command helper.
+Both projects reuse a transaction ID; foreign completed records and missing source
+headers are rejected while matching uncertain records recover. Stale activation
+remains rejected before journaling/writes, without automatic replay. A headless
+scenario checks retained history/detail/link/filter state, unavailable runtime
+buttons, permission clearing and real local completion during a foreign-source
+outage. Only matching status unlocks the button and exactly one explicit request
+sequence is sent. The fixture uses a separate local UDT channel so existing command
+sequence/persistence coverage remains independent.
+
 ## Next bounded work
 
-1. Extend the source-identity audit to command history/detail and runtime command
-   status, preserving transaction correlation, permission handling and dispatch
-   non-replay while a project switch is being detected.
+1. Extend the source-identity audit to activity and diagnostics readers, preserving
+   filters/paging, retained evidence and permission clearing while a project switch
+   is being detected. Keep exports separate from JSON read contracts.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

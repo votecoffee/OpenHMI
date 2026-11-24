@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 import { commandHistoryPath, commandTransactionPath } from './command-api.mjs';
 import { commandStates, isCommandPage, isCommandRecord } from './command-status.mjs';
 import { SecurityContext, allowed } from './security.jsx';
@@ -21,7 +21,7 @@ export function CommandConsole() {
     let stopped = false, timer;
     async function refresh() {
       try {
-        const result = await api(endpoint);
+        const result = await readRuntimeSnapshot(endpoint);
         const readable = exact ? isCommandRecord(result) && String(result.id) === identifier : isCommandPage(result);
         if (!readable) throw new Error('Invalid command status response');
         if (!stopped) setResponse({ endpoint, data: exact ? { items: [result] } : result, receivedAt: new Date() });

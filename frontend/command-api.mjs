@@ -1,7 +1,7 @@
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 
 export function readLatestCommand(command) {
-  return api(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`);
+  return readRuntimeSnapshot(`/api/commands?command_id=${encodeURIComponent(command)}&limit=1`);
 }
 
 export function commandHistoryPath({ limit = 50, command = '', state = '', before = null } = {}) {

@@ -678,11 +678,22 @@ not close hardware or operator acceptance gates.
     explicit acknowledgement without replay. Mutation helpers, payloads and server
     OpenAPI remain unchanged; CSV links are outside this JSON-read boundary.
 
+62. Delivered source-identity checks for command history/detail and runtime latest
+    command status. Missing/foreign success replies cannot install another project's
+    transaction or unlock dispatch, even with the same numeric transaction ID.
+    Existing correlation, latest-record ordering, unavailable/retention handling,
+    permission clearing and unresolved-request blocking remain intact. Matching
+    reads recover without repinning or replay. Real HTTP/JS tests and headless
+    workflow cases cover foreign completion, missing identities, retained filters
+    and evidence, denial and real local completion while status is unavailable.
+    A separate local fixture channel preserves existing sequence-allocation tests.
+    Mutation helpers, server payloads/OpenAPI and download links remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
 Recipe HTTP separation is complete for this scope. Next extend the source-identity
-audit to command history/detail and runtime command status, preserving transaction
-correlation, permission handling and dispatch non-replay while a project switch is
-being detected. Preserve scan/resource draining
+audit to activity and diagnostics readers, preserving filters/paging, retained
+evidence and permission clearing while a project switch is being detected. Keep
+exports separate from JSON read contracts. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

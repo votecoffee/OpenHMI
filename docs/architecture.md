@@ -825,8 +825,16 @@ and blocks dependent actions, while permission denial clears data. Filters, type
 drafts and selections survive recoverable read failures. A history-only failure
 does not disable acknowledgement on a healthy occurrence page. Mutation helpers,
 audit receipts and non-replay behavior remain unchanged. CSV links are outside the
-JSON reader. Other operator readers remain a follow-up, starting with command
-history/detail and runtime command status.
+JSON reader.
+Command-console history/detail polls and `readLatestCommand()` now also use the
+guarded reader. Existing endpoint cancellation, transaction correlation, monotonic
+latest-record handling, retained evidence and permission clearing remain intact.
+Source failures cannot install a foreign completion with the same transaction ID
+or make a runtime button dispatchable. Matching reads recover, but unresolved
+transactions still block a new request. Mutation receipts and activation helpers
+remain unchanged; neither failed reads nor recovery replay an operation. Download
+links are outside this JSON boundary. Activity and diagnostics readers remain the
+next source-identity audit.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

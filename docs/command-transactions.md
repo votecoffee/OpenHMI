@@ -129,6 +129,15 @@ completion. Restart during staging retains uncertainty and sends no commit.
 
 ## Validation boundary
 
+Command history/detail and runtime latest-status JSON reads require the initialized
+project's response identity before accepting data. Missing/foreign identities keep
+the last confirmed evidence marked unavailable and block dependent dispatch or
+forward paging. Permission denial clears the affected evidence. A matching reply
+recovers without repinning the client or replaying a command; existing transaction,
+command and sequence checks still apply. A completed record from another project
+cannot unlock a request, even when its numeric transaction ID is identical.
+Transaction download links are outside this JSON-read boundary.
+
 Local tests exercise sequence allocation, same-sequence acceptance/completion,
 nonzero result, permit/groups, duplicate/concurrent submissions, stale/failed
 observations, SQL/journal outages, partial write/lost reply, timeout/late feedback,

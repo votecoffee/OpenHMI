@@ -121,6 +121,50 @@ class BrowserProjectIdentityTests(unittest.TestCase):
         self.assertEqual(result['results'][-1]['data'], json.loads(tag['body']))
         self.assertTrue(all(call['headers']['X-OpenHMI-Project'] == app.state.project_instance for call in result['calls'][1:]))
 
+    def test_command_reads_reject_foreign_completion_with_same_transaction_id_without_dispatch(self):
+        from openhmi.alarms import utc_now
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        for app, state in ((original, 'uncertain'), (replacement, 'completed')):
+            stamp = utc_now()
+            with app.state.store.transaction() as db:
+                cursor = db.execute('''INSERT INTO command_transaction(operation_id,command_id,channel,signature,
+                    definition_json,sequence,state,created_at,updated_at,deadline) VALUES(?,?,?,?,?,?,?,?,?,?)''',
+                    ('identity-operation', 'identity_cycle', 'offline', 'fixture', '{}', 1, state, stamp, stamp, stamp))
+                self.assertEqual(cursor.lastrowid, 1)
+                app.state.commands._update(db, 1, state, 'Offline source-specific evidence', 0 if state == 'completed' else None)
+        paths = ['/api/commands?limit=50&command_id=identity_cycle', '/api/commands/1',
+                 '/api/commands?command_id=identity_cycle&limit=1']
+        same = [self.wire(client.get(path)) for path in paths]
+        foreign = [self.wire(other.get(path)) for path in paths]
+        missing = [{**reply, 'headers': {key: value for key, value in reply['headers'].items()
+                                       if key != 'x-openhmi-project'}} for reply in same]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        requests = [dict(path=paths[0], runtime=True), dict(path=paths[1], runtime=True),
+                    dict(latestCommand='identity_cycle')]
+        from unittest.mock import patch
+        with patch.object(replacement.state.driver, 'write', side_effect=AssertionError('No command replay')) as write, \
+             patch.object(replacement.state.activity, 'run', side_effect=AssertionError('No stale dispatch')) as journal:
+            stale = other.post('/api/controls/cycle/activate', json={},
+                               headers={'X-OpenHMI-Project': original.state.project_instance})
+            self.assertEqual(stale.status_code, 409)
+            write.assert_not_called(); journal.assert_not_called()
+        result = frontend('http_context', requests=[dict(path='/api/project')] + requests * 4
+                          + [dict(path='/api/controls/cycle/activate', options={'method': 'POST'})],
+                          replies=[self.wire(client.get('/api/project')), *same, *foreign, *missing, *same, self.wire(stale)])
+        for start in (1, 10):
+            self.assertEqual([row['data'] for row in result['results'][start:start + 3]],
+                             [json.loads(reply['body']) for reply in same])
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][4:10]))
+        self.assertEqual([row['project_changed'] for row in result['results'][4:10]], [True] * 3 + [False] * 3)
+        self.assertTrue(result['results'][-1]['conflict'])
+        self.assertEqual(len(result['calls']), 14)
+        self.assertTrue(all(call['headers']['X-OpenHMI-Project'] == original.state.project_instance
+                            for call in result['calls'][1:]))
+        self.assertEqual(replacement.state.commands.get(1)['state'], 'completed')
+        self.assertEqual(replacement.state.activity.query()['items'], [])
+        original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()
+
     def test_uninitialized_and_invalid_read_modes_never_dispatch_and_http_errors_remain_errors(self):
         app, client = self.fixture()
         from tests.test_security import bootstrap

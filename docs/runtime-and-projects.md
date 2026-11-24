@@ -35,6 +35,12 @@ event-history failure alone leaves a healthy occurrence page usable. Permission
 denial still clears the affected data. These checks do not repin the client or
 replay acknowledgement, note or shelf operations. Other operator readers remain
 subject to separate audits; CSV links are outside this JSON-read boundary.
+Command history/detail and runtime latest-command reads now use the same guard.
+Missing/foreign source identity retains confirmed evidence with unavailable
+feedback and blocks command dispatch/forward paging. Permission denial clears the
+affected evidence. Matching reads recover without repinning or replaying commands;
+transaction ID, command ID and sequence validation still apply. Transaction download
+links remain outside this JSON-read boundary.
 
 ## Connection and tag contract
 

@@ -12,6 +12,21 @@ def create_test_app():
     ]})
     from tests.test_logix_history import FakePLC
     app.state.driver.factory = FakePLC  # This fixture can never open a network PLC connection.
+    def complete_identity_cycle(application):
+        # Separate local PLC-owned memory keeps command tests on distinct channels.
+        driver = application.driver
+        with driver.io_lock, driver.lock:
+            definition = driver.definitions.get('IdentityCommand')
+            if not definition or definition['connection'] or definition['type'] != 'struct':
+                raise ValueError('Identity fixture requires its local command UDT')
+            values = driver._tags['IdentityCommand']
+            sequence = values['RequestSequence']
+            if type(sequence) is not int or sequence <= 0:
+                raise ValueError('Dispatch the identity fixture before completion')
+            values['AcceptedSequence'] = sequence
+            values['ResultCode'] = 0
+            values['CompletedSequence'] = sequence
+    app.state.application.register_action('identity_complete', 'Complete identity fixture', complete_identity_cycle)
     return app
 
 

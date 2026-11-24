@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 import { readFile } from 'node:fs/promises';
 
 test.use({ actionTimeout: 15000 });
@@ -46,7 +47,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
     const state = await response.json();
     state.values['CycleCommand.Permit'] = false;
     if (permitStale) state.samples['CycleCommand.Permit'] = { quality: 'stale', error: 'Synthetic stale permit' };
-    await route.fulfill({ response, json: state });
+    await fulfillProjectRead(route, { response, json: state });
   });
   await page.goto('/runtime');
   const request = page.getByRole('button', { name: 'Request demo cycle', exact: true });
@@ -60,7 +61,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await expect(request).toBeDisabled();
   const latestEndpoint = '**/api/commands?command_id=cycle_demo&limit=1';
   let latestReply = { status: 503, json: { detail: 'Synthetic command status outage' } };
-  await page.route(latestEndpoint, route => route.fulfill(latestReply));
+  await page.route(latestEndpoint, route => fulfillProjectRead(route, latestReply));
   await page.unroute('**/api/tags');
   const command = page.locator('[data-control="button"]').filter({ has: request });
   await expect(command).toContainText('Command status unavailable');
@@ -77,7 +78,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await expect(command).not.toContainText('PLC command: completed');
   const latest = await (await page.request.get('/api/commands?command_id=cycle_demo&limit=1')).json();
   latestReply = { json: { ...latest, items: [{ ...latest.items[0], command_id: 'different_command', state: 'completed' }] } };
-  await page.route(latestEndpoint, route => route.fulfill(latestReply));
+  await page.route(latestEndpoint, route => fulfillProjectRead(route, latestReply));
   await expect(command).toContainText('Command status unavailable');
   await expect(command).toContainText('PLC command: accepted');
   await expect(firstLink).toHaveAttribute('href', firstHref);
@@ -98,7 +99,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   await expect(command).toContainText('PLC command: completed');
   await expect(request).toBeEnabled();
   latestReply = { status: 503, json: { detail: 'Synthetic command status outage' } };
-  await page.route(latestEndpoint, route => route.fulfill(latestReply));
+  await page.route(latestEndpoint, route => fulfillProjectRead(route, latestReply));
   await expect(command).toContainText('Command status unavailable');
   await expect(command).toContainText('PLC command: completed');
   await expect(request).toBeDisabled();
@@ -118,7 +119,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   expect(evidence.transaction.events.map(event => event.state)).toEqual(['prepared', 'requested', 'accepted', 'completed']);
   const exactEndpoint = `**/api/commands/${evidence.transaction.id}`;
   let exactReply = { json: { ...evidence.transaction, id: evidence.transaction.id + 1 } };
-  await page.route(exactEndpoint, route => route.fulfill(exactReply));
+  await page.route(exactEndpoint, route => fulfillProjectRead(route, exactReply));
   const statusWarning = page.getByRole('alert');
   await expect(statusWarning).toContainText('Showing last received command status');
   await expect(row).toContainText(`#${evidence.transaction.id}`);
@@ -161,7 +162,7 @@ test('no-code command contract, accepted/completed feedback, history and timeout
   const historyEndpoint = '**/api/commands?*';
   const historySnapshot = await (await historyPage.request.get('/api/commands?command_id=cycle_demo&state=unresolved&limit=50')).json();
   let historyReply = { json: { ...historySnapshot, has_more: true, next_before_id: historySnapshot.items[0].id + 1 } };
-  await historyPage.route(historyEndpoint, route => route.fulfill(historyReply));
+  await historyPage.route(historyEndpoint, route => fulfillProjectRead(route, historyReply));
   const historyWarning = historyPage.getByRole('alert');
   await expect(historyWarning).toContainText('Showing last received command status');
   await expect(matching).toContainText('uncertain');

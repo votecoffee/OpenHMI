@@ -100,7 +100,8 @@ export async function contract(request) {
       return new Response(reply.body, { status: reply.status, headers: reply.headers });
     };
     for (const item of request.requests) {
-        try { results.push({ data: await (item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
+        try { results.push({ data: await (item.latestCommand ? readLatestCommand(item.latestCommand)
+          : item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
       catch (error) { results.push({ error: error.message, status: error.status,
           conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status,
           ...(error.project_context ? { project_context: true, project_changed: error.project_changed } : {}) }); }
@@ -292,7 +293,8 @@ export async function contract(request) {
       const body = mutation && request.malformedResponse ? (request.malformedResponse === 'null' ? 'null' : 'invalid JSON')
         : JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) });
       return new Response(body, {
-        status, headers: { 'Content-Type': 'application/json', ...(mutation ? {
+        status, headers: { 'Content-Type': 'application/json',
+          ...(request.operation === 'command_queries' ? { 'X-OpenHMI-Project': request.projectInstance ?? 'a'.repeat(32) } : {}), ...(mutation ? {
           'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });
     };
