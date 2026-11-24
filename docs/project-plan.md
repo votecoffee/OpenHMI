@@ -624,11 +624,21 @@ not close hardware or operator acceptance gates.
     retires a runtime. SQL/HTTP/Pydantic/JS contracts verify these boundaries plus
     denial/error privacy. Existing query/paging, payload and OpenAPI fields remain.
 
+57. Delivered prepared tag/quality readout delivery. Full/status-only `/api/tags`
+    responses pass through their existing route, FastAPI serializer and middleware
+    under the workspace lock, then send immutable bytes/headers outside it. Slow
+    viewers allow subscription renewal, reads, switching and runtime shutdown.
+    Cancelled preparation drains synchronous projection and middleware before
+    source closure; send failures never replay it. Mixed per-tag qualities, source
+    identity, status-only omission and query errors remain intact. Unexpected
+    preparation failures return sanitized private 503 feedback and can recover.
+    Real SQL/HTTP/ASGI and production JS contracts cover these boundaries. No PLC
+    polling/subscription is added, and payload/OpenAPI fields remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review cached runtime
-readout delivery, starting with tag/quality snapshots, for remaining workspace lock
-contention; preserve subscription lifetime, sample ownership and project-instance
-guards. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next review `/api/project/active`
+response ownership under slow clients, preserving revision/project identity pairing,
+frontend snapshot guards and source cleanup. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

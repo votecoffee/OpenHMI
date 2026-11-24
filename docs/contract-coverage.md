@@ -368,11 +368,21 @@ inventory scan with repeated cancellation keeps the lock until scanning finishes
 then permits a queued switch; denial and scan-error sends detach without exposing
 private failure details. Existing query/paging/permission contracts are preserved.
 
+Tag-delivery checks now run full/status-only snapshots through the real FastAPI
+middleware and pause both headers/body while subscription renewal, reads, switching
+and shutdown proceed. Exact bytes, mixed good/bad/pending/stale values, source
+identity and private headers survive source closure; actual replies pass production
+JS normalization. Held synchronous projection plus repeated cancellation drains
+before a queued switch closes the runtime. Send cancellation/disconnect never
+repeats projection. Query errors and injected projection failures preserve source
+context and recover; fragmented finite ASGI framing retains duplicate headers and
+rejects incomplete/unsupported responses. Existing real-cache tag contracts still
+cover stale/recovery behavior and prohibit polling or leasing from GET.
+
 ## Next bounded work
 
-1. Review cached runtime readout delivery, starting with tag/quality snapshots,
-   for remaining workspace lock contention; preserve subscription lifetime,
-   sample ownership and project-instance guards.
+1. Review `/api/project/active` response ownership under slow clients, preserving
+   revision/project identity pairing, frontend snapshot guards and source cleanup.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

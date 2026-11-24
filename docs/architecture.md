@@ -770,6 +770,18 @@ owned scanning before the lock releases; cancellation/disconnect during send doe
 not repeat preparation or retire a runtime. Existing permission/query/paging,
 Pydantic/JS payloads and FastAPI OpenAPI are unchanged. These event-gated offline
 checks establish resource ownership, not web-server exit timing or throughput.
+Cached GET `/api/tags` (including status-only and query-validation responses) now
+uses `http_snapshot.py` to stage the complete finite ASGI response under the workspace
+lock. The existing route, FastAPI serialization and identity middleware run normally;
+encoded body frames and copied raw headers retain their contents, including duplicate
+headers. Only after the full application call finishes does delivery leave the lock.
+The workspace drains preparation through cancellation, so synchronous projection
+and middleware cleanup cannot outlive their source runtime. A slow send then allows
+subscriptions, other requests, switching and shutdown without depending on runtime
+resources. Responses are private/no-store; unexpected preparation errors become a
+sanitized 503 with source identity. No poll/lease is added by staging. This helper
+is restricted to the audited finite tag endpoint, not streaming/file responses.
+Public fields, status-only omission, query validation and OpenAPI remain unchanged.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

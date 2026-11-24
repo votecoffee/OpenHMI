@@ -400,6 +400,10 @@ route does not hold up the others. When a route fails, its cached values become
 unavailable to live controls and permits until fresh reads succeed. Open the
 runtime header's PLC status to see each route. Affected controls label held,
 disabled, waiting, stale and disconnected data.
+Full and status-only tag snapshots are prepared through the normal API middleware,
+then send outside the runtime lock. A slow viewer no longer blocks subscription
+renewal, other HMI requests, project switching or runtime shutdown. Encoded values,
+per-tag quality and source identity remain fixed; reads do not add PLC acquisition.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

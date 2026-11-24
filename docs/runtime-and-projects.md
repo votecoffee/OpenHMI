@@ -6,6 +6,15 @@ No controller has been contacted during development/validation.
 
 ## Connection and tag contract
 
+Tag and status-only readout responses use cached data through the normal API route.
+Preparation, serialization and middleware completion stay protected from project
+switch/shutdown; finished responses then send outside the workspace lock. Slow
+viewers do not block subscription renewal or other HMI requests. Values, quality
+and source identity are fixed at preparation, so a received frame can describe the
+previous project after a switch; normal project-instance guards still protect writes.
+Responses are private/no-store, and unexpected preparation failures return sanitized
+503 feedback. Readout staging does not poll controllers or renew viewer leases.
+
 A connection has a unique ID, route such as `192.0.2.10/1/0`, enabled setting,
 socket timeout and program-tag discovery setting. Logical HMI tags map names to
 PLC addresses and types. Numeric tags may have scale/offset; writes reverse that

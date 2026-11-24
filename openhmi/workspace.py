@@ -24,6 +24,7 @@ from .workspace_inventory import ArtifactQuery, InventoryUnavailable, inventory
 from .workspace_contracts import LibrarySnapshot, CreatedProject, ImportedProject, OpenedProject
 from .workspace_import import import_response
 from .workspace_mutations import mutation_response
+from .http_snapshot import prepare_snapshot
 
 MAX_BACKUP = 256 * 1024 * 1024
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
@@ -287,6 +288,21 @@ class ProjectWorkspace:
         # download of the finished file need not delay HMI requests.
         if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
             return await self.current(scope, receive, send)
+        if scope['method'] == 'GET' and scope['path'] == '/api/tags':
+            async with self.lock:
+                identifier = self.current.state.project_instance
+                if self.stopping:
+                    response = JSONResponse({'detail': 'Tag snapshot is unavailable while the workspace is stopping'}, status_code=503)
+                else:
+                    try:
+                        response = await finish_cleanup(prepare_snapshot(self.current, scope, receive))
+                    except Exception:
+                        logging.exception('Cached tag readout preparation failed')
+                        response = JSONResponse({'detail': 'Tag snapshot is temporarily unavailable'}, status_code=503)
+                response.headers['Cache-Control'] = 'no-store'
+                response.headers['X-Content-Type-Options'] = 'nosniff'
+                set_response_context(Request(scope, receive), response, identifier)
+            return await response(scope, receive, send)
         if scope['method'] == 'POST' and scope['path'] == '/api/workspace/import':
             response = await import_response(self, Request(scope, receive), MAX_BACKUP)
             return await response(scope, receive, send)
