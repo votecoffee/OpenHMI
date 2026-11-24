@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
 
@@ -36,9 +37,9 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     async function breakCursor(route, key = 'id') {
       const response = await route.fetch();
       const data = await response.json();
-      return route.fulfill({ response, json: { ...data, has_more: true, next_before_id: data.items.at(-1)[key] + 1 } });
+      return fulfillProjectRead(route, { response, json: { ...data, has_more: true, next_before_id: data.items.at(-1)[key] + 1 } });
     }
-    await page.route(notesEndpoint, route => route.fulfill({ status: 503, json: { detail: 'Synthetic notes outage' } }));
+    await page.route(notesEndpoint, route => fulfillProjectRead(route, { status: 503, json: { detail: 'Synthetic notes outage' } }));
     await page.getByLabel('Screen alarm status').getByRole('link', { name: 'Alarm details: P1 Supply fault' }).press('Enter');
     const detail = page.getByRole('region', { name: 'Alarm details', exact: true });
     await expect(detail.getByRole('heading', { name: /^Alarm details #/ })).toBeFocused();
@@ -51,7 +52,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(page.getByText('2 active / 2 unacknowledged', { exact: true })).toBeVisible();
     const alarmStatus = await (await page.request.get('/api/alarms')).json();
     let status = { ...alarmStatus, evaluation_stale: true };
-    await page.route('**/api/alarms', route => route.fulfill({ json: status }));
+    await page.route('**/api/alarms', route => fulfillProjectRead(route, { json: status }));
     const lastRecorded = page.getByText('Last recorded: 2 active / 2 unacknowledged', { exact: true });
     await expect(lastRecorded).toBeVisible();
     const ackAll = page.getByRole('button', { name: 'Acknowledge all', exact: true });
@@ -67,7 +68,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
       const state = await response.json();
       state.trigger = { quality: 'bad', quality_reason: 'disconnected', age_seconds: 4.5,
         timestamp: '2026-01-01T12:00:00Z', error: 'Synthetic trigger route loss' };
-      await route.fulfill({ response, json: state });
+      await fulfillProjectRead(route, { response, json: state });
     });
     const triggerBadge = detail.getByRole('button', { name: 'Inspect ProcessAlarm quality (PLC COMM LOSS)', exact: true });
     await triggerBadge.press('Enter');
@@ -128,7 +129,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
 
     const detailPath = `/api/alarms/occurrences/${primary.occurrence_id}`;
     const captured = await (await page.request.get(detailPath)).json();
-    await page.route(`**${detailPath}`, route => route.fulfill({ json: { ...captured,
+    await page.route(`**${detailPath}`, route => fulfillProjectRead(route, { json: { ...captured,
       occurrence: { ...captured.occurrence, occurrence_id: primary.occurrence_id + 1, response: 'Wrong alarm' } } }));
     const detailWarning = detail.getByRole('alert').filter({ hasText: 'Alarm details unavailable' });
     await expect(detailWarning).toContainText('Showing the last page received');
@@ -162,7 +163,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     const shelfEndpoint = '**/api/alarms/shelves?*';
     const recordedShelves = await (await page.request.get('/api/alarms/shelves')).json();
     let shelfReply = { json: { ...recordedShelves, has_more: true, next_after_id: 'wrong-cursor' } };
-    await page.route(shelfEndpoint, route => route.fulfill(shelfReply));
+    await page.route(shelfEndpoint, route => fulfillProjectRead(route, shelfReply));
     const shelfWarning = shelves.getByRole('alert');
     await expect(shelfWarning).toContainText('Showing the last page received');
     await expect(shelves.getByRole('cell', { name: 'Supply investigation', exact: true })).toBeVisible();
@@ -172,7 +173,7 @@ test('filtered acknowledgement and attributed notes preserve hidden outstanding 
     await expect(shelfWarning).toBeHidden();
     await expect(restore).toBeEnabled();
     shelfReply = { json: { items: [recordedShelves.items[0], recordedShelves.items[0]], has_more: false, next_after_id: null } };
-    await page.route(shelfEndpoint, route => route.fulfill(shelfReply));
+    await page.route(shelfEndpoint, route => fulfillProjectRead(route, shelfReply));
     await expect(shelfWarning).toContainText('Invalid alarm response');
     await expect(shelves.locator('tbody tr')).toHaveCount(1);
     await expect(restore).toBeDisabled();

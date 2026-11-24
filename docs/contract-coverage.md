@@ -402,11 +402,23 @@ never dispatches acknowledgements or journal operations; read failures are priva
 sanitized and recoverable, with no closed-monitor reads after shutdown. Existing
 alarm lifecycle, acknowledgement, shelf, recovery and legacy contracts remain.
 
+Browser project-identity contracts now feed real same/replacement-app HTTP replies
+through the production opt-in runtime reader. Matching reads pass; missing,
+malformed and foreign identities cannot return data. Applied-project change replies
+require coherent body/header identities, never repin the API and preserve stale-
+write rejection without replay. Uninitialized/invalid guarded modes never dispatch;
+internal read options do not leak into fetch and HTTP errors retain their status.
+Headless cases cover foreign/missing values, alarm messages and user identity,
+matching recovery, a real switch/reload with a freshly pinned replacement, editor
+connection metadata/draft retention, and rejecting a foreign initial catalogue.
+Existing same-project response fixtures retain explicit context headers so payload
+shape fault/recovery coverage continues to reach the original validators.
+
 ## Next bounded work
 
-1. Audit source identity across browser runtime polls during project switches,
-   preserving the applied-project reload path and rejecting data from another
-   project before it can populate the previous screen.
+1. Extend the source-identity audit to independent alarm-console list/detail/history
+   readers, preserving retained filters/drafts, permission handling and acknowledgement
+   non-replay while a project switch is being detected.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

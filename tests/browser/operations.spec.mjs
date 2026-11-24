@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
 
@@ -24,7 +25,7 @@ test('a stale operator button cannot dispatch a replacement action', async ({ pa
     const oldMotor = (await (await page.request.get('/api/tags')).json()).values.MotorRunning;
     const displayed = await (await page.request.get('/api/project/active')).json();
     const activeEndpoint = '**/api/project/active';
-    await page.route(activeEndpoint, route => route.fulfill({ json: displayed }));
+    await page.route(activeEndpoint, route => fulfillProjectRead(route, { json: displayed }));
     const project = structuredClone(original.active);
     project.tags.push({ name: 'ButtonTarget', type: 'boolean', initial: false, writable: true });
     Object.assign(project.controls.find(control => control.id === 'toggle'),
@@ -59,7 +60,7 @@ test('diagnostics keeps readable results through bad polls and clears them on de
   const snapshot = await (await page.request.get('/api/diagnostics')).json();
   const healthy = { json: { ...snapshot, total_tags: snapshot.tags.length + 1, next_offset: snapshot.tags.length, truncated: true } };
   let reply = healthy;
-  await page.route('**/api/diagnostics?*', route => reply ? route.fulfill(reply) : route.continue());
+  await page.route('**/api/diagnostics?*', route => reply ? fulfillProjectRead(route, reply) : route.continue());
   await page.goto('/diagnostics');
   const panel = page.getByRole('region', { name: 'Runtime diagnostics', exact: true });
   const warning = panel.getByRole('alert');
@@ -116,7 +117,7 @@ test('activity preserves the current page through malformed replies and retries 
   const older = { ...journal, items: [{ ...entry, id: 1, operation_id: 'older-record' }], has_more: false, next_before_id: null };
   let reply = { json: newest };
   let olderReply = { status: 503, json: { detail: 'Synthetic older page outage' } };
-  await page.route('**/api/activity?*', route => route.fulfill(new URL(route.request().url()).searchParams.has('before_id') ? olderReply : reply));
+  await page.route('**/api/activity?*', route => fulfillProjectRead(route, new URL(route.request().url()).searchParams.has('before_id') ? olderReply : reply));
   await page.goto('/activity');
   const panel = page.getByRole('region', { name: 'Operator activity', exact: true });
   const warning = panel.getByRole('alert');
@@ -244,7 +245,7 @@ test('protected operator journal, denial attribution, filters, export and diagno
         recovery: 1375, scan_queue: 1, route_lock_wait: 150, adapter_read: 12,
       }).map(([key, ms]) => [key, { last_ms: ms, p50_ms: ms, p95_ms: ms, p99_ms: ms, count: 1 }])),
     }];
-    await route.fulfill({ response, json: data });
+    await fulfillProjectRead(route, { response, json: data });
   });
   const bench = page.getByRole('row').filter({ hasText: 'Bench PLC' });
   await bench.getByText('Timing (ms)', { exact: true }).click();

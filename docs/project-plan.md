@@ -656,10 +656,22 @@ not close hardware or operator acceptance gates.
     runtimes reject monitor access. SQL/HTTP/ASGI and production JS contracts verify
     these paths; payload/OpenAPI fields remain unchanged.
 
+60. Delivered opt-in browser project-identity checks for main runtime polls,
+    identity refresh and initial catalogue loading. Matching source headers are
+    required before data adoption; missing/malformed/foreign replies use existing
+    unavailable states without repinning or replay. Applied-project change replies
+    require paired header/body identities, preserving runtime reload. Editors keep
+    their old active metadata/layout and draft when a different project is detected.
+    Real HTTP-to-production-JS and headless cases cover rejection/recovery, source
+    pairing, initialization, real switch/reload and stale-write pinning. Existing
+    same-project synthetic fixtures now provide realistic identity headers. Default
+    API mutation/receipt behavior and server payload/OpenAPI fields remain intact.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next audit source identity across
-browser runtime polls during project switches, preserving the applied-project reload
-path and rejecting another project's data before it populates the previous screen. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next extend the source-identity
+audit to independent alarm-console list/detail/history readers, preserving retained
+filters/drafts, permission handling and acknowledgement non-replay while a project
+switch is being detected. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

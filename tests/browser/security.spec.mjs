@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test.use({ baseURL: 'http://127.0.0.1:8766' });
 test('malformed identity status preserves the last confirmed sign-in and recovers', async ({ page }) => {
@@ -18,9 +19,9 @@ test('malformed identity status preserves the last confirmed sign-in and recover
       holdPoll = false;
       markHeld();
       await heldReply;
-      return route.fulfill({ json: confirmed });
+      return fulfillProjectRead(route, { json: confirmed });
     }
-    return malformed ? route.fulfill({ json: status }) : route.continue();
+    return malformed ? fulfillProjectRead(route, { json: status }) : route.continue();
   });
   await page.goto('/runtime');
   const bar = page.locator('.security-bar');

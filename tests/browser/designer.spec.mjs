@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test('no-code live editing, autosave, apply to an open viewer and Python action', async ({ page, context }) => {
   test.setTimeout(60000);
@@ -53,9 +54,9 @@ test('analog context, redundant alarm priority and data quality remain explicit'
   const { active_revision: revision } = await (await page.request.get('/api/project')).json();
   let alarms = { sampled_revision: revision, states: {}, outstanding: [], active_count: 0, unacknowledged_count: 0 };
   let samples = {};
-  await page.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values, samples } }));
+  await page.route('**/api/tags', route => fulfillProjectRead(route, { json: { driver: 'simulator', values, samples } }));
   let alarmReachable = true;
-  await page.route('**/api/alarms', route => alarmReachable ? route.fulfill({ json: alarms }) : route.abort());
+  await page.route('**/api/alarms', route => alarmReachable ? fulfillProjectRead(route, { json: alarms }) : route.abort());
   await page.goto('/runtime');
   await expect(page.locator('[data-control="alarm"]')).toContainText('INACTIVE');
   const banner = page.getByLabel('Screen alarm status');
@@ -124,8 +125,8 @@ test('malformed alarm status keeps the last headline while the screen keeps upda
     outstanding: [{ priority: 2, message: 'Process alarm', occurrence_id: 1 }], active_count: 1, unacknowledged_count: 1 };
   let alarms = {};
   let level = 42;
-  await page.route('**/api/alarms', route => route.fulfill({ body: JSON.stringify(alarms), contentType: 'application/json' }));
-  await page.route('**/api/tags', route => route.fulfill({ json: { values: { TankLevel: level } } }));
+  await page.route('**/api/alarms', route => fulfillProjectRead(route, { body: JSON.stringify(alarms), contentType: 'application/json' }));
+  await page.route('**/api/tags', route => fulfillProjectRead(route, { json: { values: { TankLevel: level } } }));
   await page.goto('/runtime');
   const banner = page.getByLabel('Screen alarm status');
   const numeric = page.locator('[data-control="numeric"]');
@@ -154,7 +155,7 @@ test('invalid tag replies fail closed and recover without reloading', async ({ p
   page.on('pageerror', error => errors.push(error.message));
   const good = { values: { TankLevel: 42, MotorRunning: true }, samples: { TankLevel: { quality: 'good' } }, connections: [] };
   let payload = good;
-  await page.route('**/api/tags', route => route.fulfill({ body: JSON.stringify(payload), contentType: 'application/json' }));
+  await page.route('**/api/tags', route => fulfillProjectRead(route, { body: JSON.stringify(payload), contentType: 'application/json' }));
   await page.goto('/runtime');
   const numeric = page.locator('[data-control="numeric"]');
   const header = page.locator('.app-header .connection');
@@ -192,8 +193,8 @@ test('invalid applied project replies preserve the open layout until a valid rev
     project: { ...original.project, title: 'Updated layout after recovery' } };
   let status = original;
   let level = 42;
-  await page.route('**/api/project/active', route => route.fulfill({ body: JSON.stringify(status), contentType: 'application/json' }));
-  await page.route('**/api/tags', route => route.fulfill({ json: { values: { TankLevel: level } } }));
+  await page.route('**/api/project/active', route => fulfillProjectRead(route, { body: JSON.stringify(status), contentType: 'application/json' }));
+  await page.route('**/api/tags', route => fulfillProjectRead(route, { json: { values: { TankLevel: level } } }));
   await page.goto('/runtime');
   const oldRevision = page.getByText(`Live screen / revision ${original.revision}`, { exact: true });
   const oldTitle = page.getByRole('heading', { name: original.project.title, exact: true });
@@ -233,7 +234,7 @@ test('a stalled recipe status request does not delay alarms, layout or identity'
   const alarms = { sampled_revision: revision, states: { process_alarm: { quality: 'good', condition: 0 } },
     outstanding: [], active_count: 0, unacknowledged_count: 0 };
   let reachable = false;
-  await page.route('**/api/alarms', route => reachable ? route.fulfill({ json: alarms }) : route.abort());
+  await page.route('**/api/alarms', route => reachable ? fulfillProjectRead(route, { json: alarms }) : route.abort());
   await page.route('**/api/project/active', route => reachable ? route.continue() : route.abort());
   await page.route('**/api/security/session', route => reachable ? route.continue() : route.abort());
   try {
@@ -382,11 +383,11 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   await page.route('**/api/project', async route => {
     const response = await route.fetch(), data = await response.json();
     withRoutes(data.active);
-    await route.fulfill({ response, json: data });
+    await fulfillProjectRead(route, { response, json: data });
   });
   const activeProject = await (await page.request.get('/api/project/active')).json();
   withRoutes(activeProject.project);
-  await page.route('**/api/project/active', route => route.fulfill({ json: activeProject }));
+  await page.route('**/api/project/active', route => fulfillProjectRead(route, { json: activeProject }));
 
   const good = { quality: 'good' };
   const old = { timestamp: '2026-01-01T12:00:00Z', age_seconds: 3.25 };
@@ -395,7 +396,7 @@ test('PLC route status and binding quality distinguish loss, stale data and reco
   let reachable = true;
   let live = { values, connections: [{ ...online[0], awaiting_data: true }, online[1]],
     samples: { TankLevel: good, MotorRunning: { quality: 'pending' } } };
-  await page.route('**/api/tags', route => reachable ? route.fulfill({ json: live }) : route.abort());
+  await page.route('**/api/tags', route => reachable ? fulfillProjectRead(route, { json: live }) : route.abort());
   await page.goto('/runtime');
   const header = page.locator('.app-header .connection');
   const station = page.locator('.station-mode');

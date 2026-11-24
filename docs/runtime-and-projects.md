@@ -19,6 +19,16 @@ an identically numbered occurrence in a newly opened project. Send failures neve
 repeat the snapshot or create an acknowledgement/journal operation. Unexpected read
 failures return sanitized private 503 feedback and recover on a later request.
 
+The main browser polls require a matching, valid response project header before
+adopting tags, alarm status, selected-recipe data or identity. Invalid/missing source
+identity produces the normal unavailable indication; a matching later reply recovers.
+Applied-project reads require paired body/header identities so runtime viewers can
+reload on a confirmed switch. Editors keep the previous layout/metadata and draft
+until explicit reload. The API's original project pin stays fixed, including for
+writes; only fresh page initialization can adopt the replacement. Catalogue loading
+also checks that it follows the same initialized project. These checks are opt-in
+for these reads; independent console/detail readers are audited separately.
+
 ## Connection and tag contract
 
 Tag and status-only readout responses use cached data through the normal API route.

@@ -24,8 +24,8 @@ import { RecipeTransferSettings } from './recipe-transfer-settings.jsx';
 import { ProjectHistory, MergeReview, exportCandidate } from './project-history.jsx';
 import { readCandidate, retainCandidate, editorIdentity, recoveryPrefix } from './recovery-cache.mjs';
 import { WorkspacePage } from './workspace.jsx';
-import { api, json } from './api.mjs';
-import { requireIdentitySnapshot, readSecuritySession, securitySessionPath } from './security-session.mjs';
+import { api, json, readRuntimeSnapshot } from './api.mjs';
+import { requireIdentitySnapshot, securitySessionPath } from './security-session.mjs';
 import { isRecipeSelection, recipeSelectionPath } from './recipe-selection.mjs';
 import { isAlarmSnapshot, alarmSnapshotPath } from './alarm-api.mjs';
 import { Localization, useUi } from './localization.jsx';
@@ -292,7 +292,7 @@ function App({ initial, catalog }) {
     setSession(null);
     setIdentityAvailable(false);
     try {
-      const identity = await readSecuritySession();
+      const identity = requireIdentitySnapshot(await readRuntimeSnapshot(securitySessionPath));
       if (generation === identityGeneration.current) {
         setSession(identity);
         setIdentityAvailable(true);
@@ -352,7 +352,7 @@ function App({ initial, catalog }) {
       async function tick() {
         const started = generation?.current;
         try {
-          const data = await api(path);
+          const data = await readRuntimeSnapshot(path);
           if (!stopped && started === generation?.current) onSuccess(data);
         } catch {
           if (!stopped && started === generation?.current) onFailure();
@@ -390,6 +390,8 @@ function App({ initial, catalog }) {
       if (next.project_instance !== initial.project_instance) {
         if (runtime) { location.replace(location.pathname === '/projects' ? '/' : location.href); return; }
         setProjectChanged(true);
+        setScreenConnected(false);
+        return;
       }
       setActive(previous => previous.revision === next.revision ? previous : next);
       setScreenConnected(true);
@@ -417,7 +419,8 @@ function App({ initial, catalog }) {
 }
 
 try {
-  const [initial, catalog] = await Promise.all([api('/api/project'), api('/api/catalog')]);
+  const initial = await api('/api/project');
+  const catalog = await readRuntimeSnapshot('/api/catalog');
   createRoot(document.getElementById('root')).render(<App initial={initial} catalog={catalog} />);
 } catch (error) {
   document.getElementById('root').textContent = `Unable to open project: ${error.message}. Refresh to retry.`;

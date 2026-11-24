@@ -412,6 +412,12 @@ Alarm snapshots also send outside the runtime lock. Slow viewers no longer delay
 acknowledgements; prepared occurrence IDs, quality and recovery steps stay fixed.
 Acknowledgements still use their existing permissions, audit receipts and project-
 instance checks, including when occurrence IDs overlap between projects.
+Main runtime polls now verify each response's project identity before displaying
+values, alarms, recipe selection or login status. Missing, malformed or foreign
+identities use the normal unavailable-data behavior. Applied-project responses must
+pair their body/header identities; runtime viewers reload after a confirmed switch,
+while editors retain their old layout and draft with reload guidance. Initial
+catalogue loading is also checked against the opened project.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

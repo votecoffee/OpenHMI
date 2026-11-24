@@ -18,7 +18,7 @@ import { RecipePicture, LoadedRecipe, SelectedRecipe } from '../frontend/recipe-
 import { createReadoutsPalette } from '../frontend/palette-readouts.jsx';
 import { controlTypes, toEditor, toProject, scopedScreen } from '../frontend/model.mjs';
 import { resolveFaceplateControl } from '../frontend/faceplate-model.mjs';
-import { api, uploadProjectImage } from '../frontend/api.mjs';
+import { api, uploadProjectImage, readRuntimeSnapshot } from '../frontend/api.mjs';
 import { readLatestCommand, commandHistoryPath, commandTransactionPath } from '../frontend/command-api.mjs';
 import { commandStates, isCommandRecord, isCommandPage } from '../frontend/command-status.mjs';
 import { listProjectImages, isProjectImagePage } from '../frontend/image-api.mjs';
@@ -95,13 +95,15 @@ export async function contract(request) {
     globalThis.fetch = async (path, options) => {
       const reply = request.replies[index++];
       if (!reply) throw new Error('Unexpected automatic request');
-      calls.push({ path, method: options.method ?? 'GET', headers: options.headers });
+        calls.push({ path, method: options.method ?? 'GET', headers: options.headers,
+          ...(options.projectRead !== undefined ? { unexpected_project_read_option: true } : {}) });
       return new Response(reply.body, { status: reply.status, headers: reply.headers });
     };
     for (const item of request.requests) {
-      try { results.push({ data: await api(item.path, item.options) }); }
+        try { results.push({ data: await (item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
       catch (error) { results.push({ error: error.message, status: error.status,
-        conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status }); }
+          conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status,
+          ...(error.project_context ? { project_context: true, project_changed: error.project_changed } : {}) }); }
     }
     return { calls, results };
   }

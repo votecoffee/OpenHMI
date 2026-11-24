@@ -1,0 +1,93 @@
+"""Actual HTTP identity headers through the production opt-in runtime reader."""
+import json
+import unittest
+from unittest.mock import Mock
+
+from fastapi.testclient import TestClient
+from openhmi.server import create_app
+from tests.test_frontend_contract import frontend
+
+
+class BrowserProjectIdentityTests(unittest.TestCase):
+    def fixture(self):
+        app = create_app(hold_connections=True)
+        self.addCleanup(app.state.store.close)
+        self.addCleanup(app.state.driver.close)
+        app.state.driver.factory = Mock(side_effect=AssertionError('Offline test cannot contact a PLC'))
+        client = TestClient(app)  # No background acquisition/lifespan required.
+        self.addCleanup(client.close)
+        return app, client
+
+    def wire(self, response):
+        return dict(status=response.status_code, headers=dict(response.headers), body=response.text)
+
+    def test_real_same_project_reads_accept_but_other_project_data_never_rebinds_or_retries(self):
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        paths = ['/api/tags', '/api/tags?status_only=true', '/api/alarms', '/api/recipes/selected', '/api/security/session', '/api/catalog']
+        initial = self.wire(client.get('/api/project'))
+        same, foreign = [self.wire(client.get(path)) for path in paths], [self.wire(other.get(path)) for path in paths]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        stale = other.post('/api/controls/toggle/activate', json={}, headers={'X-OpenHMI-Project': original.state.project_instance})
+        self.assertEqual(stale.status_code, 409)
+        result = frontend('http_context', requests=[dict(path='/api/project')] + [dict(path=path, runtime=True) for path in paths * 2]
+                          + [dict(path='/api/controls/toggle/activate', options={'method': 'POST'})],
+                          replies=[initial, *same, *foreign, self.wire(stale)])
+        self.assertTrue(all('data' in row for row in result['results'][1:7]))
+        self.assertTrue(all(row.get('project_context') and row['project_changed'] and 'data' not in row for row in result['results'][7:13]))
+        self.assertTrue(result['results'][-1]['conflict'])
+        self.assertEqual(len(result['calls']), 14)
+        for call in result['calls'][1:]:
+            self.assertEqual(call['headers']['X-OpenHMI-Project'], original.state.project_instance)
+            self.assertNotIn('unexpected_project_read_option', call)
+        self.assertEqual(replacement.state.activity.query()['items'], [])
+        original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()
+
+    def test_missing_malformed_headers_reject_before_json_and_matching_source_recovers(self):
+        app, client = self.fixture()
+        initial = self.wire(client.get('/api/project'))
+        good = self.wire(client.get('/api/tags'))
+        replies = []
+        for source in (None, '', 'short', 'F' * 32, 'f' * 32):
+            headers = {key: value for key, value in good['headers'].items() if key != 'x-openhmi-project'}
+            if source is not None: headers['x-openhmi-project'] = source
+            replies.append(dict(status=200, headers=headers, body='not JSON; identity must be checked first'))
+        result = frontend('http_context', requests=[dict(path='/api/project')] + [dict(path='/api/tags', runtime=True) for _ in replies + [good]],
+                          replies=[initial, *replies, good])
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][1:-1]))
+        self.assertEqual([row['project_changed'] for row in result['results'][1:-1]], [False] * 4 + [True])
+        self.assertEqual(result['results'][-1]['data'], json.loads(good['body']))
+        self.assertEqual(len(result['calls']), 7)
+
+    def test_applied_project_change_is_readable_only_with_coherent_header_body_without_repinning(self):
+        app, client = self.fixture()
+        replacement, other = self.fixture()
+        initial = self.wire(client.get('/api/project'))
+        current = self.wire(client.get('/api/project/active'))
+        changed = self.wire(other.get('/api/project/active'))
+        mismatch = {**changed, 'headers': current['headers']}
+        reverse = {**current, 'headers': changed['headers']}
+        tag = self.wire(client.get('/api/tags'))
+        result = frontend('http_context', requests=[dict(path='/api/project')] + [dict(path='/api/project/active', runtime=True) for _ in range(4)]
+                          + [dict(path='/api/tags', runtime=True)], replies=[initial, current, changed, mismatch, reverse, tag])
+        self.assertEqual(result['results'][2]['data']['project_instance'], replacement.state.project_instance)
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][3:5]))
+        self.assertEqual(result['results'][-1]['data'], json.loads(tag['body']))
+        self.assertTrue(all(call['headers']['X-OpenHMI-Project'] == app.state.project_instance for call in result['calls'][1:]))
+
+    def test_uninitialized_and_invalid_read_modes_never_dispatch_and_http_errors_remain_errors(self):
+        app, client = self.fixture()
+        from tests.test_security import bootstrap
+        bootstrap(app)
+        initial = self.wire(client.get('/api/project'))
+        denied = self.wire(client.get('/api/security'))
+        self.assertEqual(denied['status'], 401)
+        requests = [dict(path='/api/tags', runtime=True), dict(path='/api/tags', options={'projectRead': 'unknown'}),
+                    dict(path='/api/tags', options={'projectRead': 'same', 'method': 'POST'}), dict(path='/api/project'),
+                    dict(path='/api/security', runtime=True)]
+        result = frontend('http_context', requests=requests, replies=[initial, denied])
+        self.assertEqual(len(result['calls']), 2)
+        self.assertTrue(all('data' not in row for row in result['results'][:3]))
+        self.assertTrue(result['results'][0]['project_context'])
+        self.assertEqual(result['results'][-1]['status'], 401)
+        self.assertNotIn('project_context', result['results'][-1])

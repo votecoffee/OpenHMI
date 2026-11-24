@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jX1sAAAAASUVORK5CYII=', 'base64');
 
@@ -86,7 +87,7 @@ test('compact annotations, LED and setpoint displays survive canvas save and liv
     const live = await (await page.request.get('/api/tags')).json();
     live.values.PanelValue = 99.96;
     live.values.ProcessSample = 1.2;
-    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await page.route('**/api/tags', route => fulfillProjectRead(route, { json: live }));
     await expect(comparison).toContainText('Outside tolerance');
     await expect(comparison).toContainText('+0.2 bar');
     live.samples.CompareSetpoint = { quality: 'stale', age_seconds: 4 };
@@ -211,7 +212,7 @@ test('state, position and rotation images follow tags and quality', async ({ pag
     const live = await (await page.request.get('/api/tags')).json();
     live.values.ValveOpen = false;
     live.values.FixtureState = 2;
-    await page.route('**/api/tags', route => route.fulfill({ json: live }));
+    await page.route('**/api/tags', route => fulfillProjectRead(route, { json: live }));
     const closed = control.getByRole('img', { name: 'Valve: Closed', exact: true });
     await expect(closed).toHaveAttribute('src', '/api/canvas-images/' + image.off_image);
     await expect(closed).toHaveJSProperty('naturalWidth', 4);
@@ -369,7 +370,7 @@ test('runtime fit width preserves canvas alignment, controls and trend cursor', 
     }, decorations: {
       machine: { kind: 'image', label: 'Machine', image, locked: true, x: 900, y: 20, width: 280, height: 150 },
     } } });
-    await page.route(url => url.pathname === '/api/history', route => route.fulfill({ json: {
+    await page.route(url => url.pathname === '/api/history', route => fulfillProjectRead(route, { json: {
       start: 100, end: 110, truncated: false,
       samples: [{ tag: 'TankLevel', epoch: 100, value: 10, quality: 'good' },
         { tag: 'TankLevel', epoch: 110, value: 30, quality: 'good' }],
@@ -892,12 +893,12 @@ test('image picker pages recover from malformed cursors and clear rows on access
     if (route.request().method() !== 'GET') return route.continue();
     const params = new URL(route.request().url()).searchParams;
     queries.push(Object.fromEntries(params));
-    if (mode === 'denied') return route.fulfill({ status: 403, json: { detail: 'Synthetic image access denial' } });
-    if (mode === 'malformed') return route.fulfill({ json: { items: [{ id: secondId, name: 'Second.png' }], next_before: 'bad cursor' } });
+    if (mode === 'denied') return fulfillProjectRead(route, { status: 403, json: { detail: 'Synthetic image access denial' } });
+    if (mode === 'malformed') return fulfillProjectRead(route, { json: { items: [{ id: secondId, name: 'Second.png' }], next_before: 'bad cursor' } });
     const older = params.get('before') === '42';
-    return route.fulfill({ json: { items: [{ id: older ? secondId : firstId, name: older ? 'Second.png' : 'First.png' }], next_before: older ? null : 42 } });
+    return fulfillProjectRead(route, { json: { items: [{ id: older ? secondId : firstId, name: older ? 'Second.png' : 'First.png' }], next_before: older ? null : 42 } });
   });
-  await page.route(/\/api\/canvas-images\/[ab]{64}$/, route => route.fulfill({ contentType: 'image/png', body: drawing }));
+  await page.route(/\/api\/canvas-images\/[ab]{64}$/, route => fulfillProjectRead(route, { contentType: 'image/png', body: drawing }));
   try {
     await page.goto('/');
     const freeform = page.getByRole('button', { name: 'Enable freeform layout', exact: true });

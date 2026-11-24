@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 import { fileURLToPath } from 'node:url';
 
 test('malformed recipe identity replies retain confirmed identity and recover by refresh', async ({ page }) => {
@@ -11,7 +12,7 @@ test('malformed recipe identity replies retain confirmed identity and recover by
     logins += 1;
     const response = await route.fetch();
     const body = await response.json();
-    await route.fulfill({ response, json: { ...body, user: { ...body.user, roles: {} } } });
+    await fulfillProjectRead(route, { response, json: { ...body, user: { ...body.user, roles: {} } } });
   });
   await session.getByLabel('Recipe user', { exact: true }).fill('engineer');
   await session.getByLabel('Password', { exact: true }).fill('RecipeTestOnly-2026!');
@@ -22,7 +23,7 @@ test('malformed recipe identity replies retain confirmed identity and recover by
   await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
   await expect(session).toContainText('Signed in: engineer');
   await expect(session.getByRole('alert')).toHaveCount(0);
-  await page.route('**/api/recipe-auth/session', route => route.fulfill({ json: { configured: true, user: { name: 'Malformed', roles: {} } } }));
+  await page.route('**/api/recipe-auth/session', route => fulfillProjectRead(route, { json: { configured: true, user: { name: 'Malformed', roles: {} } } }));
   await page.getByRole('button', { name: 'Refresh recipes', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Invalid recipe session response');
   await expect(session).toContainText('Signed in: engineer');
@@ -33,7 +34,7 @@ test('malformed recipe identity replies retain confirmed identity and recover by
   await page.route('**/api/recipe-auth/logout', async route => {
     logouts += 1;
     const response = await route.fetch();
-    await route.fulfill({ response, json: { ok: false } });
+    await fulfillProjectRead(route, { response, json: { ok: false } });
   });
   await session.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(session.getByRole('alert')).toContainText('Invalid recipe sign-out response');
@@ -53,7 +54,7 @@ test('recipe library faults retain unsaved edits and recover without writing', a
   let reply = { json: { revisions: null } }, writes = 0;
   await page.route('**/api/recipes', route => {
     if (route.request().method() !== 'GET') { writes += 1; return route.continue(); }
-    return reply ? route.fulfill(reply) : route.continue();
+    return reply ? fulfillProjectRead(route, reply) : route.continue();
   });
   await page.goto('/recipe-editor');
   await expect(page.getByRole('alert')).toContainText('Invalid recipe library response');
@@ -96,7 +97,7 @@ test('recipe-local session preserves sign-in when logout fails', async ({ page }
   await expect(session).toContainText('Signed in: engineer');
   await expect(session.getByRole('alert')).toHaveCount(0);
   const endpoint = '**/api/recipe-auth/logout';
-  await page.route(endpoint, route => route.fulfill({ status: 503, json: { detail: 'Synthetic logout outage' } }));
+  await page.route(endpoint, route => fulfillProjectRead(route, { status: 503, json: { detail: 'Synthetic logout outage' } }));
   await session.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(session.getByRole('alert')).toContainText('Synthetic logout outage');
   await expect(session).toContainText('Signed in: engineer');
@@ -236,7 +237,7 @@ test('recipe image, same-user approval and independent production copy', async (
   const clear = viewer.getByRole('button', { name: 'Clear loaded copy', exact: true });
   const endpoint = '**/api/recipes/selected';
   let selection = selected;
-  await viewer.route(endpoint, route => route.fulfill({ body: JSON.stringify(selection), contentType: 'application/json' }));
+  await viewer.route(endpoint, route => fulfillProjectRead(route, { body: JSON.stringify(selection), contentType: 'application/json' }));
   for (const invalid of [{}, { ...selected, version: '2' }, { ...selected, snapshot: {} },
     { ...selected, snapshot: { ...selected.snapshot, production_approved: 'false' } },
     { ...selected, snapshot: { ...selected.snapshot, content: { ...selected.snapshot.content, parameters: [null] } } }]) {
@@ -271,7 +272,7 @@ test('recipe image, same-user approval and independent production copy', async (
   await expect(viewer.locator('[data-control="recipe"] .recipe-image')).toBeVisible();
   const compact = viewer.locator('[data-control="recipe"]');
   selection = null;
-  await viewer.route(endpoint, route => route.fulfill({ body: JSON.stringify(selection), contentType: 'application/json' }));
+  await viewer.route(endpoint, route => fulfillProjectRead(route, { body: JSON.stringify(selection), contentType: 'application/json' }));
   await expect(compact).toContainText('Recipe selection unavailable');
   await expect(compact).not.toContainText('Fixture A');
   selection = selected;

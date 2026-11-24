@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fulfillProjectRead } from './project-reply.mjs';
 
 test.use({ actionTimeout: 8000 });
 
@@ -87,7 +88,7 @@ test('drag live tank, gauge, bar, radar, pie and XY controls onto a screen and h
 
     let values = { TankLevel: 42, MotorRunning: true, ProcessAlarm: false, AlarmWord: 10, RecipeRevision: 1, ChartFlow: -25, ChartPressure: 50, ChartParts: 150 };
     const viewer = await context.newPage();
-    await viewer.route('**/api/tags', route => route.fulfill({ json: { driver: 'simulator', values } }));
+    await viewer.route('**/api/tags', route => fulfillProjectRead(route, { json: { driver: 'simulator', values } }));
     await viewer.goto('/runtime');
     const tank = viewer.locator('[data-control="tank"]');
     const gauge = viewer.locator('[data-control="gauge"]');

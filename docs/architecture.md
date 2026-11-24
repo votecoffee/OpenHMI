@@ -803,6 +803,20 @@ old-project requests are rejected before journaling even when IDs collide. Cance
 preparation drains the monitor/SQL work before source closure; send failures do not
 repeat it. Unexpected read failures are sanitized/recoverable and stopped runtimes
 reject monitor access. Payloads and OpenAPI remain unchanged.
+`readRuntimeSnapshot()` adds opt-in project context checks to the shared API client.
+It captures the initially pinned project at dispatch, requires a valid matching
+response header for ordinary reads, and strips its internal option before fetch.
+Missing/malformed/foreign success headers are rejected before JSON adoption; no
+request is replayed and the pin never changes. Applied-project reads may describe
+a new instance only when header/body identities agree, allowing the existing
+runtime reload flow. Editors now return after flagging a changed project instead
+of installing its active metadata. Main tag/alarm/recipe/identity polls and explicit
+identity refresh use these checks; initial catalogue loading follows the pinned
+project read sequentially. Existing unavailable-state/generation handlers remain.
+Default API mutation/receipt behavior and legacy unguarded callers are unchanged.
+Same-project synthetic browser fixtures now supply realistic context headers via a
+scoped test helper; missing/foreign cases deliberately bypass it. No server schema
+or OpenAPI changed. Independent operator detail/history readers remain a follow-up.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply
