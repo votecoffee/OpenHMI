@@ -689,11 +689,21 @@ not close hardware or operator acceptance gates.
     A separate local fixture channel preserves existing sequence-allocation tests.
     Mutation helpers, server payloads/OpenAPI and download links remain unchanged.
 
+63. Delivered source-identity checks in activity and diagnostics API readers before
+    payload validation/adoption. Foreign/missing success replies retain confirmed
+    records, tag quality and worker health only for the same query/page, with
+    unavailable feedback and blocked forward paging. Permission denial still clears
+    data; matching replies recover without clearing unapplied filters or creating
+    operator actions. Failed older pages stay empty and retry without substituting
+    the previous page. Real HTTP/JS and headless cases cover these boundaries;
+    payload/OpenAPI and export links remain unchanged. Checkpoints 51–60 are
+    preserved verbatim in the existing history document to keep issue 15 usable.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
 Recipe HTTP separation is complete for this scope. Next extend the source-identity
-audit to activity and diagnostics readers, preserving filters/paging, retained
-evidence and permission clearing while a project switch is being detected. Keep
-exports separate from JSON read contracts. Preserve scan/resource draining
+audit to trend history and saved recording status, preserving query/capture ownership,
+retained traces, permission clearing and recording-command non-replay. Keep exports
+separate from JSON read contracts. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

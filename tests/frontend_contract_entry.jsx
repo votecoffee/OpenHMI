@@ -101,6 +101,8 @@ export async function contract(request) {
     };
     for (const item of request.requests) {
         try { results.push({ data: await (item.latestCommand ? readLatestCommand(item.latestCommand)
+          : item.activity ? readActivity(item.activity.filters, item.activity.before, item.activity.options)
+          : item.diagnostics ? readDiagnostics(item.diagnostics.criteria, item.diagnostics.offset, item.diagnostics.options)
           : item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
       catch (error) { results.push({ error: error.message, status: error.status,
           conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status,
@@ -294,7 +296,7 @@ export async function contract(request) {
         : JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) });
       return new Response(body, {
         status, headers: { 'Content-Type': 'application/json',
-          ...(request.operation === 'command_queries' ? { 'X-OpenHMI-Project': request.projectInstance ?? 'a'.repeat(32) } : {}), ...(mutation ? {
+          ...(['command_queries', 'operations_queries'].includes(request.operation) ? { 'X-OpenHMI-Project': request.projectInstance ?? 'a'.repeat(32) } : {}), ...(mutation ? {
           'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });
     };

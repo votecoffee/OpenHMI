@@ -181,3 +181,38 @@ class BrowserProjectIdentityTests(unittest.TestCase):
         self.assertTrue(result['results'][0]['project_context'])
         self.assertEqual(result['results'][-1]['status'], 401)
         self.assertNotIn('project_context', result['results'][-1])
+
+    def test_activity_and_diagnostics_helpers_keep_source_across_filtered_pages(self):
+        from starlette.requests import Request
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        for app, entity in ((original, 'Original 设备'), (replacement, 'Foreign 设备')):
+            ticket = app.state.activity.start(Request({'type': 'http', 'headers': []}), 'offline_fixture', entity, {})
+            app.state.activity.finish(ticket.id, 'succeeded', {}, '')
+        self.assertEqual(original.state.activity.query()['items'][0]['id'],
+                         replacement.state.activity.query()['items'][0]['id'])
+        paths = ['/api/activity?limit=1', '/api/activity?before_id=1&limit=1',
+                 '/api/diagnostics?quality=all&offset=0&limit=1', '/api/diagnostics?quality=all&offset=1&limit=1']
+        requests = [dict(activity={'options': {'limit': 1}}), dict(activity={'before': 1, 'options': {'limit': 1}}),
+                    dict(diagnostics={'criteria': {'quality': 'all'}, 'offset': 0, 'options': {'limit': 1}}),
+                    dict(diagnostics={'criteria': {'quality': 'all'}, 'offset': 1, 'options': {'limit': 1}})]
+        same = [self.wire(client.get(path)) for path in paths]
+        foreign = [self.wire(other.get(path)) for path in paths]
+        missing = [{**reply, 'headers': {key: value for key, value in reply['headers'].items()
+                                       if key != 'x-openhmi-project'}} for reply in same]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        result = frontend('http_context', requests=[dict(path='/api/project')] + requests * 4,
+                          replies=[self.wire(client.get('/api/project')), *same, *foreign, *missing, *same])
+        for start in (1, 13):
+            self.assertEqual([row['data'] for row in result['results'][start:start + 4]],
+                             [json.loads(reply['body']) for reply in same])
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][5:13]))
+        self.assertEqual([row['project_changed'] for row in result['results'][5:13]], [True] * 4 + [False] * 4)
+        self.assertEqual(len(result['calls']), 17)
+        for index, call in enumerate(result['calls'][1:]):
+            self.assertEqual(call['path'], paths[index % 4])
+            self.assertEqual(call['method'], 'GET')
+            self.assertEqual(call['headers']['X-OpenHMI-Project'], original.state.project_instance)
+        for app in (original, replacement):
+            self.assertEqual(len(app.state.activity.query()['items']), 1, 'Read recovery cannot append operator actions')
+            app.state.driver.factory.assert_not_called()

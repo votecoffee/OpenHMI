@@ -436,11 +436,21 @@ outage. Only matching status unlocks the button and exactly one explicit request
 sequence is sent. The fixture uses a separate local UDT channel so existing command
 sequence/persistence coverage remains independent.
 
+Activity/diagnostics source contracts feed actual paged HTTP responses from two
+offline apps through the production API helpers. Overlapping journal IDs cannot
+admit another project's records; foreign/missing success identities are rejected
+and matching replies recover with original filters, cursors, offsets and project
+headers. Reads do not append activity or contact PLC transport. Headless cases
+verify retained journal/quality/worker data and unapplied filters, unavailable
+paging, denied-data clearing, no previous-page substitution and successful retry
+of failed older reads. Foreign fixtures intentionally bypass the same-project
+header helper. Existing payload/cursor and protected export regressions remain.
+
 ## Next bounded work
 
-1. Extend the source-identity audit to activity and diagnostics readers, preserving
-   filters/paging, retained evidence and permission clearing while a project switch
-   is being detected. Keep exports separate from JSON read contracts.
+1. Extend the source-identity audit to trend history and saved recording status,
+   preserving query/capture ownership, retained traces, permission clearing and
+   recording-command non-replay. Keep exports separate from JSON read contracts.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

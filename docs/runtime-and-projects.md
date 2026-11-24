@@ -41,6 +41,13 @@ feedback and blocks command dispatch/forward paging. Permission denial clears th
 affected evidence. Matching reads recover without repinning or replaying commands;
 transaction ID, command ID and sequence validation still apply. Transaction download
 links remain outside this JSON-read boundary.
+Activity and diagnostics readers now check source identity as well. Missing or
+foreign success replies retain confirmed data only for the same query/page, mark
+it unavailable and disable forward paging. A failed older-page request cannot show
+the previous page as its result and continues to retry normally. Denial clears the
+affected records, tag-quality rows and worker health. Matching-source replies
+recover while unapplied filters remain intact. These cached reads do not create
+operator actions or change subscriptions. CSV/JSON export links remain separate.
 
 ## Connection and tag contract
 

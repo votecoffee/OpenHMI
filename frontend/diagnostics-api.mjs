@@ -1,4 +1,4 @@
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 
 export function diagnosticsPath(criteria = {}, offset = 0, { limit = null } = {}) {
   const params = new URLSearchParams({ ...criteria, offset });
@@ -7,7 +7,7 @@ export function diagnosticsPath(criteria = {}, offset = 0, { limit = null } = {}
 }
 
 export const diagnosticsExportPath = (criteria = {}) => '/api/diagnostics.json?' + new URLSearchParams(criteria);
-export const readDiagnostics = (criteria, offset, options) => api(diagnosticsPath(criteria, offset, options));
+export const readDiagnostics = (criteria, offset, options) => readRuntimeSnapshot(diagnosticsPath(criteria, offset, options));
 
 export function isDiagnosticsSnapshot(data, offset) {
   if (!Number.isSafeInteger(offset) || offset < 0 || data?.offset !== offset || !Number.isSafeInteger(data.total_tags) || data.total_tags < 0

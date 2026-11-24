@@ -1,4 +1,4 @@
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 
 function activityParams(filters, before) {
   const query = new URLSearchParams();
@@ -15,7 +15,7 @@ export function activityHistoryPath(filters = {}, before = null, { limit = null 
 }
 
 export const activityCsvPath = (filters = {}) => '/api/activity.csv?' + activityParams(filters);
-export const readActivity = (filters, before, options) => api(activityHistoryPath(filters, before, options));
+export const readActivity = (filters, before, options) => readRuntimeSnapshot(activityHistoryPath(filters, before, options));
 
 export const activityOutcomes = ['pending', 'succeeded', 'denied', 'rejected', 'uncertain', 'interrupted'];
 

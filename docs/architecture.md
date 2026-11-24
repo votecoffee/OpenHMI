@@ -833,8 +833,16 @@ Source failures cannot install a foreign completion with the same transaction ID
 or make a runtime button dispatchable. Matching reads recover, but unresolved
 transactions still block a new request. Mutation receipts and activation helpers
 remain unchanged; neither failed reads nor recovery replay an operation. Download
-links are outside this JSON boundary. Activity and diagnostics readers remain the
-next source-identity audit.
+links are outside this JSON boundary.
+`readActivity()` and `readDiagnostics()` now use the same guarded reader before
+their existing payload validators. Criteria/endpoint and page ownership, effect
+cancellation, retained timestamps and permission clearing stay with their consoles.
+Foreign/missing replies cannot install activity attribution, tag quality or worker
+health. Confirmed results stay readable only for the same query/page, unavailable
+feedback disables forward paging, and failed older reads still retry. Matching
+replies recover without clearing unapplied filters or issuing operator mutations.
+CSV/JSON exports stay separate. Trend history and saved recording status remain
+the next source-identity audit.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

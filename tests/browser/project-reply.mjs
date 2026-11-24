@@ -1,6 +1,6 @@
 // Same-project synthetic fixtures need the header supplied by the real server.
 // Missing/foreign identity tests must use raw route.fulfill instead of this helper.
-const runtimePaths = new Set(['/api/tags', '/api/alarms', '/api/recipes/selected', '/api/security/session', '/api/project/active']);
+const runtimePaths = new Set(['/api/tags', '/api/alarms', '/api/recipes/selected', '/api/security/session', '/api/project/active', '/api/activity', '/api/diagnostics']);
 
 export function fulfillProjectRead(route, options) {
   const expected = route.request().headers()['x-openhmi-project'];

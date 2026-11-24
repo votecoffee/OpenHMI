@@ -426,6 +426,10 @@ Command history, transaction details and runtime command-button status also chec
 their source project. Source failures retain confirmed evidence with unavailable
 feedback; command buttons stay blocked until matching status returns. A foreign
 completion cannot unlock dispatch, even when its transaction ID matches.
+Activity and diagnostics reads also verify their source before displaying journal
+records, tag quality or worker health. Source failures retain confirmed data for
+the current filter/page with a warning and block forward paging. Permission denial
+clears that data; matching replies recover without losing unapplied filters.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;
