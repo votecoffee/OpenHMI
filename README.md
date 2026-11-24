@@ -418,6 +418,10 @@ identities use the normal unavailable-data behavior. Applied-project responses m
 pair their body/header identities; runtime viewers reload after a confirmed switch,
 while editors retain their old layout and draft with reload guidance. Initial
 catalogue loading is also checked against the opened project.
+Alarm-console occurrences, event history, details, notes and shelving use the same
+source checks. Missing or foreign identities retain the last confirmed page with
+an unavailable warning and block actions that depend on that read. Matching reads
+recover without losing filters or text drafts; access denial clears retained data.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

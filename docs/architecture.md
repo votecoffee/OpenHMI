@@ -816,7 +816,17 @@ project read sequentially. Existing unavailable-state/generation handlers remain
 Default API mutation/receipt behavior and legacy unguarded callers are unchanged.
 Same-project synthetic browser fixtures now supply realistic context headers via a
 scoped test helper; missing/foreign cases deliberately bypass it. No server schema
-or OpenAPI changed. Independent operator detail/history readers remain a follow-up.
+or OpenAPI changed.
+The shared `useAlarmRead()` hook now uses this guarded reader for independent
+occurrence, event-history, detail, note and shelving polls. Source checks run before
+payload validators; existing endpoint/generation cancellation and retention rules
+stay intact. A source failure retains the confirmed page with unavailable feedback
+and blocks dependent actions, while permission denial clears data. Filters, typed
+drafts and selections survive recoverable read failures. A history-only failure
+does not disable acknowledgement on a healthy occurrence page. Mutation helpers,
+audit receipts and non-replay behavior remain unchanged. CSV links are outside the
+JSON reader. Other operator readers remain a follow-up, starting with command
+history/detail and runtime command status.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

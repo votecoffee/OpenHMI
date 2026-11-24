@@ -59,6 +59,52 @@ class BrowserProjectIdentityTests(unittest.TestCase):
         self.assertEqual(result['results'][-1]['data'], json.loads(good['body']))
         self.assertEqual(len(result['calls']), 7)
 
+    def test_alarm_console_reads_keep_source_even_when_occurrence_ids_collide(self):
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        identifiers = []
+        for app in (original, replacement):
+            monitor = app.state.alarms
+            monitor.sample_values = Mock(return_value={'ProcessAlarm': True})
+            monitor.sample()
+            identifier = monitor.snapshot()['outstanding'][0]['occurrence_id']
+            monitor.note(identifier, 'Source-specific recovery note', ('Fixture Operator', 'local'), '1' * 32)
+            monitor.shelves.begin(identifier, 900, 'Source-specific investigation', ('Fixture Operator', 'local'), '2' * 32)
+            identifiers.append(identifier)
+        self.assertEqual(identifiers[0], identifiers[1])
+        identifier = identifiers[0]
+        paths = ['/api/alarms/occurrences?state=all&shelving=all', '/api/alarms/events?event=operator_note',
+                 f'/api/alarms/occurrences/{identifier}', f'/api/alarms/occurrences/{identifier}/notes',
+                 '/api/alarms/shelves?after_id=']
+        same = [self.wire(client.get(path)) for path in paths]
+        foreign = [self.wire(other.get(path)) for path in paths]
+        missing = [{**reply, 'headers': {key: value for key, value in reply['headers'].items()
+                                       if key != 'x-openhmi-project'}} for reply in same]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        calls_before = [app.state.alarms.sample_values.call_count for app in (original, replacement)]
+        stale = other.post(f'/api/alarms/{identifier}/acknowledge', json={'comment': 'Old screen'},
+                           headers={'X-OpenHMI-Project': original.state.project_instance})
+        self.assertEqual(stale.status_code, 409)
+        result = frontend('http_context', requests=[dict(path='/api/project')]
+                          + [dict(path=path, runtime=True) for path in paths * 4]
+                          + [dict(path=f'/api/alarms/{identifier}/acknowledge', options={'method': 'POST'})],
+                          replies=[self.wire(client.get('/api/project')), *same, *foreign, *missing, *same, self.wire(stale)])
+        for index in (1, 16):
+            self.assertEqual([row['data'] for row in result['results'][index:index + 5]],
+                             [json.loads(reply['body']) for reply in same])
+        for row in result['results'][6:16]:
+            self.assertTrue(row['project_context'])
+            self.assertNotIn('data', row)
+        self.assertEqual([row['project_changed'] for row in result['results'][6:16]], [True] * 5 + [False] * 5)
+        self.assertTrue(result['results'][-1]['conflict'])
+        self.assertEqual(len(result['calls']), 22, 'Read failures cannot replay acknowledgements')
+        self.assertTrue(all(call['headers']['X-OpenHMI-Project'] == original.state.project_instance
+                            for call in result['calls'][1:]))
+        self.assertEqual(calls_before, [app.state.alarms.sample_values.call_count for app in (original, replacement)])
+        self.assertEqual(replacement.state.activity.query()['items'], [])
+        self.assertIsNone(replacement.state.alarm_queries.detail(identifier)['occurrence']['acknowledged_at'])
+        original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()
+
     def test_applied_project_change_is_readable_only_with_coherent_header_body_without_repinning(self):
         app, client = self.fixture()
         replacement, other = self.fixture()

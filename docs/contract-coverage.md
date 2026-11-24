@@ -414,10 +414,21 @@ connection metadata/draft retention, and rejecting a foreign initial catalogue.
 Existing same-project response fixtures retain explicit context headers so payload
 shape fault/recovery coverage continues to reach the original validators.
 
+Alarm-console source contracts cover actual occurrence, event-history, detail,
+notes and shelving HTTP responses from two offline apps that reuse an occurrence
+ID. Matching replies pass; foreign/missing sources cannot return data, matching
+reads recover, and stale acknowledgement stays rejected without dispatch or source
+sampling. A headless console case retains recovery steps, recorded notes, shelves,
+filters and typed drafts through foreign/missing sources; blocks dependent actions;
+keeps acknowledgement available during a history-only fault; clears denied data;
+and dispatches one acknowledgement only after an explicit operator action. Existing
+workflow coverage still exercises malformed bodies/cursors, isolated notes/history
+outages, shelving, permission denial and restoration with realistic source headers.
+
 ## Next bounded work
 
-1. Extend the source-identity audit to independent alarm-console list/detail/history
-   readers, preserving retained filters/drafts, permission handling and acknowledgement
+1. Extend the source-identity audit to command history/detail and runtime command
+   status, preserving transaction correlation, permission handling and dispatch
    non-replay while a project switch is being detected.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.

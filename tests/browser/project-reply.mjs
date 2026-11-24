@@ -4,9 +4,13 @@ const runtimePaths = new Set(['/api/tags', '/api/alarms', '/api/recipes/selected
 
 export function fulfillProjectRead(route, options) {
   const expected = route.request().headers()['x-openhmi-project'];
-  if (!expected || !runtimePaths.has(new URL(route.request().url()).pathname)) return route.fulfill(options);
+  const path = new URL(route.request().url()).pathname;
+  const alarmRead = route.request().method() === 'GET'
+    && /^\/api\/alarms\/(occurrences(?:\/[1-9]\d*(?:\/notes)?)?|events|shelves)$/.test(path);
+  if (!expected || !(runtimePaths.has(path) || alarmRead)) return route.fulfill(options);
   const headers = new Headers(options.response?.headers() ?? {});
   for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
+  if (options.json !== undefined || options.body !== undefined) headers.delete('Content-Length');
   if (!headers.has('X-OpenHMI-Project')) headers.set('X-OpenHMI-Project', expected);
   return route.fulfill({ ...options, headers: Object.fromEntries(headers) });
 }

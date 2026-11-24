@@ -667,11 +667,22 @@ not close hardware or operator acceptance gates.
     same-project synthetic fixtures now provide realistic identity headers. Default
     API mutation/receipt behavior and server payload/OpenAPI fields remain intact.
 
+61. Delivered source-identity checks for independent alarm-console occurrence,
+    event-history, detail, note and shelving reads through the shared polling hook.
+    Missing/foreign sources cannot replace confirmed data. Existing unavailable
+    warnings, dependent-action blocking, endpoint/generation isolation and permission
+    clearing remain intact; matching reads recover with filters/drafts retained.
+    History-only faults leave a healthy occurrence page usable. Real HTTP/JS tests
+    reuse occurrence IDs across two offline projects and preserve stale-write
+    rejection; headless coverage verifies retention, denial, recovery and a single
+    explicit acknowledgement without replay. Mutation helpers, payloads and server
+    OpenAPI remain unchanged; CSV links are outside this JSON-read boundary.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
 Recipe HTTP separation is complete for this scope. Next extend the source-identity
-audit to independent alarm-console list/detail/history readers, preserving retained
-filters/drafts, permission handling and acknowledgement non-replay while a project
-switch is being detected. Preserve scan/resource draining
+audit to command history/detail and runtime command status, preserving transaction
+correlation, permission handling and dispatch non-replay while a project switch is
+being detected. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

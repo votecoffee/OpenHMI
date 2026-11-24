@@ -27,7 +27,14 @@ reload on a confirmed switch. Editors keep the previous layout/metadata and draf
 until explicit reload. The API's original project pin stays fixed, including for
 writes; only fresh page initialization can adopt the replacement. Catalogue loading
 also checks that it follows the same initialized project. These checks are opt-in
-for these reads; independent console/detail readers are audited separately.
+for these reads. The alarm console also checks occurrences, event history, detail,
+notes and shelving before validation/adoption. Source failures retain only the
+last confirmed data for the same endpoint, mark it unavailable and block dependent
+actions; matching reads recover without discarding filters or text drafts. An
+event-history failure alone leaves a healthy occurrence page usable. Permission
+denial still clears the affected data. These checks do not repin the client or
+replay acknowledgement, note or shelf operations. Other operator readers remain
+subject to separate audits; CSV links are outside this JSON-read boundary.
 
 ## Connection and tag contract
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 
 export { hasAlarmMessage } from './alarm-responses.mjs';
 
@@ -10,7 +10,7 @@ export function useAlarmRead(endpoint, validate, generation, identifier) {
     let stopped = false, timer;
     async function refresh() {
       try {
-        const data = await api(endpoint);
+        const data = await readRuntimeSnapshot(endpoint);
         if (!validate(data, identifier)) throw new Error('Invalid alarm response');
         if (!stopped) setResponse({ endpoint, data, receivedAt: new Date() });
       } catch (problem) {
