@@ -408,6 +408,10 @@ Applied-screen snapshots use the same boundary. Their revision, layout and proje
 identity remain paired even if a newer revision is applied while a reply is still
 sending. Existing revision and project-instance checks continue to reject stale
 control actions and writes.
+Alarm snapshots also send outside the runtime lock. Slow viewers no longer delay
+acknowledgements; prepared occurrence IDs, quality and recovery steps stay fixed.
+Acknowledgements still use their existing permissions, audit receipts and project-
+instance checks, including when occurrence IDs overlap between projects.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

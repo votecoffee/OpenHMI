@@ -645,10 +645,21 @@ not close hardware or operator acceptance gates.
     reject closed-store access. SQL/HTTP/ASGI, canonical Project and production JS
     contracts cover these paths; payload/OpenAPI fields remain unchanged.
 
+59. Delivered prepared alarm snapshot delivery through the explicit finite-read
+    allowlist. Monitor projection, serializer and middleware stay protected; finished
+    responses send outside the runtime lock, permitting acknowledgements, reads,
+    switching and shutdown. Occurrence identity, quality/staleness and recovery
+    information stay frozen. Existing acknowledgement permission/audit/instance
+    boundaries remain; overlapping IDs cannot dispatch into a different project.
+    Cancelled projection drains before source closure; failed sends never repeat
+    it or create journal operations. Sanitized read failures recover and stopped
+    runtimes reject monitor access. SQL/HTTP/ASGI and production JS contracts verify
+    these paths; payload/OpenAPI fields remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
-Recipe HTTP separation is complete for this scope. Next review `/api/alarms` snapshot
-delivery under slow clients, preserving occurrence identity, quality/recovery
-information and acknowledgement/journal boundaries. Preserve scan/resource draining
+Recipe HTTP separation is complete for this scope. Next audit source identity across
+browser runtime polls during project switches, preserving the applied-project reload
+path and rejecting another project's data before it populates the previous screen. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

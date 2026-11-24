@@ -390,10 +390,23 @@ retires an active runtime. Store failures are sanitized/recoverable and stopped
 workspaces reject projection before accessing a closed store. Existing applied-
 project palette/layout and legacy/malformed response contracts remain in the run.
 
+Alarm-delivery contracts pause real SQL/FastAPI headers and bodies while an
+acknowledgement completes, records its operation ID/comment and succeeded journal
+status, then switches projects and closes both runtimes. Prepared bytes retain
+old unacknowledged counts, bad quality, occurrence IDs, sampled metadata and
+localized recovery steps; actual frames pass production JS guards. A second
+project deliberately reuses an occurrence ID: the old source header rejects its
+acknowledgement before monitor or journal dispatch. Held monitor projection drains
+through repeated cancellation before source closure. Send cancellation/disconnect
+never dispatches acknowledgements or journal operations; read failures are private,
+sanitized and recoverable, with no closed-monitor reads after shutdown. Existing
+alarm lifecycle, acknowledgement, shelf, recovery and legacy contracts remain.
+
 ## Next bounded work
 
-1. Review `/api/alarms` snapshot delivery under slow clients, preserving occurrence
-   identity, quality/recovery information and acknowledgement/journal boundaries.
+1. Audit source identity across browser runtime polls during project switches,
+   preserving the applied-project reload path and rejecting data from another
+   project before it can populate the previous screen.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

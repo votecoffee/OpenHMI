@@ -11,6 +11,14 @@ or another project opens before delivery completes. Existing revision/instance
 checks protect writes; failed reads return sanitized private 503 feedback and can
 recover. Cancelled preparation drains before a source store can close.
 
+Alarm GET snapshots use the same finite-response boundary. Prepared occurrence
+IDs, sampled metadata, quality/staleness and recovery information remain fixed while
+acknowledgements, switching and shutdown proceed. Acknowledgements retain their
+permission, audit and project-instance checks; an old snapshot cannot acknowledge
+an identically numbered occurrence in a newly opened project. Send failures never
+repeat the snapshot or create an acknowledgement/journal operation. Unexpected read
+failures return sanitized private 503 feedback and recover on a later request.
+
 ## Connection and tag contract
 
 Tag and status-only readout responses use cached data through the normal API route.

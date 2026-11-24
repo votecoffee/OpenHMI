@@ -780,8 +780,8 @@ and middleware cleanup cannot outlive their source runtime. A slow send then all
 subscriptions, other requests, switching and shutdown without depending on runtime
 resources. Responses are private/no-store; unexpected preparation errors become a
 sanitized 503 with source identity. No poll/lease is added by staging. This helper
-is restricted to audited finite tag/applied-project endpoints, not streaming/file
-responses.
+is restricted to explicitly allowlisted finite tag/applied-project/alarm endpoints,
+not streaming/file responses.
 Public fields, status-only omission, query validation and OpenAPI remain unchanged.
 GET `/api/project/active` now shares that finite-response staging boundary. The
 existing store snapshot, route serializer and identity middleware finish under the
@@ -792,6 +792,17 @@ fences reject operations from the older screen. Cancelled preparation drains SQL
 projection before source closure, while send failures never repeat it. Unexpected
 store/projection errors return sanitized private 503 feedback, and stopped workspaces
 reject reads without touching closed stores. Payloads and OpenAPI remain unchanged.
+GET `/api/alarms` now shares this boundary through an explicit path-to-label map.
+Its existing monitor snapshot, serializer and middleware complete under the lock;
+immutable delivery then permits acknowledgements, reads, switching and shutdown.
+Occurrence IDs, sampled revision, quality/staleness fields, recovery text and source
+header remain those prepared, even if acknowledgement state later changes. Reads
+never dispatch acknowledgements or operator-journal operations. Acknowledgement
+routes retain permission, attribution, transaction and project-instance guards;
+old-project requests are rejected before journaling even when IDs collide. Cancelled
+preparation drains the monitor/SQL work before source closure; send failures do not
+repeat it. Unexpected read failures are sanitized/recoverable and stopped runtimes
+reject monitor access. Payloads and OpenAPI remain unchanged.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

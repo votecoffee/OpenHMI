@@ -27,6 +27,8 @@ from .workspace_mutations import mutation_response
 from .http_snapshot import prepare_snapshot
 
 MAX_BACKUP = 256 * 1024 * 1024
+READOUT_LABELS = {'/api/tags': 'Tag snapshot', '/api/project/active': 'Applied project snapshot',
+                  '/api/alarms': 'Alarm snapshot'}
 TABLES = {'security_group_style', 'alarm_shelf', 'project', 'recipe_entry', 'recipe_revision', 'recipe_image', 'recipe_audit', 'recipe_policy', 'recipe_selection',
           'security_settings', 'security_group', 'security_user', 'security_windows', 'security_audit', 'tag_history',
           'alarm_config', 'alarm_state', 'alarm_occurrence', 'alarm_event', 'alarm_meta', 'alarm_acknowledgement', 'alarm_event_context', 'alarm_note', 'operator_activity', 'command_transaction', 'command_event', 'recipe_transfer', 'project_storage', 'project_revision', 'project_recovery', 'trend_capture', 'trend_frame', 'canvas_image', 'sqlite_sequence'}
@@ -288,8 +290,8 @@ class ProjectWorkspace:
         # download of the finished file need not delay HMI requests.
         if scope['method'] == 'GET' and scope['path'] == '/api/history/full.csv':
             return await self.current(scope, receive, send)
-        if scope['method'] == 'GET' and scope['path'] in ('/api/tags', '/api/project/active'):
-            label = 'Tag snapshot' if scope['path'] == '/api/tags' else 'Applied project snapshot'
+        if scope['method'] == 'GET' and scope['path'] in READOUT_LABELS:
+            label = READOUT_LABELS[scope['path']]
             async with self.lock:
                 identifier = self.current.state.project_instance
                 if self.stopping:
