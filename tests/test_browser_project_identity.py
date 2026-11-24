@@ -269,3 +269,45 @@ class BrowserProjectIdentityTests(unittest.TestCase):
         self.assertEqual(samples_before, [app.state.driver.sample_snapshot.call_count for app in (original, replacement)])
         self.assertEqual(replacement.state.activity.query()['items'], [])
         original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()
+
+    def test_recipe_library_and_identity_helpers_reject_reused_revision_ids_from_another_project(self):
+        from unittest.mock import patch
+        from openhmi.recipe_auth import RecipeUser
+        from openhmi.recipe_models import RecipeCreate, RecipeSave
+        original, client = self.fixture()
+        replacement, other = self.fixture()
+        user = RecipeUser('Offline Engineer', frozenset({'engineer', 'approver', 'operator'}))
+        for app, title in ((original, 'Original recipe'), (replacement, 'Foreign recipe')):
+            content = {'title': title, 'description': 'Offline source fixture', 'parameters': []}
+            first = app.state.recipes.create(RecipeCreate(code='IDENTITY', content=content, reason='Initial fixture'), user)
+            second = app.state.recipes.save(first['recipe_id'], RecipeSave(expected_latest_revision=first['id'],
+                parent_revision=first['id'], content={**content, 'title': title + ' revision 2'}, reason='Fixture revision'), user)
+            self.assertEqual((first['id'], second['id']), (1, 2))
+        paths = ['/api/recipes', '/api/recipe-auth/session']
+        same = [self.wire(client.get(path)) for path in paths]
+        foreign = [self.wire(other.get(path)) for path in paths]
+        missing = [{**reply, 'headers': {key: value for key, value in reply['headers'].items()
+                                       if key != 'x-openhmi-project'}} for reply in same]
+        self.assertTrue(all(reply['status'] == 200 for reply in same + foreign))
+        before = replacement.state.recipes.snapshot()
+        with patch.object(replacement.state.recipes, 'save', side_effect=AssertionError('No stale recipe mutation')) as save:
+            stale = other.post('/api/recipes/1/revisions', json={'expected_latest_revision': 2, 'parent_revision': 1,
+                'content': {'title': 'Old editor draft', 'parameters': []}, 'reason': 'Old project'},
+                headers={'X-OpenHMI-Project': original.state.project_instance})
+            self.assertEqual(stale.status_code, 409)
+            save.assert_not_called()
+        result = frontend('http_context', requests=[dict(path='/api/project')]
+                          + [item for _ in range(4) for item in (dict(recipeLibrary=True), dict(recipeSession=True))]
+                          + [dict(path='/api/recipes/1/revisions', options={'method': 'POST'})],
+                          replies=[self.wire(client.get('/api/project')), *same, *foreign, *missing, *same, self.wire(stale)])
+        for start in (1, 7):
+            self.assertEqual([row['data'] for row in result['results'][start:start + 2]],
+                             [json.loads(reply['body']) for reply in same])
+        self.assertTrue(all(row.get('project_context') and 'data' not in row for row in result['results'][3:7]))
+        self.assertEqual([row['project_changed'] for row in result['results'][3:7]], [True] * 2 + [False] * 2)
+        self.assertTrue(result['results'][-1]['conflict'])
+        self.assertEqual(len(result['calls']), 10)
+        self.assertTrue(all(call['headers']['X-OpenHMI-Project'] == original.state.project_instance for call in result['calls'][1:]))
+        self.assertEqual(replacement.state.recipes.snapshot(), before)
+        self.assertEqual(replacement.state.activity.query()['items'], [])
+        original.state.driver.factory.assert_not_called(); replacement.state.driver.factory.assert_not_called()

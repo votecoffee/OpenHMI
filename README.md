@@ -434,6 +434,10 @@ Trend/sparkline history and saved recording status also check their source proje
 Failed history reads retain only the same query's trace; failed recording-status
 reads retain capture details while blocking Run, Stop and Delete. Matching replies
 recover without replaying recording commands, and denied data is cleared.
+Recipe workspace refreshes also verify the source of both the library (including
+revisions, audit and policy) and recipe identity. A failed refresh retains the
+selected revision and unsaved content, blocks dependent operations and requires a
+matching-source refresh before editing or saving resumes.
 
 Use **Activity** to inspect operator identity, control/tag context, requested
 values and confirmed/denied/uncertain outcomes. Filter and export the journal;

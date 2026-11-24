@@ -10,7 +10,8 @@ export function fulfillProjectRead(route, options) {
   const commandRead = route.request().method() === 'GET' && /^\/api\/commands(?:\/[1-9]\d*)?$/.test(path);
   const trendRead = route.request().method() === 'GET'
     && (path === '/api/history' || /^\/api\/(?:trends\/[^/]+|trend-captures\/[1-9]\d*)$/.test(path));
-  if (!expected || !(runtimePaths.has(path) || alarmRead || commandRead || trendRead)) return route.fulfill(options);
+  const recipeRead = route.request().method() === 'GET' && ['/api/recipes', '/api/recipe-auth/session'].includes(path);
+  if (!expected || !(runtimePaths.has(path) || alarmRead || commandRead || trendRead || recipeRead)) return route.fulfill(options);
   const headers = new Headers(options.response?.headers() ?? {});
   for (const [name, value] of Object.entries(options.headers ?? {})) headers.set(name, value);
   if (options.json !== undefined || options.body !== undefined) headers.delete('Content-Length');

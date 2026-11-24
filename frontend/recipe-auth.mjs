@@ -1,4 +1,4 @@
-import { api, json } from './api.mjs';
+import { api, json, readRuntimeSnapshot } from './api.mjs';
 
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const user = value => record(value) && typeof value.name === 'string'
@@ -22,6 +22,6 @@ export function requireRecipeSignOut(result) {
   return result;
 }
 
-export const readRecipeSession = async () => requireRecipeSession(await api('/api/recipe-auth/session'));
+export const readRecipeSession = async () => requireRecipeSession(await readRuntimeSnapshot('/api/recipe-auth/session'));
 export const signInRecipe = async (name, password) => requireRecipeSignIn(await api('/api/recipe-auth/login', json('POST', { name, password })));
 export const signOutRecipe = async () => requireRecipeSignOut(await api('/api/recipe-auth/logout', json('POST', {})));

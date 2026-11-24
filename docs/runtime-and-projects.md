@@ -57,6 +57,16 @@ delete confirmation. History failure alone leaves healthy recording controls
 usable. Matching-source reads recover without command replay, while permission
 denial clears the affected data. Live tag readouts remain independent. CSV links
 and recorded-tag browsing are outside this increment.
+Recipe workspace refreshes now guard both library and recipe-session JSON reads.
+Revisions, audit history, policy and identity must come from the initialized
+project before the paired refresh is adopted. Missing/foreign identities use the
+existing failed-refresh path: the last readable library, selected revision and
+unsaved content/reason remain visible, while edits and dependent operations are
+blocked until a matching refresh succeeds. Failed initial loading shows Retry
+without installing foreign data. Existing denied-refresh handling also retains
+the public library and draft while blocking operations. Sign-in/out and recipe
+mutation helpers retain their existing receipt and non-replay behavior. Independent
+recipe-transfer status reads remain a separate audit.
 
 ## Connection and tag contract
 

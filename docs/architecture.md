@@ -851,7 +851,15 @@ retain capture metadata while blocking commands and open delete confirmations.
 History-only failure leaves healthy recording controls usable. A matching read
 recovers without repinning or repeating Run/Stop/Delete; mutation helpers and CSV
 links remain unchanged. Recorded-tag browsing remains outside this increment.
-Recipe workspace library/revision readers are the next source-identity audit.
+`readRecipeLibrary()` and `readRecipeSession()` now use the guarded reader before
+their existing validators. The library already contains revision, audit and policy
+data; no new revision endpoint is needed. The workspace's paired refresh adopts
+library/identity only after both succeed. Source errors follow existing refresh
+failure handling: initial retry feedback or retained library/selected revision and
+dirty content/reason, with dependent mutations blocked. Matching-source refresh
+preserves dirty fields. Existing denied-refresh retention, sign-in/out, image and
+recipe mutation receipts remain unchanged; no refresh replays an operation.
+Independent recipe-transfer listing/detail reads are the next source-identity audit.
 
 Preserve model/import
 compatibility, project-instance identity, write non-replay behavior, apply

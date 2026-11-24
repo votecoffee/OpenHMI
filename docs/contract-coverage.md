@@ -457,11 +457,22 @@ change, clears denied data and blocks an open delete confirmation during status
 loss. Exactly one explicit Start, Stop and Delete is observed. Existing sparse
 history, cursor, precision, Boolean lane and capture workflow regressions remain.
 
+Recipe library/session source contracts feed real SQL-backed revisions/audit/policy
+and identity HTTP replies through the production guarded helpers. Two offline
+projects reuse recipe/revision IDs with different titles; missing/foreign sources
+are rejected and matching data recovers without repinning. Stale revision writes
+are rejected before service dispatch and leave recipe/audit state unchanged. A
+headless case rejects a foreign initial library, then preserves an older selected
+revision, unsaved title/description/reason, original audit and confirmed identity
+through independent foreign/missing library and session replies. Failed/denied
+refreshes block saves and retain the draft; matching refresh recovers without any
+recipe write. Existing lifecycle, policy, identity and loaded-copy coverage remains.
+
 ## Next bounded work
 
-1. Extend the source-identity audit to recipe workspace library/revision reads,
-   preserving selected revision, edit drafts, permission handling and mutation
-   non-replay. Keep exports separate from JSON read contracts.
+1. Extend the source-identity audit to recipe-transfer listing/detail reads,
+   preserving history filters, verified-record ownership, receipt evidence,
+   permission handling and dispatch non-replay.
 2. Continue response parity across other operator pages as concrete gaps arise.
    Review older nullable/history data before adding strict response filtering.
 

@@ -1,4 +1,4 @@
-import { api } from './api.mjs';
+import { readRuntimeSnapshot } from './api.mjs';
 
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const positiveId = value => Number.isSafeInteger(value) && value > 0;
@@ -50,7 +50,7 @@ export function isRecipeLibrary(library) {
 }
 
 export async function readRecipeLibrary() {
-  const library = await api('/api/recipes');
+  const library = await readRuntimeSnapshot('/api/recipes');
   if (!isRecipeLibrary(library)) throw new Error('Invalid recipe library response');
   return library;
 }

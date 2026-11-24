@@ -710,11 +710,21 @@ not close hardware or operator acceptance gates.
     payload/OpenAPI, mutation helpers, CSV links and recorded-tag browsing remain
     unchanged.
 
+65. Delivered source-identity checks for recipe library and session read helpers.
+    The paired workspace refresh adopts revisions/audit/policy and identity only
+    after both guarded reads succeed. Foreign/missing replies use existing initial
+    retry or retained-library feedback and block dependent operations. Matching
+    refresh keeps dirty title/description/reason and the selected older revision.
+    Real SQL/HTTP/JS tests reuse recipe/revision IDs across projects; headless cases
+    verify independent source failures, recovery and no recipe writes. Existing
+    denied-refresh retention, sign-in/out and mutation receipts remain intact.
+    Server payloads and OpenAPI remain unchanged.
+
 The current control/router/driver/schema-store and live-snapshot separation baseline is delivered.
 Recipe HTTP separation is complete for this scope. Next extend the source-identity
-audit to recipe workspace library/revision readers, preserving selected revision,
-edit drafts, permission handling and mutation non-replay. Keep exports separate
-from JSON read contracts. Preserve scan/resource draining
+audit to recipe-transfer listing/detail readers, preserving history filters,
+verified-record ownership, receipt evidence, permission handling and dispatch
+non-replay. Keep exports separate from JSON read contracts. Preserve scan/resource draining
 and transport ownership. Prioritize observable failure behavior and contract
 coverage over further file splitting. Controller, operator-station and endurance
 acceptance stay deferred.

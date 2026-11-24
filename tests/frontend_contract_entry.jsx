@@ -4,7 +4,7 @@ import { workspaceArtifactPath, isWorkspaceArtifactPage, readWorkspaceArtifacts 
 import { isOccurrencePage, isEventPage, isNotePage, isAlarmDetail, isShelfPage } from '../frontend/alarm-responses.mjs';
 import { isRecipeSelection, recipeSelectionPath } from '../frontend/recipe-selection.mjs';
 import { readRecipeSession, signInRecipe, signOutRecipe, requireRecipeSession, requireRecipeSignIn, requireRecipeSignOut } from '../frontend/recipe-auth.mjs';
-import { isRecipeLibrary } from '../frontend/recipe-library.mjs';
+import { isRecipeLibrary, readRecipeLibrary } from '../frontend/recipe-library.mjs';
 import { recipeTransferPaths, recipeTransferPath, dispatchRecipeTransfer } from '../frontend/recipe-transfer-api.mjs';
 import { isRecipeTransferPage, isRecipeTransferRecord, requireRecipeTransferReceipt, recipeTransferFailureMessage } from '../frontend/recipe-transfer-responses.mjs';
 import { validatedRecipeContent, createRecipe, saveRecipeRevision, transitionRecipeRevision, selectRecipeRevision, saveRecipePolicy, uploadRecipeImage } from '../frontend/recipe-api.mjs';
@@ -105,6 +105,8 @@ export async function contract(request) {
           : item.diagnostics ? readDiagnostics(item.diagnostics.criteria, item.diagnostics.offset, item.diagnostics.options)
           : item.trendHistory ? readTrendHistory(item.trendHistory)
           : item.captureStatus ? readCaptureStatus(item.captureStatus)
+          : item.recipeLibrary ? readRecipeLibrary()
+          : item.recipeSession ? readRecipeSession()
           : item.runtime ? readRuntimeSnapshot(item.path) : api(item.path, item.options)) }); }
       catch (error) { results.push({ error: error.message, status: error.status,
           conflict: error.conflict, operation_id: error.operation_id, audit_status: error.audit_status,
@@ -298,7 +300,7 @@ export async function contract(request) {
         : JSON.stringify(status >= 400 ? { detail: 'Synthetic denial' } : { ok: true, project_instance: request.projectInstance ?? 'a'.repeat(32) });
       return new Response(body, {
         status, headers: { 'Content-Type': 'application/json',
-          ...(['command_queries', 'operations_queries'].includes(request.operation) ? { 'X-OpenHMI-Project': request.projectInstance ?? 'a'.repeat(32) } : {}), ...(mutation ? {
+          ...(['command_queries', 'operations_queries', 'recipe_sessions'].includes(request.operation) ? { 'X-OpenHMI-Project': request.projectInstance ?? 'a'.repeat(32) } : {}), ...(mutation ? {
           'X-OpenHMI-Operation-ID': 'b'.repeat(32), 'X-OpenHMI-Audit-Status': status >= 400 ? 'denied' : 'pending' } : {}) },
       });
     };
